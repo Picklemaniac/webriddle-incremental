@@ -190,7 +190,6 @@ export const labels = {
     scriptsPanel: 'Scripts',
     networkPanel: 'Network',
     upgradesPanel: 'Upgrades',
-    findingsPanel: 'Findings',
     insight: 'Insight',
     money: 'Money',
     words: 'Words',
