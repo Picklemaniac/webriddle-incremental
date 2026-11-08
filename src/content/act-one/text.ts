@@ -102,7 +102,7 @@ export const upgradeText = {
     proxyChecker: { name: 'Proxy checker', description: 'Automatically replace dead proxies after 10 seconds.' },
     sizeFilter: { name: 'Response-size filter', description: 'Ignore identical wildcard responses.' },
     dorking: { name: 'Search engine dorking', description: 'Skip the 8% of generated pages already indexed.' },
-    gobuster: { name: 'gobuster', description: 'Twice the useful work from every request.' },
+    gobuster: { name: 'gobuster', description: 'Two and a half times the useful work from every request.' },
     seniorCertification: { name: 'Senior certification', description: 'Triple ticket income again.' },
     archives: { name: 'Public archives', description: 'Triple word income again.' },
     proxyPool: { name: 'Larger proxy pool', description: 'Six more proxy slots.' },

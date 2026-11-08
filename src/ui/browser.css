@@ -3,7 +3,7 @@
 .browser-toolbar .tool-button span:last-child { display: inline; }
 .browser-toolbar .navigation-icon span:last-child { display: none; }
 .browser-menu:nth-last-child(-n+2) .menu-popup { left: auto; right: 0; }
-.tool-button[aria-expanded=true] { background: #ddd; border: 1px inset #eee !important; }
+.tool-button[aria-expanded=true] { background: repeating-conic-gradient(#c0c0c0 0% 25%, #fff 0% 50%) 0 0 / 2px 2px; box-shadow: inset 1px 1px #808080, inset -1px -1px #fff; }
 .tool-button { min-height: 29px; }
 .browser-icon { flex: 0 0 16px; object-fit: contain; background: transparent; }
 .throbber { align-self: center; flex: 0 0 28px; width: 28px; height: 28px; padding: 0; object-fit: contain; }
@@ -13,16 +13,16 @@
 .source-heading { display: flex; align-items: center; gap: 12px; flex: 0 0 29px; padding: 3px 6px; background: #c0c0c0; border-bottom: 1px solid #777; }
 .source-heading strong { flex: 1; }
 .source-heading span { font-size: 10px; color: #555; }
-.source-heading button { width: 21px; padding: 0; height: 20px; font-size: 16px; }
+.source-heading button { --pad-y: 0px; --pad-x: 0px; width: 21px; height: 20px; font-size: 14px; }
 .source-pane .source-document { flex: 1; min-height: 0; max-height: none; margin: 0; border: 0; padding: 12px; color: #242424; background: #fffef8; font: 12px/1.75 'IBM Plex Mono', Consolas, monospace; tab-size: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
 .source-tag { color: #2f5485; }
 .source-comment { color: #476339; }
 .source-document a { color: #164d9b; text-decoration: underline; }
 .source-document a:hover { background: #dce9fb; }
-.browser-status .follow-current { position: static; box-shadow: none; padding: 1px 7px; font-size: 10px; height: 22px; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.browser-status .follow-current { --pad-y: 1px; --pad-x: 7px; position: static; font-size: 11px; height: 22px; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 500px) {
     .browser-toolbar { gap: 1px; }
-    .browser-toolbar .tool-button { padding: 3px 5px; font-size: 11px; }
+    .browser-toolbar .tool-button { --pad-y: 3px; --pad-x: 5px; font-size: 11px; }
     .browser-toolbar .tool-icon { font-size: 14px; }
     .browser-toolbar .throbber { display: none; }
     .browser-toolbar .tool-button.secondary span:last-child { display: none; }

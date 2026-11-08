@@ -3,7 +3,7 @@ import type { Game } from '../../core/game.ts';
 import { currentSearch, dirbuster } from './automation.ts';
 import { answerCaptcha } from './captchas.ts';
 import { assignJob, passiveIncome, scour, solveRiddle, work } from './economy.ts';
-import { findingDrops, findingModifiers } from './findings.ts';
+import { findingDrops, findingModifiers, findingsEnabled } from './findings.ts';
 import { entrance } from './levels.ts';
 import { isBanned, network, networkCapacity, replaceProxy, requestedRate } from './network.ts';
 import { canonicalUrl, resolvePage } from './pages.ts';
@@ -98,6 +98,7 @@ const pacedNetwork: GameSystem = {
 
 const pacedFindings: GameSystem = {
     update(game, seconds) {
+        if (!findingsEnabled) return;
         const revealed = game.state.flags.findingsRevealed;
         if (!revealed) {
             if (automationElapsed(game.state) < 360) return;

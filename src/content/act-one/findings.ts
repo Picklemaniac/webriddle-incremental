@@ -20,6 +20,9 @@ export interface Finding {
     readonly speed?: number;
 }
 
+// Parked: findings are switched off until they come back as an upgrade. Keep the code compiling and tested.
+export const findingsEnabled = false;
+
 export const findings: readonly Finding[] = [
     { id: 'robots', path: 'robots.txt', rarity: 'common', weight: 22, insight: 3, ...findingText.robots },
     { id: 'readme', path: 'readme.txt', rarity: 'common', weight: 20, insight: 5, ...findingText.readme },

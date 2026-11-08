@@ -11,6 +11,7 @@ import { entrance, urlOfLevel } from '../src/content/act-one/levels.ts';
 import { encodeExport, serializeSave } from '../src/persistence/save.ts';
 import { AutoPlayer } from '../src/simulation/auto-player.ts';
 import { actOneStrategy } from '../src/simulation/act-one-strategy.ts';
+import { upgrades } from '../src/content/act-one/upgrades.ts';
 
 const origin = process.env.WEBRIDDLE_TEST_URL ?? 'http://127.0.0.1:5173';
 const expectsDevelopmentTools = process.env.WEBRIDDLE_TEST_PRODUCTION !== '1';
@@ -169,11 +170,6 @@ try {
     await sleep(900);
     await screenshot('working');
     await assertLayout(1440);
-    await evaluate(`[...document.querySelectorAll('.findings-window .file')].find((file) => !file.hidden && file.textContent.startsWith('sitemap'))?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
-    await waitFor(`document.querySelector('dialog[open] .notepad-text') !== null`);
-    assert.match(await evaluate(`document.querySelector('dialog[open] .notepad-text').textContent`), /<loc>http/, 'The sitemap lists real level addresses');
-    await screenshot('notepad');
-    await closeDialog();
     await toolbar('View Source');
     const inspectedPage = await evaluate(`document.querySelector('.browser-viewport').contentDocument.title`);
     const inspectedSource = await evaluate(`document.querySelector('.source-document').textContent`);
@@ -188,6 +184,10 @@ try {
     assert.equal(await evaluate(`document.querySelector('.machine-details').open`), false);
     assert.ok(await evaluate(`[...document.querySelectorAll('.resource-action')].some((button) => /\\+\\$/.test(button.textContent))`), 'The day job shows what a ticket pays');
     for (const proxy of game.state.network.proxies.slice(0, 2)) proxy.diesAtSeconds = game.state.elapsedSeconds - 1;
+    const unbought = upgrades.find((item) => !game.state.purchases[item.id] && item.isAvailable(game.state));
+    assert.ok(unbought, 'Expected an upgrade the robot has not bought yet');
+    game.state.flags[`seen:${unbought.id}`] = true;
+    for (const resource of ['insight', 'money', 'words']) game.state.resources[resource] = 1_000_000;
     await importGame(game);
     await waitFor(`!document.querySelector('.replace-dead-proxies').hidden`);
     await evaluate(`document.querySelector('.replace-dead-proxies').click()`);
