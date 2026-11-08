@@ -1,6 +1,6 @@
 import type { Game } from '../core/game.ts';
 import { activities, activityRate, assignedScripts, dirbustingScripts, incomePerSecond, isJobUnlocked, isResourceRevealed, scriptSlots, type ActivityId, type JobId } from '../content/act-one/economy.ts';
-import { effectiveRate, isBanned, liveProxies, networkCapacity, requestedRate } from '../content/act-one/network.ts';
+import { effectiveRate, isBanned, isThrottled, liveProxies, networkCapacity } from '../content/act-one/network.ts';
 import { owns } from '../content/act-one/progress.ts';
 import { activityText, connectionNames, fill, labels, toolNames, uiText } from '../content/act-one/text.ts';
 import { formatDuration, formatNumber } from '../format.ts';
@@ -28,6 +28,8 @@ export class StatusPanel implements Panel {
     private readonly proxySummary = createElement('span', { className: 'proxy-summary' });
     private readonly proxyList = createElement('div', { className: 'proxy-list' });
     private readonly proxies = createElement('div', { className: 'proxy-controls' });
+    private readonly throttle: HTMLButtonElement;
+    private readonly throttleRow: HTMLElement;
 
     constructor(game: Game) {
         this.game = game;
@@ -61,7 +63,10 @@ export class StatusPanel implements Panel {
             createElement('details', { className: 'proxy-details' }, [createElement('summary', { text: uiText.individualProxies }), this.proxyList]),
         );
         this.networkElement.classList.add('network-panel');
-        this.networkElement.append(createElement('div', { className: 'heat-track' }, [this.heat]), this.proxies);
+        this.throttle = createButton('', () => game.dispatch({ type: 'setThrottle', enabled: !isThrottled(game) }));
+        this.throttle.className = 'throttle-switch';
+        this.throttleRow = createElement('div', { className: 'stat-row' }, [createElement('span', { text: labels.throttle }), this.throttle]);
+        this.networkElement.append(createElement('div', { className: 'heat-track' }, [this.heat]), this.throttleRow, this.proxies);
         this.element.append(this.you, this.scripts);
     }
 
@@ -91,8 +96,11 @@ export class StatusPanel implements Panel {
         for (const [id, value] of Object.entries({ connection: connectionNames[connection]!, tool, slots: String(scriptSlots(game)), threads: String(game.stat('threadsPerScript')), efficiency: `${game.stat('searchEfficiency').toFixed(1)}×` })) setText(this.machineValues.get(id)!, value);
         this.machineElement.hidden = !game.state.flags.machineRevealed;
         this.networkElement.hidden = !game.state.flags.networkRevealed;
-        for (const [id, value] of Object.entries({ sending: `${formatNumber(owns(game.state, 'throttle') ? effectiveRate(game) : requestedRate(game))}/s`, allowed: `${formatNumber(networkCapacity(game))}/s`, ips: `${1 + liveProxies(game) + game.stat('extraAddresses')}`, status: isBanned(game) ? fill(labels.banned, { time: formatDuration(game.state.network.bannedUntil - game.state.elapsedSeconds) }) : `${Math.round(game.state.network.heat)}%` })) setText(this.networkValues.get(id)!, value);
+        for (const [id, value] of Object.entries({ sending: `${formatNumber(effectiveRate(game))}/s`, allowed: `${formatNumber(networkCapacity(game))}/s`, ips: `${1 + liveProxies(game) + game.stat('extraAddresses')}`, status: isBanned(game) ? fill(labels.banned, { time: formatDuration(game.state.network.bannedUntil - game.state.elapsedSeconds) }) : `${Math.round(game.state.network.heat)}%` })) setText(this.networkValues.get(id)!, value);
         this.heat.style.width = `${game.state.network.heat}%`;
+        this.throttleRow.hidden = !owns(game.state, 'throttle');
+        setText(this.throttle, isThrottled(game) ? uiText.on : uiText.off);
+        this.throttle.setAttribute('aria-pressed', String(isThrottled(game)));
         const aliveCount = liveProxies(game);
         const deadCount = game.state.network.proxies.length - aliveCount;
         this.proxies.hidden = game.state.network.proxies.length === 0;

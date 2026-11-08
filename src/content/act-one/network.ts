@@ -1,12 +1,12 @@
 import type { GameSystem } from '../../core/content.ts';
 import type { Game } from '../../core/game.ts';
-import type { Modifier } from '../../core/stats.ts';
 import { createCaptcha } from './captchas.ts';
 import { dirbustingScripts } from './economy.ts';
 import { increment, noticeOnce, owns } from './progress.ts';
 
 const requestsPerAddress = 10;
 const banSeconds = 90;
+const heatPerExcessRatio = 2;
 
 export function liveProxies(game: Game): number {
     return game.state.network.proxies.filter((proxy) => proxy.diesAtSeconds > game.state.elapsedSeconds).length;
@@ -16,17 +16,28 @@ export function networkCapacity(game: Game): number {
     return requestsPerAddress * (1 + liveProxies(game) + game.stat('extraAddresses'));
 }
 
-export function requestedRate(game: Game, extraModifiers: readonly Modifier[] = []): number {
-    const stat = (statId: string): number => extraModifiers.length === 0 ? game.stat(statId) : game.statWith(statId, extraModifiers);
-    return dirbustingScripts(game) * stat('threadsPerScript') * stat('requestsPerThread');
+export function requestedRate(game: Game): number {
+    return dirbustingScripts(game) * game.stat('threadsPerScript') * game.stat('requestsPerThread');
 }
 
 export function isBanned(game: Game): boolean {
     return game.state.network.bannedUntil > game.state.elapsedSeconds;
 }
 
+export function isThrottled(game: Game): boolean {
+    return owns(game.state, 'throttle') && game.state.flags.throttleOff !== true;
+}
+
 export function effectiveRate(game: Game): number {
-    return isBanned(game) ? 0 : Math.min(requestedRate(game), networkCapacity(game));
+    if (isBanned(game)) return 0;
+    const capped = isThrottled(game) || game.state.flags.networkRevealed !== true;
+    return capped ? Math.min(requestedRate(game), networkCapacity(game)) : requestedRate(game);
+}
+
+export function setThrottle(game: Game, enabled: boolean): boolean {
+    if (!owns(game.state, 'throttle') || isThrottled(game) === enabled) return false;
+    game.state.flags.throttleOff = !enabled;
+    return true;
 }
 
 export function replaceProxy(game: Game, proxyIndex: number): boolean {
@@ -60,14 +71,14 @@ export const network: GameSystem = {
             game.announce({ type: 'unbanned', byCaptcha: false });
         }
         if (!state.flags.automated || isBanned(game)) return;
-        const excess = Math.max(0, requestedRate(game) - networkCapacity(game));
+        const capacity = networkCapacity(game);
+        const excess = Math.max(0, requestedRate(game) - capacity);
         if (excess > 0) {
             state.flags.networkRevealed = true;
             noticeOnce(game, 'firstRateLimit');
         }
-        const limited = excess > 0 && !owns(state, 'throttle');
-        state.network.heat = Math.max(0, state.network.heat + deltaSeconds * (limited ? 1 + Math.min(3, excess / networkCapacity(game)) : -3));
-        if (limited) increment(state, 'requestsWasted', excess * deltaSeconds);
+        const overLimit = excess > 0 && !isThrottled(game);
+        state.network.heat = Math.max(0, state.network.heat + deltaSeconds * (overLimit ? heatPerExcessRatio * excess / capacity : -3));
         if (state.network.heat >= 100) {
             state.network.heat = 100;
             state.network.bannedUntil = state.elapsedSeconds + banSeconds;

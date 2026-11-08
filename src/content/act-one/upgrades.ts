@@ -28,7 +28,6 @@ function upgrade(id: UpgradeId, price: ResourceAmounts, level: number,
     };
 }
 
-export const speedUpgrades: ReadonlySet<string> = new Set(['curlBatch', 'keepAlive', 'isdn', 'threads8', 'adsl', 'cable', 'threads32', 'fiber']);
 export const capacityUpgrades: ReadonlySet<string> = new Set(['freeProxies', 'proxyPool', 'rentedAddresses', 'addressBlock', 'throttle']);
 
 export const upgrades: readonly Upgrade[] = [

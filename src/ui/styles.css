@@ -122,7 +122,8 @@ strong { font-weight: 600; }
 .resource-row strong { color: #fff; }
 .income-rate { font-size: 11px; }
 .dashboard .resource-action { --pad-y: 3px; --pad-x: 5px; width: 118px; height: 26px; }
-.dashboard .resource-action[aria-pressed="true"] { box-shadow: var(--pressed); background: repeating-conic-gradient(#c0c0c0 0% 25%, #dcdcdc 0% 50%) 0 0 / 2px 2px; padding: calc(var(--pad-y) + 1px) max(0px, calc(var(--pad-x) - 1px)) max(0px, calc(var(--pad-y) - 1px)) calc(var(--pad-x) + 1px); }
+.dashboard .throttle-switch { --pad-y: 2px; --pad-x: 10px; min-width: 56px; }
+.dashboard .resource-action[aria-pressed="true"], .dashboard .throttle-switch[aria-pressed="true"] { box-shadow: var(--pressed); background: repeating-conic-gradient(#c0c0c0 0% 25%, #dcdcdc 0% 50%) 0 0 / 2px 2px; padding: calc(var(--pad-y) + 1px) max(0px, calc(var(--pad-x) - 1px)) max(0px, calc(var(--pad-y) - 1px)) calc(var(--pad-x) + 1px); }
 .stat-row { display: flex; gap: 12px; justify-content: space-between; align-items: center; min-height: 27px; white-space: nowrap; }
 .stat-row strong { font-weight: normal; }
 .worker-row { display: grid; grid-template-columns: 1fr 26px 30px 26px; align-items: center; gap: 7px; min-height: 32px; white-space: nowrap; animation: reveal .4s ease; }

@@ -5,12 +5,12 @@ import { answerCaptcha } from './captchas.ts';
 import { assignJob, passiveIncome, setActivity } from './economy.ts';
 import { findingDrops, findingModifiers, findingsEnabled } from './findings.ts';
 import { entrance } from './levels.ts';
-import { isBanned, network, networkCapacity, replaceProxy, requestedRate } from './network.ts';
+import { isBanned, network, networkCapacity, replaceProxy, requestedRate, setThrottle } from './network.ts';
 import { canonicalUrl, resolvePage } from './pages.ts';
 import { automationElapsed, isUpgradeRevealed, owns, solveLevel, wasNoticed } from './progress.ts';
 import { homeUrl, startUrl } from './riddle.ts';
 import { labels } from './text.ts';
-import { capacityUpgrades, offeredUpgrades, speedUpgrades, upgrades, type Upgrade } from './upgrades.ts';
+import { capacityUpgrades, offeredUpgrades, upgrades, type Upgrade } from './upgrades.ts';
 
 const firstOfferSeconds = 75;
 const currencyFollowSeconds = 6;
@@ -67,17 +67,9 @@ function readyForUpgrade(game: Game, item: Upgrade): boolean {
     if (item.price.money !== undefined && !state.flags.moneyRevealed) return false;
     if (item.price.data !== undefined && !state.flags.dataRevealed) return false;
     if (item.id === 'throttle') return state.flags.networkRevealed === true;
-    if (speedUpgrades.has(item.id) && !speedsUp(game, item)) return false;
     if (item.id === 'wgetMirror') return state.flags.dataRevealed === true && state.flags.scriptsRevealed === true;
     if (item.id === 'autoReplyMacros' || item.id === 'otherRiddles') return state.flags.scriptsRevealed === true;
     return true;
-}
-
-function speedsUp(game: Game, item: Upgrade): boolean {
-    const capacity = networkCapacity(game);
-    const after = requestedRate(game, item.modifiers?.(1));
-    if (!owns(game.state, 'throttle')) return after <= capacity;
-    return Math.min(after, capacity) >= 1.5 * Math.min(requestedRate(game), capacity);
 }
 
 function revealUpgrade(game: Game, id: string): void {
@@ -158,6 +150,7 @@ export const actOneContent: GameContent = {
                 game.state.statistics.nextRevealAt = game.state.elapsedSeconds + 45;
                 return true;
             case 'setActivity': return setActivity(game, action.activity);
+            case 'setThrottle': return setThrottle(game, action.enabled);
             case 'assignJob': return assignJob(game, action.jobId, action.change);
             case 'replaceProxy': return replaceProxy(game, action.proxyIndex);
             case 'answerCaptcha': return answerCaptcha(game, action.answer);

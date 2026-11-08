@@ -4,6 +4,7 @@ export type Action =
     | { readonly type: 'submitCredentials'; readonly url: string; readonly username: string; readonly password: string }
     | { readonly type: 'automate' }
     | { readonly type: 'setActivity'; readonly activity: string }
+    | { readonly type: 'setThrottle'; readonly enabled: boolean }
     | { readonly type: 'assignJob'; readonly jobId: string; readonly change: number }
     | { readonly type: 'replaceProxy'; readonly proxyIndex: number }
     | { readonly type: 'answerCaptcha'; readonly answer: string }

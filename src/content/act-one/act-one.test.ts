@@ -6,7 +6,7 @@ import { actOneContent } from './index.ts';
 import { entrance, levelPage, urlOfLevel } from './levels.ts';
 import { hallOfFameUrl, hintsUrl, riddleHomeUrl, rulesUrl } from './riddle.ts';
 import { createCaptcha } from './captchas.ts';
-import { effectiveRate, networkCapacity } from './network.ts';
+import { effectiveRate, networkCapacity, requestedRate } from './network.ts';
 import { planSearch, searchCapabilities } from './search.ts';
 import { actOneStrategy } from '../../simulation/act-one-strategy.ts';
 import { AutoPlayer } from '../../simulation/auto-player.ts';
@@ -111,6 +111,27 @@ describe('Act I', () => {
         game.state.network.bannedUntil = game.state.elapsedSeconds + 90;
         game.advance(91);
         expect(game.state.captcha).toBeNull();
+    });
+
+    it('lets requests over the limit through at the cost of Heat, with a switchable Throttle', () => {
+        const game = newGame();
+        game.state.currentLevel = 5;
+        game.dispatch({ type: 'automate' });
+        game.state.purchases.curlBatch = 1;
+        game.state.purchases.keepAlive = 1;
+        game.invalidateStats();
+        game.advance(10);
+        expect(effectiveRate(game)).toBe(networkCapacity(game));
+        game.advance(50);
+        expect(game.state.flags.networkRevealed).toBe(true);
+        expect(effectiveRate(game)).toBe(requestedRate(game));
+        expect(effectiveRate(game)).toBeGreaterThan(networkCapacity(game));
+        expect(game.state.network.heat).toBeGreaterThan(0);
+        expect(game.dispatch({ type: 'setThrottle', enabled: true })).toBe(false);
+        game.state.purchases.throttle = 1;
+        expect(effectiveRate(game)).toBe(networkCapacity(game));
+        expect(game.dispatch({ type: 'setThrottle', enabled: false })).toBe(true);
+        expect(effectiveRate(game)).toBe(requestedRate(game));
     });
 
     it('resumes saved search progress, random drops, proxies and economy identically', () => {

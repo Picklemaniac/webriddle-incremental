@@ -1,7 +1,7 @@
 import { currentSearch } from '../content/act-one/automation.ts';
 import { activities, activityRate, assignedScripts, dirbustingScripts, isJobUnlocked, isResourceRevealed, scriptSlots, type ActivityId } from '../content/act-one/economy.ts';
 import { entrance } from '../content/act-one/levels.ts';
-import { effectiveRate, networkCapacity, requestedRate } from '../content/act-one/network.ts';
+import { effectiveRate, isThrottled, networkCapacity, requestedRate } from '../content/act-one/network.ts';
 import { isUpgradeRevealed, owns } from '../content/act-one/progress.ts';
 import { capacityUpgrades, offeredUpgrades, upgrades, type Upgrade } from '../content/act-one/upgrades.ts';
 import type { Game } from '../core/game.ts';
@@ -56,7 +56,7 @@ export function actOneStrategy(decisionIntervalSeconds: number, purist = false):
                     riddles: (state.resources.insight ?? 0) >= neededInsight || slots < 3 ? 0 : Math.max(1, Math.floor(slots * 0.2)),
                 };
                 const perScript = game.stat('threadsPerScript') * game.stat('requestsPerThread');
-                const safeScripts = owns(state, 'throttle') ? slots : Math.max(1, Math.floor(networkCapacity(game) / perScript));
+                const safeScripts = isThrottled(game) ? slots : Math.max(1, Math.floor(networkCapacity(game) / perScript));
                 const unlockedJobs = (['ticketing', 'riddles', 'scraping'] as const).filter((job) => isJobUnlocked(game, job));
                 const firstJob = unlockedJobs[0];
                 if (firstJob !== undefined) {
