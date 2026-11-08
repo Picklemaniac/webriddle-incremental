@@ -69,7 +69,6 @@ describe('Act I', () => {
             expect(game.content.resolvePage(game.state.browserUrl, game.state).statusCode).toBe(200);
         }
         expect(game.state.statistics.handSolves).toBe(1249);
-        expect(Object.keys(game.state.flags).filter((flag) => flag.startsWith('learned:'))).toEqual(['learned:userAgent']);
         expect(game.state.flags.automated).not.toBe(true);
     });
 

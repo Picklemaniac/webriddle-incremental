@@ -5,6 +5,7 @@ export type Action =
     | { readonly type: 'automate' }
     | { readonly type: 'work' }
     | { readonly type: 'scour' }
+    | { readonly type: 'solveRiddle' }
     | { readonly type: 'assignJob'; readonly jobId: string; readonly change: number }
     | { readonly type: 'replaceProxy'; readonly proxyIndex: number }
     | { readonly type: 'answerCaptcha'; readonly answer: string }

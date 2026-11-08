@@ -43,14 +43,17 @@ export function actOneStrategy(decisionIntervalSeconds: number, purist = false):
                 }
                 const neededMoney = upgrades.filter((item) => !state.purchases[item.id]).reduce((sum, item) => sum + (item.price.money ?? 0), 0);
                 const neededWords = upgrades.filter((item) => !state.purchases[item.id]).reduce((sum, item) => sum + (item.price.words ?? 0), 0);
+                const neededInsight = upgrades.filter((item) => !state.purchases[item.id]).reduce((sum, item) => sum + (item.price.insight ?? 0), 0);
                 if ((state.resources.money ?? 0) < neededMoney) acted = game.dispatch({ type: 'work' }) || acted;
                 if ((state.resources.words ?? 0) < neededWords) acted = game.dispatch({ type: 'scour' }) || acted;
+                if ((state.resources.insight ?? 0) < neededInsight) acted = game.dispatch({ type: 'solveRiddle' }) || acted;
                 const slots = scriptSlots(game);
                 const targets = {
                     ticketing: (state.resources.money ?? 0) >= neededMoney ? 0 : Math.max(1, Math.floor(slots * 0.4)),
                     scraping: (state.resources.words ?? 0) >= neededWords || slots < 4 ? 0 : Math.max(1, Math.floor(slots * 0.2)),
+                    riddles: (state.resources.insight ?? 0) >= neededInsight || slots < 3 ? 0 : Math.max(1, Math.floor(slots * 0.2)),
                 };
-                for (const job of ['ticketing', 'scraping'] as const) {
+                for (const job of ['ticketing', 'scraping', 'riddles'] as const) {
                     if (!isJobUnlocked(game, job)) continue;
                     if (assignedScripts(game, job) > targets[job]) {
                         acted = game.dispatch({ type: 'assignJob', jobId: job, change: -1 }) || acted;

@@ -2,7 +2,7 @@ import type { GameSystem } from '../../core/content.ts';
 import type { Game } from '../../core/game.ts';
 import { increment, owns } from './progress.ts';
 
-export type JobId = 'scraping' | 'ticketing';
+export type JobId = 'scraping' | 'ticketing' | 'riddles';
 
 interface JobDefinition {
     readonly id: JobId;
@@ -12,6 +12,7 @@ interface JobDefinition {
 const jobs: readonly JobDefinition[] = [
     { id: 'scraping', unlockedBy: 'wgetMirror' },
     { id: 'ticketing', unlockedBy: 'autoReplyMacros' },
+    { id: 'riddles', unlockedBy: 'otherRiddles' },
 ];
 
 const manualActionCooldownSeconds = 2;
@@ -48,7 +49,7 @@ export function assignJob(game: Game, jobId: string, change: number): boolean {
     return true;
 }
 
-export function cooldownRemaining(game: Game, actionId: 'work' | 'scour'): number {
+export function cooldownRemaining(game: Game, actionId: 'work' | 'scour' | 'riddle'): number {
     return Math.max(0, (game.state.cooldowns[actionId] ?? 0) - game.state.elapsedSeconds);
 }
 
@@ -72,6 +73,20 @@ export function scour(game: Game): boolean {
     return true;
 }
 
+export function solveRiddle(game: Game): boolean {
+    if (game.state.flags.insightRevealed !== true || cooldownRemaining(game, 'riddle') > 0) {
+        return false;
+    }
+    game.gainResource('insight', game.stat('riddleValue'));
+    game.state.cooldowns.riddle = game.state.elapsedSeconds + manualActionCooldownSeconds;
+    increment(game.state, 'otherRiddles');
+    return true;
+}
+
+export function insightPerSecond(game: Game): number {
+    return assignedScripts(game, 'riddles') * game.stat('riddleBotRate');
+}
+
 export function moneyPerSecond(game: Game): number {
     return assignedScripts(game, 'ticketing') * game.stat('ticketBotRate');
 }
@@ -84,5 +99,6 @@ export const passiveIncome: GameSystem = {
     update(game, deltaSeconds) {
         game.gainResource('money', moneyPerSecond(game) * deltaSeconds);
         game.gainResource('words', wordsPerSecond(game) * deltaSeconds);
+        game.gainResource('insight', insightPerSecond(game) * deltaSeconds);
     },
 };

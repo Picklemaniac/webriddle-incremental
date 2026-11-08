@@ -1,5 +1,5 @@
 import type { Game } from '../core/game.ts';
-import { assignedScripts, cooldownRemaining, dirbustingScripts, isJobUnlocked, moneyPerSecond, scriptSlots, wordsPerSecond } from '../content/act-one/economy.ts';
+import { assignedScripts, cooldownRemaining, dirbustingScripts, insightPerSecond, isJobUnlocked, moneyPerSecond, scriptSlots, wordsPerSecond, type JobId } from '../content/act-one/economy.ts';
 import { effectiveRate, isBanned, liveProxies, networkCapacity, requestedRate } from '../content/act-one/network.ts';
 import { owns } from '../content/act-one/progress.ts';
 import { connectionNames, labels, toolNames, uiText } from '../content/act-one/text.ts';
@@ -31,7 +31,7 @@ export class StatusPanel implements Panel {
 
     constructor(game: Game) {
         this.game = game;
-        for (const [id, name, action] of [['money', labels.money, 'work'], ['words', labels.words, 'scour']] as const) {
+        for (const [id, name, action] of [['insight', labels.insight, 'solveRiddle'], ['money', labels.money, 'work'], ['words', labels.words, 'scour']] as const) {
             const value = createElement('strong');
             const rate = createElement('span', { className: 'income-rate' });
             const yieldLabel = createElement('span', { className: 'action-yield' });
@@ -43,7 +43,7 @@ export class StatusPanel implements Panel {
             this.resources.set(id, { element: row, value, rate, button, yield: yieldLabel });
         }
         this.scripts.append(createElement('p', { className: 'panel-help', text: uiText.workersHelp }), createElement('div', { className: 'stat-row' }, [createElement('span', { text: labels.dirbusting }), this.bustingCount]));
-        for (const [id, label] of [['ticketing', labels.ticketBot], ['scraping', labels.scraping]] as const) {
+        for (const [id, label] of [['riddles', labels.otherRiddles], ['ticketing', labels.ticketBot], ['scraping', labels.scraping]] as const) {
             const count = createElement('strong');
             const minus = createButton('−', () => game.dispatch({ type: 'assignJob', jobId: id, change: -1 }));
             const plus = createButton('+', () => game.dispatch({ type: 'assignJob', jobId: id, change: 1 }));
@@ -76,21 +76,22 @@ export class StatusPanel implements Panel {
 
     render(): void {
         const game = this.game;
-        this.you.hidden = !game.state.flags.moneyRevealed && !game.state.flags.wordsRevealed;
+        this.you.hidden = !game.state.flags.insightRevealed && !game.state.flags.moneyRevealed && !game.state.flags.wordsRevealed;
         for (const [id, row] of this.resources) {
             row.element.hidden = !game.state.flags[`${id}Revealed`];
             setText(row.value, `${id === 'money' ? '$' : ''}${formatNumber(game.state.resources[id] ?? 0)}`);
-            const rate = id === 'money' ? moneyPerSecond(game) : wordsPerSecond(game);
+            const rate = { insight: insightPerSecond, money: moneyPerSecond, words: wordsPerSecond }[id as 'insight' | 'money' | 'words'](game);
             setText(row.rate, rate > 0 ? `+${rate.toFixed(1).replace('.0', '')}/s` : '');
-            const remaining = cooldownRemaining(game, id === 'money' ? 'work' : 'scour');
+            const remaining = cooldownRemaining(game, id === 'insight' ? 'riddle' : id === 'money' ? 'work' : 'scour');
             row.button.disabled = remaining > 0;
             row.button.style.setProperty('--cooldown', `${remaining / 2 * 100}%`);
-            setText(row.yield, `+${id === 'money' ? '$' : ''}${formatNumber(game.stat(id === 'money' ? 'ticketValue' : 'scourValue'))}${id === 'words' ? ` ${labels.words.toLowerCase()}` : ''}`);
+            const gain = formatNumber(game.stat(id === 'insight' ? 'riddleValue' : id === 'money' ? 'ticketValue' : 'scourValue'));
+            setText(row.yield, id === 'money' ? `+$${gain}` : `+${gain} ${(id === 'insight' ? labels.insight : labels.words).toLowerCase()}`);
         }
         this.scripts.hidden = !game.state.flags.scriptsRevealed;
         setText(this.bustingCount, String(dirbustingScripts(game)));
         for (const [id, row] of this.workerRows) {
-            const jobId = id as 'ticketing' | 'scraping';
+            const jobId = id as JobId;
             row.element.hidden = !isJobUnlocked(game, jobId);
             const count = assignedScripts(game, jobId);
             setText(row.count, String(count));

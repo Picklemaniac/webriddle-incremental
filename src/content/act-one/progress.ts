@@ -1,12 +1,11 @@
 import type { SolveMethod } from '../../core/events.ts';
 import type { Game } from '../../core/game.ts';
 import type { GameState } from '../../core/state.ts';
-import { isLearned, lessonFor, type Lesson } from './lessons.ts';
 import { urlOfLevel } from './levels.ts';
-import { planSearch, searchCapabilities } from './search.ts';
 import type { NoticeId } from './text.ts';
 
 export const automationBootSeconds = 5;
+const handSolveInsight = 5;
 
 export function automationElapsed(state: GameState): number {
     if (!state.flags.automated) return 0;
@@ -20,8 +19,6 @@ export function isUpgradeRevealed(state: GameState, purchasableId: string): bool
 export function solveLevel(game: Game, method: SolveMethod): void {
     const { state } = game;
     const previousUrl = urlOfLevel(state.currentLevel);
-    const target = state.currentLevel + 1;
-    const lesson = method === 'hand' ? lessonFor(planSearch(target, searchCapabilities(state)).blockedBy, target) : null;
     state.currentLevel += 1;
     state.search = { level: state.currentLevel, requestsSpent: 0, configuration: '' };
     state.visitedLevels[urlOfLevel(state.currentLevel)] = state.currentLevel;
@@ -31,6 +28,7 @@ export function solveLevel(game: Game, method: SolveMethod): void {
         state.browserUrl = urlOfLevel(state.currentLevel);
     }
     increment(state, `${method}Solves`);
+    if (method === 'hand' && state.flags.insightRevealed === true) game.gainResource('insight', handSolveInsight);
     const boostedLevelsLeft = state.statistics.boostedLevels ?? 0;
     if (boostedLevelsLeft > 0) {
         state.statistics.boostedLevels = boostedLevelsLeft - 1;
@@ -39,12 +37,6 @@ export function solveLevel(game: Game, method: SolveMethod): void {
         }
     }
     game.announce({ type: 'levelSolved', level: state.currentLevel, method });
-    if (lesson !== null) learn(game, lesson);
-}
-
-export function learn(game: Game, lesson: Lesson): void {
-    if (isLearned(game.state, lesson)) return;
-    game.state.flags[`learned:${lesson}`] = true;
 }
 
 export function noticeOnce(game: Game, noticeId: NoticeId): void {

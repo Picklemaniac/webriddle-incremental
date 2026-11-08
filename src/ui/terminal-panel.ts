@@ -3,12 +3,10 @@ import type { GameEvent } from '../core/events.ts';
 import { currentSearch } from '../content/act-one/automation.ts';
 import { dirbustingScripts } from '../content/act-one/economy.ts';
 import { findingFile, findings } from '../content/act-one/findings.ts';
-import { isLearned, lessonFor } from '../content/act-one/lessons.ts';
 import { entrance, urlOfLevel } from '../content/act-one/levels.ts';
 import { effectiveRate, isBanned, requestedRate } from '../content/act-one/network.ts';
 import { automationBootSeconds, automationElapsed, owns } from '../content/act-one/progress.ts';
 import { riddleOrigin } from '../content/act-one/riddle.ts';
-import type { BlockReason } from '../content/act-one/search.ts';
 import { automationText, fill, notices, terminalText, uiText, type NoticeId } from '../content/act-one/text.ts';
 import { wordAtRank } from '../content/act-one/vocabulary.ts';
 import { formatDuration, formatNumber } from '../format.ts';
@@ -78,7 +76,7 @@ export class TerminalPanel implements Panel {
         let footer = uiText.waiting as string;
         if (isBanned(game)) footer = `${terminalText.ban} · ${formatDuration(game.state.network.bannedUntil - game.state.elapsedSeconds)}`;
         else if (dirbustingScripts(game) === 0) footer = uiText.paused;
-        else if (plan.blockedBy) footer = blockedFooter(game, plan.blockedBy);
+        else if (plan.blockedBy) footer = terminalText.blocks[plan.blockedBy];
         else if (phase) footer = `${phase.label} · ${formatNumber(spent)} / ${formatNumber(phase.size)} · ${formatDuration((phase.size - spent) / Math.max(0.001, rate * game.stat('searchEfficiency')))} ${uiText.exhaust}`;
         setText(this.footer, footer);
         this.footer.title = footer;
@@ -153,10 +151,4 @@ export class TerminalPanel implements Panel {
 
 function sampleInterval(requestsPerSecond: number): number {
     return Math.min(3500, Math.max(250, 6000 / Math.sqrt(Math.max(1, requestsPerSecond))));
-}
-
-function blockedFooter(game: Game, blockedBy: BlockReason): string {
-    const lesson = lessonFor(blockedBy, game.state.currentLevel + 1);
-    if (lesson === null) return terminalText.blocks[blockedBy];
-    return `${terminalText.blocks[blockedBy]} · ${isLearned(game.state, lesson) ? terminalText.learned : terminalText.byHand}`;
 }

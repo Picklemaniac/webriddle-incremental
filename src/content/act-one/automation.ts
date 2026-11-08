@@ -2,8 +2,7 @@ import type { GameSystem } from '../../core/content.ts';
 import type { Game } from '../../core/game.ts';
 import { entrance } from './levels.ts';
 import { effectiveRate } from './network.ts';
-import { isLearned, lessonFallbackSeconds, lessonFor } from './lessons.ts';
-import { automationBootSeconds, automationElapsed, increment, learn, noticeOnce, solveLevel } from './progress.ts';
+import { automationBootSeconds, automationElapsed, increment, noticeOnce, solveLevel } from './progress.ts';
 import { capabilitySignature, planSearch, searchCapabilities, type BlockReason, type SearchPlan } from './search.ts';
 import type { NoticeId } from './text.ts';
 
@@ -34,7 +33,6 @@ export const dirbuster: GameSystem = {
             state.search.configuration = configuration;
             state.search.requestsSpent = 0;
         }
-        trackLesson(game, deltaSeconds);
         const rate = effectiveRate(game);
         if (rate === 0) return;
         increment(state, 'requestsSent', rate * deltaSeconds);
@@ -66,10 +64,3 @@ export const dirbuster: GameSystem = {
     },
 };
 
-function trackLesson(game: Game, deltaSeconds: number): void {
-    const { state } = game;
-    const lesson = lessonFor(currentSearch(game).blockedBy, state.currentLevel + 1);
-    if (lesson === null || isLearned(state, lesson)) return;
-    increment(state, `stuck:${lesson}`, deltaSeconds);
-    if ((state.statistics[`stuck:${lesson}`] ?? 0) >= lessonFallbackSeconds) learn(game, lesson);
-}

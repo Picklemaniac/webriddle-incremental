@@ -36,14 +36,14 @@ export const setupText = {
 
 export const notices = {
     firstRateLimit: '429 Too Many Requests. The server only answers about 15 requests a second from one address. Everything above that bounces.',
-    userAgentBlock: '403 Forbidden on every request. The server stopped answering dirbuster, but your browser still gets in. Solve this level yourself and dirbuster can learn how.',
-    folderBlock: 'Nothing new at the top level. The levels moved into a folder, and dirbuster does not look inside folders. Solve this level yourself and it can learn how.',
-    extensionBlock: 'No .htm page matches. This level is not an .htm page. Solve it yourself and dirbuster can learn to try other endings.',
-    wildcardBlock: 'Every guess in this folder returns a page, so every guess looks like a hit. Solve this level yourself and dirbuster can learn to tell them apart.',
-    credentialsBlock: '401 Unauthorized. This page wants a user name and a password. Log in yourself once and dirbuster can learn to try pairs.',
-    leetAnswer: 'No wordlist has this answer. It is not a plain word, and brute force will take a while. Solve it yourself and dirbuster can learn the pattern.',
-    numberAnswer: 'This answer is a number, so dirbuster is counting. Solve it yourself and it can learn where to start.',
-    twoWordsAnswer: 'This answer is two words glued together, and your lists hold one word per line. Solve it yourself and dirbuster can learn to combine them.',
+    userAgentBlock: '403 Forbidden on every request. The server stopped answering dirbuster, but your browser still gets in.',
+    folderBlock: 'Nothing new at the top level. The levels moved into a folder, and dirbuster does not look inside folders.',
+    extensionBlock: 'No .htm page matches. This level is not an .htm page.',
+    wildcardBlock: 'Every guess in this folder returns a page, so every guess looks like a hit.',
+    credentialsBlock: '401 Unauthorized. This page wants a user name and a password.',
+    leetAnswer: 'No wordlist has this answer. It is not a plain word, and brute force will take a while.',
+    numberAnswer: 'This answer is a number, so dirbuster is counting.',
+    twoWordsAnswer: 'This answer is two words glued together, and your lists hold one word per line.',
     phraseWall: 'A whole phrase. No wordlist holds these, and brute force would outlive you.',
     bruteForce: '(!) WARNING: no wordlist matches; falling back to brute force',
     firstBan: '(!) 429: banned; solve the captcha in the browser or wait',
@@ -85,7 +85,8 @@ export const upgradeText = {
     throttle: { name: 'Throttle', description: 'Stay inside the rate limit. No wasted requests or new heat.' },
     ram: { name: 'More RAM', description: 'Room for a second script.' },
     wgetMirror: { name: 'wget --mirror', description: 'Assign scripts to scrape words: 12 words per second each.' },
-    autoReplyMacros: { name: 'Auto-reply macros', description: 'Assign scripts to close tickets: $1.15 per second each.' },
+    autoReplyMacros: { name: 'Auto-reply macros', description: 'Assign scripts to close tickets: $0.80 per second each.' },
+    otherRiddles: { name: 'Riddle bookmarks', description: 'Assign scripts to other riddles: 0.25 insight per second each.' },
     isdn: { name: 'ISDN', description: 'Twice the requests per thread.' },
     english10k: { name: 'english-10k.txt', description: '10,000 entries. Covers more unusual words.' },
     newPc: { name: 'New PC', description: 'Two more script slots.' },
@@ -127,11 +128,11 @@ export type UpgradeId = keyof typeof upgradeText;
 
 export const findingText = {
     robots: {
-        description: '+$15 per find.',
+        description: '+3 insight per find.',
         file: 'User-agent: *\nDisallow: /admin/\nDisallow: /answers/\n# answers stay lowercase',
     },
     readme: {
-        description: '+$25 per find.',
+        description: '+5 insight per find.',
         file: 'README\n\nEvery answer is the name of a page.\nAll lowercase, no spaces.\nStuck? Look at the source.',
     },
     sitemap: {
@@ -145,7 +146,7 @@ export const findingText = {
         entry: '{word}',
     },
     notes: {
-        description: '+$60 per find.',
+        description: '+12 insight per find.',
         file: 'notes\n\n- the picture is not always the clue\n- every answer must be in the dictionary\n- TODO: move new levels into folders',
     },
     cache: {
@@ -158,7 +159,7 @@ export const findingText = {
         file: 'Index of /.git/\n\nHEAD\nconfig\nlogs/\nobjects/\nrefs/\n\nlogs/HEAD:\nadd levels 1-9\nadd generated levels\nanswers: dictionary words only\nmove levels 100+ into folders\nfix: credentials door',
     },
     htpasswd: {
-        description: 'Unlocks Crack .htpasswd. Duplicates give +$75.',
+        description: 'Unlocks Crack .htpasswd. Duplicates give +15 insight.',
         file: 'admin:$apr1$Qx4l1oPZ$Hk3hJ6v.9mJdZf5yq0fN0/\nguest:$apr1$7KmLr2Da$WqU1lN2cE0r9dQ3xY8kL2.',
     },
     backup: {
@@ -176,7 +177,7 @@ export const findingText = {
         entry: 'level {level}: {url}',
     },
     source: {
-        description: '+$250 per find.',
+        description: '+50 insight per find.',
         file: 'riddle/\nriddle/make-levels.pl\nriddle/words.txt\nriddle/images/\nriddle/levels/\nriddle/README',
     },
 } as const satisfies Record<string, { readonly description: string; readonly file: string; readonly entry?: string }>;
@@ -190,13 +191,16 @@ export const labels = {
     networkPanel: 'Network',
     upgradesPanel: 'Upgrades',
     findingsPanel: 'Findings',
+    insight: 'Insight',
     money: 'Money',
     words: 'Words',
+    solveRiddle: 'Solve another riddle',
     work: 'Close a ticket',
     scour: 'Scour the web',
     dirbusting: 'Dirbusting',
     scraping: 'Scraping',
     ticketBot: 'Ticket bot',
+    otherRiddles: 'Other riddles',
     replace: 'Replace',
     connection: 'Connection',
     tool: 'Tool',
@@ -265,8 +269,6 @@ export const terminalText = {
     indexed: 'indexed page',
     identicalResponse: '[identical response]',
     testing: '--> Testing:',
-    byHand: 'solve it by hand',
-    learned: 'fix in Upgrades',
     blocks: { unguessable: 'Read this page by hand', userAgent: '403 · user-agent rejected', folder: 'No paths found · needs recursion', extension: 'No .htm matches · try other extensions', wildcard: 'Wildcard responses · needs size filtering', credentials: '401 · needs credential pairs' },
 } as const;
 

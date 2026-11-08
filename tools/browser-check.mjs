@@ -183,10 +183,10 @@ try {
     await screenshot('source-automated');
     await toolbar('View Source');
     const buttons = await evaluate(`[...document.querySelectorAll('.resource-action')].map(button => button.getBoundingClientRect().width)`);
-    assert.equal(buttons[0], buttons[1], 'Work and Scour widths differ');
+    assert.ok(buttons.every((width) => width === buttons[0]), 'Resource buttons differ in width');
     assert.equal(await evaluate(`document.querySelector('.proxy-details').open`), false);
     assert.equal(await evaluate(`document.querySelector('.machine-details').open`), false);
-    assert.match(await evaluate(`document.querySelector('.resource-action').textContent`), /\+\$/);
+    assert.ok(await evaluate(`[...document.querySelectorAll('.resource-action')].some((button) => /\\+\\$/.test(button.textContent))`), 'The day job shows what a ticket pays');
     for (const proxy of game.state.network.proxies.slice(0, 2)) proxy.diesAtSeconds = game.state.elapsedSeconds - 1;
     await importGame(game);
     await waitFor(`!document.querySelector('.replace-dead-proxies').hidden`);

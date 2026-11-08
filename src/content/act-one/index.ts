@@ -2,7 +2,7 @@ import type { GameContent, GameSystem } from '../../core/content.ts';
 import type { Game } from '../../core/game.ts';
 import { currentSearch, dirbuster } from './automation.ts';
 import { answerCaptcha } from './captchas.ts';
-import { assignJob, passiveIncome, scour, work } from './economy.ts';
+import { assignJob, passiveIncome, scour, solveRiddle, work } from './economy.ts';
 import { findingDrops, findingModifiers } from './findings.ts';
 import { entrance } from './levels.ts';
 import { isBanned, network, networkCapacity, replaceProxy, requestedRate } from './network.ts';
@@ -14,6 +14,7 @@ import { offeredUpgrades, upgrades, type Upgrade } from './upgrades.ts';
 
 const firstOfferSeconds = 75;
 const currencyFollowSeconds = 6;
+const moneyIntroductionSeconds = 135;
 
 const reveals: GameSystem = {
     update(game) {
@@ -25,10 +26,16 @@ const reveals: GameSystem = {
             if (seconds < firstOfferSeconds) return;
             revealBeforeCurrency(game, 'curlBatch');
             return;
-        } else if (!state.flags.moneyRevealed) {
-            reveal(game, 'moneyRevealed');
+        } else if (!state.flags.insightRevealed) {
+            reveal(game, 'insightRevealed');
         } else if (state.flags.networkRevealed && !isUpgradeRevealed(state, 'throttle')) {
             revealUpgrade(game, 'throttle');
+        } else if (!state.flags.moneyRevealed && seconds >= moneyIntroductionSeconds && owns(state, 'curlBatch')) {
+            if (!isUpgradeRevealed(state, 'ram')) {
+                revealBeforeCurrency(game, 'ram');
+                return;
+            }
+            reveal(game, 'moneyRevealed');
         } else if (!state.flags.scriptsRevealed && game.stat('scriptSlots') >= 2) {
             state.flags.scriptsRevealed = true;
             state.flags.machineRevealed = true;
@@ -56,11 +63,12 @@ const reveals: GameSystem = {
 
 function readyForUpgrade(game: Game, item: Upgrade): boolean {
     const { state } = game;
+    if (item.price.insight !== undefined && !state.flags.insightRevealed) return false;
     if (item.price.money !== undefined && !state.flags.moneyRevealed) return false;
     if (item.price.words !== undefined && !state.flags.wordsRevealed) return false;
     if (item.id === 'throttle') return state.flags.networkRevealed === true;
     if (item.id === 'wgetMirror') return state.flags.wordsRevealed === true && state.flags.scriptsRevealed === true;
-    if (item.id === 'autoReplyMacros') return state.flags.scriptsRevealed === true;
+    if (item.id === 'autoReplyMacros' || item.id === 'otherRiddles') return state.flags.scriptsRevealed === true;
     return true;
 }
 
@@ -101,16 +109,16 @@ const pacedFindings: GameSystem = {
     },
 };
 
-function reveal(game: Game, flag: 'moneyRevealed' | 'wordsRevealed'): void {
+function reveal(game: Game, flag: 'insightRevealed' | 'moneyRevealed' | 'wordsRevealed'): void {
     game.state.flags[flag] = true;
 }
 
 export const actOneContent: GameContent = {
     tickSeconds: 0.25,
     startUrl,
-    resources: [{ id: 'money', name: labels.money }, { id: 'words', name: labels.words }],
-    baseStats: { requestsPerThread: 2, threadsPerScript: 1, scriptSlots: 1, ticketValue: 3, scourValue: 25,
-        ticketBotRate: 1.15, scraperRate: 12, proxySlots: 0, extraAddresses: 0, searchEfficiency: 1, dorkChance: 0 },
+    resources: [{ id: 'insight', name: labels.insight }, { id: 'money', name: labels.money }, { id: 'words', name: labels.words }],
+    baseStats: { requestsPerThread: 2, threadsPerScript: 1, scriptSlots: 1, ticketValue: 3, scourValue: 25, riddleValue: 1,
+        ticketBotRate: 0.8, riddleBotRate: 0.25, scraperRate: 12, proxySlots: 0, extraAddresses: 0, searchEfficiency: 1, dorkChance: 0 },
     purchasables: upgrades.map((item) => ({
         ...item, isAvailable: (state) => isUpgradeRevealed(state, item.id) && item.isAvailable(state) &&
             (item.id !== 'crackHtpasswd' || (state.findings.htpasswd ?? 0) > 0),
@@ -140,6 +148,7 @@ export const actOneContent: GameContent = {
                 return true;
             case 'work': return work(game);
             case 'scour': return scour(game);
+            case 'solveRiddle': return solveRiddle(game);
             case 'assignJob': return assignJob(game, action.jobId, action.change);
             case 'replaceProxy': return replaceProxy(game, action.proxyIndex);
             case 'answerCaptcha': return answerCaptcha(game, action.answer);
