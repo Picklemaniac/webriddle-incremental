@@ -1,5 +1,5 @@
 import { encode, toLeet, toRomanNumerals, type Encoding } from './encodings.ts';
-import { imageForSubject, imageIdsWithSubject, imageWithWord, levelImageCount, pictureSubjects } from './images.ts';
+import { imageForSubject, imageWithWord, levelImageCount } from './images.ts';
 import { pickByUnit, ramp, riddleOrigin, salts, startUrl, unitHash } from './riddle.ts';
 import { clueLines, fill, handcraftedText, pageText } from './text.ts';
 import { vocabularySize, wordAtRank } from './vocabulary.ts';
@@ -13,7 +13,6 @@ interface Clue {
     readonly comment?: string;
     readonly hiddenText?: string;
     readonly imageName?: string;
-    readonly pictureSubject?: string;
     readonly imageLink?: boolean;
 }
 
@@ -60,6 +59,8 @@ interface HandcraftedEntrance {
 const firstGeneratedLevel = 11;
 export const userAgentBlockLevel = 45;
 const firstFolderLevel = 100;
+const commonWordShare = 0.25;
+const commonWordRanks = 300;
 const levelsPerFolder = 100;
 
 const wildcardFolders = new Set(['basalt', 'ember']);
@@ -114,12 +115,11 @@ export function folderFor(level: number): string | null {
 export function levelPage(level: number): LevelPage {
     const next = entrance(level + 1);
     const clue = next.clue;
-    const imageId = clue.pictureSubject === undefined ? pageImage(level) : subjectImage(clue.pictureSubject, level);
     return {
         level,
         url: urlOfLevel(level),
         title: clue.title ? fill(pageText.levelTitleWithClue, { level, clue: clue.title }) : fill(pageText.levelTitle, { level }),
-        imageId,
+        imageId: pageImage(level),
         imageName: clue.imageName ?? `${level}.jpg`,
         link: clue.imageLink === true ? next.url : null,
         lines: [...(clue.lines ?? []), ...(level === 404 ? [handcraftedText.easterEgg404] : level === 418 ? [handcraftedText.easterEgg418] : [])],
@@ -161,12 +161,7 @@ function generatedEntrance(level: number, attempt = 0): Entrance {
     const folder = folderFor(level);
     switch (kind) {
         case 'word': {
-            if (unit(salts.picture) < 0.25) {
-                const subject = pickByUnit(pictureSubjects, unit(salts.clue));
-                const clue: Clue = { pictureSubject: subject.word };
-                return buildEntrance(level, kind, subject.word, 'htm', [subject.word], null, clue, folder);
-            }
-            const word = sampleWord(level, unit(salts.rank));
+            const word = unit(salts.common) < commonWordShare ? sampleCommonWord(unit(salts.rank), commonWordRanks, 10) : sampleWord(level, unit(salts.rank));
             return buildEntrance(level, kind, word, 'htm', [word], null, wordClue(level, word), folder);
         }
         case 'extension': {
@@ -324,11 +319,6 @@ function binaryLines(word: string): string[] {
 
 export function inWildcardFolder(address: string): boolean {
     return wildcardFolders.has(new URL(address).pathname.split('/')[1] ?? '');
-}
-
-function subjectImage(subject: string, level: number): number {
-    const candidates = imageIdsWithSubject(subject).filter((imageId) => !handcraftedPageImages.has(imageId));
-    return pickByUnit(candidates.length > 0 ? candidates : [pageImage(level)], unitHash(level, salts.picture));
 }
 
 function pageImage(level: number): number {

@@ -71,5 +71,5 @@ function trackLesson(game: Game, deltaSeconds: number): void {
     const lesson = lessonFor(currentSearch(game).blockedBy, state.currentLevel + 1);
     if (lesson === null || isLearned(state, lesson)) return;
     increment(state, `stuck:${lesson}`, deltaSeconds);
-    if ((state.statistics[`stuck:${lesson}`] ?? 0) >= lessonFallbackSeconds) learn(game, lesson, false);
+    if ((state.statistics[`stuck:${lesson}`] ?? 0) >= lessonFallbackSeconds) learn(game, lesson);
 }

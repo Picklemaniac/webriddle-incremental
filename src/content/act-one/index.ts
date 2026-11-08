@@ -7,7 +7,7 @@ import { findingDrops, findingModifiers } from './findings.ts';
 import { entrance } from './levels.ts';
 import { isBanned, network, networkCapacity, replaceProxy, requestedRate } from './network.ts';
 import { canonicalUrl, resolvePage } from './pages.ts';
-import { automationElapsed, isUpgradeRevealed, noticeOnce, owns, solveLevel } from './progress.ts';
+import { automationElapsed, isUpgradeRevealed, owns, solveLevel } from './progress.ts';
 import { startUrl } from './riddle.ts';
 import { labels } from './text.ts';
 import { offeredUpgrades, upgrades, type Upgrade } from './upgrades.ts';
@@ -32,7 +32,6 @@ const reveals: GameSystem = {
         } else if (!state.flags.scriptsRevealed && game.stat('scriptSlots') >= 2) {
             state.flags.scriptsRevealed = true;
             state.flags.machineRevealed = true;
-            noticeOnce(game, 'scriptsRevealed');
         } else if (!state.flags.wordsRevealed && seconds >= 240 && state.currentLevel >= 10) {
             if (!isUpgradeRevealed(state, 'english10k')) {
                 revealBeforeCurrency(game, 'english10k');
@@ -104,7 +103,6 @@ const pacedFindings: GameSystem = {
 
 function reveal(game: Game, flag: 'moneyRevealed' | 'wordsRevealed'): void {
     game.state.flags[flag] = true;
-    noticeOnce(game, flag);
 }
 
 export const actOneContent: GameContent = {
@@ -112,7 +110,7 @@ export const actOneContent: GameContent = {
     startUrl,
     resources: [{ id: 'money', name: labels.money }, { id: 'words', name: labels.words }],
     baseStats: { requestsPerThread: 2, threadsPerScript: 1, scriptSlots: 1, ticketValue: 3, scourValue: 25,
-        ticketBotRate: 1, scraperRate: 12, proxySlots: 0, extraAddresses: 0, searchEfficiency: 1, dorkChance: 0 },
+        ticketBotRate: 1.15, scraperRate: 12, proxySlots: 0, extraAddresses: 0, searchEfficiency: 1, dorkChance: 0 },
     purchasables: upgrades.map((item) => ({
         ...item, isAvailable: (state) => isUpgradeRevealed(state, item.id) && item.isAvailable(state) &&
             (item.id !== 'crackHtpasswd' || (state.findings.htpasswd ?? 0) > 0),

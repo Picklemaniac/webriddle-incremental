@@ -39,14 +39,12 @@ export function solveLevel(game: Game, method: SolveMethod): void {
         }
     }
     game.announce({ type: 'levelSolved', level: state.currentLevel, method });
-    if (lesson !== null) learn(game, lesson, true);
-    if (method === 'search') noticeOnce(game, 'firstSearchSolve');
+    if (lesson !== null) learn(game, lesson);
 }
 
-export function learn(game: Game, lesson: Lesson, byHand: boolean): void {
+export function learn(game: Game, lesson: Lesson): void {
     if (isLearned(game.state, lesson)) return;
     game.state.flags[`learned:${lesson}`] = true;
-    noticeOnce(game, byHand ? 'learnedByHand' : 'learnedFromForum');
 }
 
 export function noticeOnce(game: Game, noticeId: NoticeId): void {

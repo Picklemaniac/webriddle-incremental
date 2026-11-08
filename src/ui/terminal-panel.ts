@@ -3,15 +3,19 @@ import type { GameEvent } from '../core/events.ts';
 import { currentSearch } from '../content/act-one/automation.ts';
 import { dirbustingScripts } from '../content/act-one/economy.ts';
 import { findings } from '../content/act-one/findings.ts';
+import { isLearned, lessonFor } from '../content/act-one/lessons.ts';
 import { entrance, urlOfLevel } from '../content/act-one/levels.ts';
 import { effectiveRate, isBanned, requestedRate } from '../content/act-one/network.ts';
 import { automationBootSeconds, automationElapsed, owns } from '../content/act-one/progress.ts';
 import { riddleOrigin } from '../content/act-one/riddle.ts';
-import { automationText, fill, terminalText, uiText } from '../content/act-one/text.ts';
+import type { BlockReason } from '../content/act-one/search.ts';
+import { automationText, fill, notices, terminalText, uiText, type NoticeId } from '../content/act-one/text.ts';
 import { wordAtRank } from '../content/act-one/vocabulary.ts';
 import { formatDuration, formatNumber } from '../format.ts';
 import { createElement, createTitleBar, setText } from './dom.ts';
 import type { Panel } from './panel.ts';
+
+const warningNotices: ReadonlySet<NoticeId> = new Set<NoticeId>(['bruteForce', 'firstBan', 'firstProxyDeath']);
 
 export class TerminalPanel implements Panel {
     readonly element = createElement('section', { className: 'terminal-window', attributes: { 'aria-label': automationText.program } });
@@ -74,7 +78,7 @@ export class TerminalPanel implements Panel {
         let footer = uiText.waiting as string;
         if (isBanned(game)) footer = `${terminalText.ban} · ${formatDuration(game.state.network.bannedUntil - game.state.elapsedSeconds)}`;
         else if (dirbustingScripts(game) === 0) footer = uiText.paused;
-        else if (plan.blockedBy) footer = terminalText.blocks[plan.blockedBy];
+        else if (plan.blockedBy) footer = blockedFooter(game, plan.blockedBy);
         else if (phase) footer = `${phase.label} · ${formatNumber(spent)} / ${formatNumber(phase.size)} · ${formatDuration((phase.size - spent) / Math.max(0.001, rate * game.stat('searchEfficiency')))} ${uiText.exhaust}`;
         setText(this.footer, footer);
         this.footer.title = footer;
@@ -114,6 +118,9 @@ export class TerminalPanel implements Panel {
         if (!this.game.state.flags.automated) return;
         if (this.game.isCatchingUp) return;
         switch (event.type) {
+            case 'notice':
+                if (warningNotices.has(event.noticeId as NoticeId)) this.queueLine(notices[event.noticeId as NoticeId], 'warning');
+                break;
             case 'levelSolved': {
                 if (event.method === 'windfall') break;
                 const method = event.method === 'hand' ? terminalText.hand : event.method === 'search' ? terminalText.indexed : '200';
@@ -142,4 +149,10 @@ export class TerminalPanel implements Panel {
 
 function sampleInterval(requestsPerSecond: number): number {
     return Math.min(3500, Math.max(250, 6000 / Math.sqrt(Math.max(1, requestsPerSecond))));
+}
+
+function blockedFooter(game: Game, blockedBy: BlockReason): string {
+    const lesson = lessonFor(blockedBy, game.state.currentLevel + 1);
+    if (lesson === null) return terminalText.blocks[blockedBy];
+    return `${terminalText.blocks[blockedBy]} · ${isLearned(game.state, lesson) ? terminalText.learned : terminalText.byHand}`;
 }

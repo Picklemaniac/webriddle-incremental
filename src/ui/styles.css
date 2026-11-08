@@ -107,8 +107,6 @@ strong { font-weight: 600; }
 .browser-column { display: flex; flex-direction: column; align-items: center; width: 100%; min-width: 0; }
 .prompt-area { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 54px; padding-top: 10px; }
 .prompt-area .automate-offer { min-width: 130px; padding: 8px 20px; font-size: 12px; animation: reveal .8s ease; }
-.notice-line { max-width: 100%; margin: 0; color: var(--text); font: 13px/1.6 Verdana, sans-serif; text-align: center; }
-.notice-line.fresh { animation: reveal .8s ease; }
 .dashboard { display: grid; grid-template-columns: minmax(320px, 1.1fr) minmax(370px, 1.25fr) minmax(215px, .7fr); gap: 32px; align-items: start; margin-top: 10px; animation: reveal .7s ease; }
 .panel { min-width: 0; margin-bottom: 28px; animation: reveal .4s ease; }
 .panel h2 { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 10px; padding: 0 0 6px; border-bottom: 1px solid var(--rule); color: #fff; font: bold 13px Tahoma, Verdana, sans-serif; white-space: nowrap; }
@@ -172,17 +170,21 @@ strong { font-weight: 600; }
 .dev-row input, .dev-row select { width: 112px; }
 .dev-row textarea { width: 100%; }
 .dev-status { color: #adc698; }
-.setup-wizard { width: min(500px, calc(100vw - 32px)); }
-.wizard-body { display: flex; min-height: 240px; margin-top: 3px; background: #fff; border-bottom: 1px solid #808080; box-shadow: 0 1px #fff; }
-.wizard-banner { flex: 0 0 130px; display: flex; align-items: flex-end; padding: 14px; background: linear-gradient(180deg, #000080, #1084c8); color: #fff; font: bold italic 19px Georgia, serif; }
-.wizard-page { flex: 1; min-width: 0; padding: 18px 20px; }
-.wizard-page h3 { margin: 0 0 16px; font: bold 13px Tahoma, Arial, sans-serif; }
+.setup-wizard { width: min(560px, calc(100vw - 32px)); }
+.wizard-body { display: flex; min-height: 290px; margin-top: 3px; background: #fff; border-bottom: 1px solid #808080; box-shadow: 0 1px #fff; }
+.wizard-banner { flex: 0 0 150px; display: flex; align-items: flex-end; padding: 16px; background: linear-gradient(180deg, #000080, #1084c8); color: #fff; font: bold italic 22px Georgia, serif; }
+.wizard-page { flex: 1; min-width: 0; padding: 22px 24px; font-size: 12px; }
+.wizard-page h3 { margin: 0 0 18px; font: bold 14px Tahoma, Arial, sans-serif; }
 .wizard-page p { margin: 0 0 10px; line-height: 1.5; }
 .wizard-actions { display: flex; justify-content: flex-end; gap: 6px; padding: 10px 8px 6px; }
 .wizard-actions button { min-width: 78px; padding: 4px 10px; }
 .wizard-actions button:disabled { color: #808080; text-shadow: 1px 1px #fff; }
 .win-progress { height: 18px; padding: 2px; background: #fff; border: 1px solid #808080; box-shadow: inset 1px 1px #404040; }
 .win-progress-fill { width: 0; height: 100%; background: repeating-linear-gradient(90deg, #000080 0 9px, transparent 9px 11px); animation: progress var(--duration, 2s) steps(18, end) forwards; }
+.message-box { display: flex; gap: 16px; align-items: flex-start; padding: 4px 4px 0; }
+.message-box p { margin: 0; line-height: 1.6; }
+.message-icon { flex: 0 0 34px; height: 30px; padding-top: 11px; clip-path: polygon(50% 0, 100% 100%, 0 100%); background: #ffd800; color: #000; font: bold 15px Arial, sans-serif; text-align: center; }
+.window-dialog:has(.message-box) .dialog-actions { justify-content: center; }
 .setup-windows { position: fixed; right: 20px; bottom: 20px; z-index: 30; display: flex; flex-direction: column; gap: 10px; width: min(320px, calc(100vw - 40px)); pointer-events: none; }
 .setup-window { padding: 3px; background: #c0c0c0; color: #000; border: 2px solid; border-color: #fff #444 #444 #fff; box-shadow: 2px 2px 0 #000; font: 11px Tahoma, Arial, sans-serif; animation: reveal .25s ease; }
 .setup-body { padding: 10px 10px 12px; }

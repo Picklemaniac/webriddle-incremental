@@ -16,12 +16,12 @@ export class GameDialog {
         document.body.append(this.element);
     }
 
-    show(title: string, children: readonly Node[], actions: readonly HTMLElement[] = [], wide = false): void {
+    show(title: string, children: readonly Node[], actions: readonly HTMLElement[] = [], wide = false, closeLabel: string = dialogText.close): void {
         this.heading.textContent = title;
         this.element.setAttribute('aria-label', title);
         this.element.classList.toggle('wide', wide);
         this.body.replaceChildren(...children);
-        this.footer.replaceChildren(...actions, createButton(dialogText.close, () => this.element.close()));
+        this.footer.replaceChildren(...actions, createButton(closeLabel, () => this.element.close()));
         if (!this.element.open) this.element.showModal();
     }
 

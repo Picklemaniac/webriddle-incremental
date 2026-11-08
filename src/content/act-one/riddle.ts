@@ -18,7 +18,7 @@ export const salts = {
     leet: 13,
     year: 14,
     phraseLength: 15,
-    picture: 16,
+    common: 16,
     door: 17,
     username: 18,
     password: 19,

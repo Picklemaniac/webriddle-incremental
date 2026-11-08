@@ -5,7 +5,7 @@ import { AwaySummary } from './away-summary.ts';
 import { BrowserPanel } from './browser-panel.ts';
 import { createButton, createElement } from './dom.ts';
 import { FindingsPanel } from './findings-panel.ts';
-import { NoticeLine } from './notice-line.ts';
+import { MessageBoxes } from './message-boxes.ts';
 import type { Panel } from './panel.ts';
 import { PurchasesPanel } from './purchases-panel.ts';
 import { SetupWizard } from './setup-wizard.ts';
@@ -21,6 +21,8 @@ export class GameScreen {
     private readonly panels: readonly Panel[];
     private readonly awaySummary: AwaySummary;
     private readonly automate: HTMLButtonElement;
+    private readonly prompt: HTMLElement;
+    private readonly messageBoxes: MessageBoxes;
     private readonly dashboard: HTMLElement;
     private readonly wizard = new SetupWizard();
 
@@ -31,12 +33,13 @@ export class GameScreen {
         const status = new StatusPanel(game);
         const purchases = new PurchasesPanel(game);
         const findings = new FindingsPanel(game, (url) => browser.navigate(url));
-        const notice = new NoticeLine(game);
-        this.panels = [browser, terminal, status, purchases, findings, notice];
+        this.panels = [browser, terminal, status, purchases, findings];
+        this.messageBoxes = new MessageBoxes(game);
         this.awaySummary = new AwaySummary(game.content);
         this.automate = createButton(labels.automate, () => this.wizard.open(() => game.dispatch({ type: 'automate' })));
         this.automate.className = 'automate-offer';
-        const browserColumn = createElement('div', { className: 'browser-column' }, [browser.element, createElement('div', { className: 'prompt-area' }, [this.automate, notice.element])]);
+        this.prompt = createElement('div', { className: 'prompt-area' }, [this.automate]);
+        const browserColumn = createElement('div', { className: 'browser-column' }, [browser.element, this.prompt]);
         const terminalSlot = createElement('div', { className: 'terminal-slot' }, [terminal.element]);
         purchases.element.classList.add('dashboard-upgrades');
         status.machineElement.classList.add('dashboard-machine');
@@ -52,7 +55,8 @@ export class GameScreen {
         const automated = state.flags.automated === true;
         const offered = state.currentLevel > 5 || (state.currentLevel === 5 && state.elapsedSeconds - (state.statistics.lastSolveAt ?? 0) >= automationOfferDelaySeconds);
         this.element.classList.toggle('automated', automated);
-        this.automate.hidden = automated || !offered;
+        this.prompt.hidden = automated;
+        this.automate.hidden = !offered;
         this.dashboard.hidden = !automated || state.flags.upgradesRevealed !== true;
         for (const panel of this.panels) panel.render();
     }

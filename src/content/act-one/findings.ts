@@ -46,7 +46,6 @@ function discoverFinding(game: Game, finding: Finding): void {
     if (finding.id === 'dictionary') game.gainResource('words', 1000);
     for (let index = 0; index < (finding.levels ?? 0); index++) solveLevel(game, 'windfall');
     game.invalidateStats();
-    noticeOnce(game, 'firstFind');
     game.announce({ type: 'findingDiscovered', findingId: finding.id, count: state.findings[finding.id]! });
 }
 
