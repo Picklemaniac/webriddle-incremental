@@ -8,7 +8,7 @@ import { entrance } from './levels.ts';
 import { isBanned, network, networkCapacity, replaceProxy, requestedRate } from './network.ts';
 import { canonicalUrl, resolvePage } from './pages.ts';
 import { automationElapsed, isUpgradeRevealed, owns, solveLevel } from './progress.ts';
-import { homeUrl, startUrl } from './riddle.ts';
+import { homeUrl, riddleOrigin, startUrl } from './riddle.ts';
 import { labels } from './text.ts';
 import { offeredUpgrades, upgrades, type Upgrade } from './upgrades.ts';
 
@@ -135,7 +135,7 @@ export const actOneContent: GameContent = {
     resolvePage,
     handleNavigation(game, address) {
         const url = canonicalUrl(address);
-        game.state.browserUrl = url;
+        game.state.browserUrl = url.startsWith(`${riddleOrigin}/`) ? url : address;
         if (url === startUrl) game.state.flags.entered = true;
         const next = entrance(game.state.currentLevel + 1);
         if (!isBanned(game) && next.url === url && next.credentials === null) solveLevel(game, 'hand');

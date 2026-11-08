@@ -90,7 +90,7 @@ export function canonicalUrl(url: string): string {
 
 export function resolvePage(url: string, state: GameState): Page {
     const address = canonicalUrl(url);
-    const start = startPage(address, scrollbarStyle);
+    const start = startPage(address, scrollbarStyle, pictureStyle);
     if (start !== null) return start;
     if (state.captcha !== null && state.network.bannedUntil > state.elapsedSeconds) return captchaPage(state.captcha, state.flags.captchaRejected === true);
     if (!address.startsWith(`${riddleOrigin}/`)) return errorPage('unavailable');

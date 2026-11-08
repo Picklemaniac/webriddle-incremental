@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Game } from '../core/game.ts';
 import { createInitialState } from '../core/state.ts';
 import { MemoryStorage } from '../testing/memory-storage.ts';
+import { saveMigrations } from './migrations.ts';
 import { testContent } from '../testing/test-content.ts';
 import {
     currentSaveVersion,
@@ -41,6 +42,19 @@ describe('save format', () => {
     it('rejects an export string that was cut off', () => {
         const exported = encodeExport(serializeSave(defaults, 1_000));
         expect(() => decodeExport(exported.slice(0, -10))).toThrow(SaveError);
+    });
+
+    it('moves stored addresses from the placeholder domains to Notfinite and Enigma Web', () => {
+        const save = { version: 2, savedAt: 0, state: {
+            browserUrl: 'http://riddle.example/level2.htm',
+            visitedLevels: { 'http://riddle.example/level2.htm': 2 },
+            favorites: ['http://home.enigmaweb.example/'],
+        } };
+        expect(migrateSave(save, saveMigrations, 3).state).toEqual({
+            browserUrl: 'http://www.notfinite.net/level2.htm',
+            visitedLevels: { 'http://www.notfinite.net/level2.htm': 2 },
+            favorites: ['http://www.enigmaweb.net/'],
+        });
     });
 
     it('rejects saves from a newer version', () => {

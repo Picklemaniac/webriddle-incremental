@@ -62,14 +62,14 @@ try {
     await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
     assert.equal((await fetch(origin)).status, 200);
     await send('Page.navigate', { url: origin });
-    await waitFor(`document.querySelector('.browser-viewport')?.contentDocument?.title === 'Enigma Web Start Page'`);
+    await waitFor(`document.querySelector('.browser-viewport')?.contentDocument?.title === 'Welcome to Enigma Web'`);
     assert.equal(await evaluate(`document.querySelector('.follow-current').hidden`), true, 'No return button before entering the riddle');
     await screenshot('start-page');
     await evaluate(`document.querySelector('.browser-viewport').contentDocument.querySelector('a').click()`);
-    await waitFor(`document.querySelector('.browser-viewport')?.contentDocument?.title === 'Infinitum'`);
+    await waitFor(`document.querySelector('.browser-viewport')?.contentDocument?.title === 'Notfinite'`);
     await screenshot('riddle-home');
     await evaluate(`[...document.querySelector('.browser-viewport').contentDocument.querySelectorAll('a')].find((link) => link.textContent === 'enter').click()`);
-    await waitFor(`document.querySelector('.browser-viewport')?.contentDocument?.querySelector('img')?.naturalWidth > 0`);
+    await waitFor(`document.querySelector('.browser-viewport')?.contentDocument?.title === 'Level 1' && document.querySelector('.browser-viewport').contentDocument.querySelector('img').naturalWidth > 0`);
     await screenshot('opening');
     await assertPageFits();
     assert.equal(await evaluate(`document.querySelector('.dashboard').hidden`), true);
@@ -103,7 +103,7 @@ try {
     assert.equal(await evaluate(`document.querySelector('.browser-viewport').contentDocument.title`), 'Level 5: it blinks.');
     assert.equal(await evaluate(`document.querySelector('.tool-button[aria-label="Forward"]').disabled`), true);
     await toolbar('Home');
-    await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === 'Enigma Web Start Page'`);
+    await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === 'Welcome to Enigma Web'`);
     await evaluate(`document.querySelector('.follow-current').click()`);
     await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === 'Level 5: it blinks.'`);
     await evaluate(`document.querySelector('.browser-viewport').contentDocument.body.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 60, clientY: 60 }))`);

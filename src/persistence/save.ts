@@ -1,7 +1,7 @@
 import type { GameState } from '../core/state.ts';
 import { saveMigrations } from './migrations.ts';
 
-export const currentSaveVersion = 2;
+export const currentSaveVersion = 3;
 
 const exportPrefix = 'WEBRIDDLE-';
 const exportSuffix = '-END';
