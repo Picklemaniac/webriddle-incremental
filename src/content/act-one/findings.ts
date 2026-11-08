@@ -3,8 +3,10 @@ import type { Game } from '../../core/game.ts';
 import type { GameState } from '../../core/state.ts';
 import type { Modifier } from '../../core/stats.ts';
 import { effectiveRate } from './network.ts';
-import { increment, noticeOnce, solveLevel } from './progress.ts';
-import { findingText, type FindingId } from './text.ts';
+import { urlOfLevel } from './levels.ts';
+import { increment, solveLevel } from './progress.ts';
+import { fill, findingText, type FindingId } from './text.ts';
+import { wordAtRank } from './vocabulary.ts';
 
 export interface Finding {
     readonly id: FindingId;
@@ -41,6 +43,7 @@ export function findingModifiers(state: GameState): readonly Modifier[] {
 function discoverFinding(game: Game, finding: Finding): void {
     const { state } = game;
     state.findings[finding.id] = (state.findings[finding.id] ?? 0) + 1;
+    state.statistics[`foundAtLevel:${finding.id}`] = state.currentLevel;
     state.flags.findingsRevealed = true;
     game.gainResource('money', finding.money ?? 0);
     if (finding.id === 'dictionary') game.gainResource('words', 1000);
@@ -66,4 +69,22 @@ export const findingDrops: GameSystem = {
 
 function nextDelay(game: Game): number {
     return Math.min(360, 60 - Math.log(1 - game.random()) * 130);
+}
+
+const fileDate = '2001-03-14 02:11';
+
+export function findingFile(finding: Finding, state: GameState): string {
+    const texts: Readonly<Record<FindingId, { readonly file: string; readonly entry?: string }>> = findingText;
+    const { file, entry = '' } = texts[finding.id];
+    const level = state.statistics[`foundAtLevel:${finding.id}`] ?? state.currentLevel;
+    const following = Array.from({ length: finding.levels ?? 0 }, (_, index) => level + 1 + index);
+    const pageName = (target: number): string => new URL(urlOfLevel(target)).pathname;
+    const size = (target: number): string => String(900 + target * 37 % 3100).padStart(9);
+    const entries = finding.id === 'dictionary'
+        ? Array.from({ length: 12 }, (_, index) => fill(entry, { word: wordAtRank(300 + index * 7) }))
+        : following.map((target) => fill(entry, {
+            url: urlOfLevel(target), level: target, size: size(target), date: fileDate,
+            name: finding.id === 'cache' ? pageName(target).slice(1).padEnd(24) : pageName(target).slice(1),
+        }));
+    return fill(file, { entries: entries.join('\n') });
 }

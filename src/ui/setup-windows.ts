@@ -1,5 +1,8 @@
+import type { Game } from '../core/game.ts';
+import { findings } from '../content/act-one/findings.ts';
+import { riddleOrigin } from '../content/act-one/riddle.ts';
 import { fill, setupText, type UpgradeId } from '../content/act-one/text.ts';
-import type { Upgrade } from '../content/act-one/upgrades.ts';
+import { upgrades, type Upgrade } from '../content/act-one/upgrades.ts';
 import { createElement, createProgressBar, createTitleBar } from './dom.ts';
 
 type SetupKind = 'install' | 'download' | 'hardware' | 'connection';
@@ -16,19 +19,30 @@ const downloadFiles: Readonly<Partial<Record<UpgradeId, string>>> = {
 };
 
 const durations: Readonly<Record<SetupKind, number>> = { install: 1.6, download: 2, hardware: 1.4, connection: 2.4 };
+const maximumWindows = 3;
 
 export class SetupWindows {
     private readonly element = createElement('div', { className: 'setup-windows', attributes: { role: 'status' } });
 
-    constructor() {
+    constructor(game: Game) {
         document.body.append(this.element);
+        game.subscribe((event) => {
+            if (game.isCatchingUp) return;
+            if (event.type === 'actionApplied' && event.action.type === 'purchase') {
+                const id = event.action.purchasableId;
+                const upgrade = upgrades.find((item) => item.id === id);
+                if (upgrade) this.showPurchase(upgrade);
+            } else if (event.type === 'findingDiscovered') {
+                const finding = findings.find((item) => item.id === event.findingId);
+                if (finding) this.open(setupText.downloadTitle, [fill(setupText.downloading, { file: finding.path, host: new URL(riddleOrigin).host })], durations.download);
+            }
+        });
     }
 
-    show(upgrade: Upgrade): void {
+    private showPurchase(upgrade: Upgrade): void {
         const id = upgrade.id as UpgradeId;
         const kind = kinds[id];
         if (kind === undefined) return;
-        const seconds = durations[kind];
         const name = upgrade.name;
         const title = {
             install: fill(setupText.installTitle, { name }),
@@ -41,15 +55,22 @@ export class SetupWindows {
             download: [fill(setupText.downloading, { file: downloadFiles[id] ?? name, host: setupText.downloadHost })],
             hardware: [name, setupText.hardwareStatus],
             connection: [setupText.connectionSteps[0]],
-        }[kind].map((line) => createElement('p', { text: line }));
+        }[kind];
+        const status = this.open(title, lines, durations[kind]);
+        if (kind === 'connection') {
+            setupText.connectionSteps.forEach((step, index) => setTimeout(() => { status.textContent = step; }, index * durations.connection * 1000 / setupText.connectionSteps.length));
+        }
+    }
+
+    private open(title: string, lines: readonly string[], seconds: number): HTMLElement {
+        const paragraphs = lines.map((line) => createElement('p', { text: line }));
         const window = createElement('section', { className: 'setup-window' }, [
             createTitleBar([createElement('strong', { text: title })]),
-            createElement('div', { className: 'setup-body' }, [...lines, createProgressBar(seconds)]),
+            createElement('div', { className: 'setup-body' }, [...paragraphs, createProgressBar(seconds)]),
         ]);
         this.element.append(window);
-        if (kind === 'connection') {
-            setupText.connectionSteps.forEach((step, index) => setTimeout(() => { lines[0]!.textContent = step; }, index * seconds * 1000 / setupText.connectionSteps.length));
-        }
+        while (this.element.childElementCount > maximumWindows) this.element.firstElementChild?.remove();
         setTimeout(() => window.remove(), seconds * 1000 + 900);
+        return paragraphs[0]!;
     }
 }

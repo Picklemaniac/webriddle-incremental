@@ -143,15 +143,20 @@ strong { font-weight: 600; }
 .proxy-address { font-family: 'IBM Plex Mono', monospace; }
 .proxy-row button { width: 65px; padding: 4px; }
 .proxy-row.dead .proxy-address { color: var(--problem); text-decoration: line-through; }
-.finding-count { font-size: 10px; letter-spacing: 0; }
-.finding-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 30px; white-space: nowrap; }
-.dashboard .finding-link { padding: 4px 0; background: transparent; box-shadow: none; color: var(--text); font: 12px 'IBM Plex Mono', monospace; text-decoration: underline; }
-.dashboard .finding-link:hover:not(:disabled) { background: transparent; color: #fff; }
-.dashboard .uncommon .finding-link { color: var(--found); }
-.dashboard .rare .finding-link { color: var(--link); }
-.dashboard .legendary .finding-link { color: var(--treasure); }
-.dashboard .text-button { margin-top: 12px; padding: 0; background: transparent; box-shadow: none; color: var(--text-dim); font: 11px Verdana, sans-serif; text-decoration: underline; }
-.dashboard .text-button:hover:not(:disabled) { background: transparent; color: var(--text); }
+.findings-window { margin-bottom: 28px; padding: 3px; background: #c0c0c0; color: #000; border: 2px solid; border-color: #fff #444 #444 #fff; box-shadow: 1px 1px 0 #000; font: 11px Tahoma, Arial, sans-serif; color-scheme: light; animation: reveal .4s ease; }
+.file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 8px 4px; align-content: start; min-height: 132px; margin-top: 3px; padding: 10px 6px; background: #fff; border: 2px solid; border-color: #777 #eee #eee #777; }
+.dashboard .findings-window .file { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; padding: 2px; background: transparent; box-shadow: none; color: #000; text-shadow: none; cursor: default; }
+.dashboard .findings-window .file:hover { background: transparent; }
+.dashboard .findings-window .file:focus-visible { outline: 1px dotted #000; outline-offset: 0; }
+.file-icon { width: 32px; height: 32px; }
+.file-label { max-width: 100%; padding: 0 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.findings-window .file.selected .file-label { background: #000080; color: #fff; }
+.file-status { display: flex; align-items: center; gap: 4px; padding-top: 3px; height: 26px; }
+.file-info, .file-count { padding: 3px 5px; border: 1px solid; border-color: #888 #eee #eee #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-info { flex: 1; min-width: 0; }
+.file-count { flex: none; }
+.dashboard .file-status button { flex: none; height: 22px; padding: 0 8px; }
+.notepad-text { margin: 0; padding: 8px 10px; min-height: 220px; max-height: 55vh; overflow: auto; background: #fff; color: #000; border: 2px solid; border-color: #777 #eee #eee #777; font: 13px/1.5 'Courier New', monospace; white-space: pre; }
 .window-dialog { padding: 3px; width: min(430px, calc(100vw - 32px)); max-height: 85vh; background: #c0c0c0; color: black; border: 2px solid; border-color: white #444 #444 white; font: 12px Tahoma, Arial, sans-serif; color-scheme: light; box-shadow: 4px 4px 0 #0006; }
 .window-dialog.wide { width: min(800px, calc(100vw - 40px)); }
 .window-dialog::backdrop { background: #0006; }

@@ -126,19 +126,60 @@ export const upgradeText = {
 export type UpgradeId = keyof typeof upgradeText;
 
 export const findingText = {
-    robots: { description: '+$15 per find.', file: 'User-agent: *\nDisallow: /answers/' },
-    readme: { description: '+$25 per find.', file: 'lowercase. no spaces. look at the source.' },
-    sitemap: { description: 'Skip 3 levels per find.', file: '<urlset>\n  <!-- A few paths that should not be here. -->\n</urlset>' },
-    dictionary: { description: '+1,000 words per find.', file: '# An old wordlist. Still useful.' },
-    notes: { description: '+$60 per find.', file: 'The picture is not always the clue.' },
-    cache: { description: 'Skip 5 levels per find.', file: 'Index of /cache/\nFive pages, already answered.' },
-    git: { description: '+10% search efficiency per copy, up to 5 copies.', file: 'An old revision of the riddle. Some patterns have not changed.' },
-    htpasswd: { description: 'Unlocks Crack .htpasswd. Duplicates give +$75.', file: '# Recovered credentials. The tools to read them are in Upgrades.' },
-    backup: { description: 'Skip 12 levels per find.', file: 'backup.zip\n12 readable pages recovered.' },
-    env: { description: '+25% search efficiency per copy, up to 5 copies.', file: 'RIDDLE_MODE=production\nDEBUG=true' },
-    walkthrough: { description: 'Skip 25 levels per find.', file: 'Someone has been here before. The next 25 answers are legible.' },
-    source: { description: '+$250 per find.', file: 'A fragment of the machinery behind the pages.' },
-} as const satisfies Record<string, { readonly description: string; readonly file: string }>;
+    robots: {
+        description: '+$15 per find.',
+        file: 'User-agent: *\nDisallow: /admin/\nDisallow: /answers/\n# answers stay lowercase',
+    },
+    readme: {
+        description: '+$25 per find.',
+        file: 'README\n\nEvery answer is the name of a page.\nAll lowercase, no spaces.\nStuck? Look at the source.',
+    },
+    sitemap: {
+        description: 'Skip 3 levels per find.',
+        file: '<?xml version="1.0" encoding="UTF-8"?>\n<urlset>\n{entries}\n</urlset>',
+        entry: '  <url><loc>{url}</loc></url>',
+    },
+    dictionary: {
+        description: '+1,000 words per find.',
+        file: '{entries}\n...\n(1,000 lines)',
+        entry: '{word}',
+    },
+    notes: {
+        description: '+$60 per find.',
+        file: 'notes\n\n- the picture is not always the clue\n- every answer must be in the dictionary\n- TODO: move new levels into folders',
+    },
+    cache: {
+        description: 'Skip 5 levels per find.',
+        file: 'Index of /cache/\n\nName                    Last modified       Size\n{entries}',
+        entry: '{name}{date}  {size}',
+    },
+    git: {
+        description: '+10% search efficiency per copy, up to 5 copies.',
+        file: 'Index of /.git/\n\nHEAD\nconfig\nlogs/\nobjects/\nrefs/\n\nlogs/HEAD:\nadd levels 1-9\nadd generated levels\nanswers: dictionary words only\nmove levels 100+ into folders\nfix: credentials door',
+    },
+    htpasswd: {
+        description: 'Unlocks Crack .htpasswd. Duplicates give +$75.',
+        file: 'admin:$apr1$Qx4l1oPZ$Hk3hJ6v.9mJdZf5yq0fN0/\nguest:$apr1$7KmLr2Da$WqU1lN2cE0r9dQ3xY8kL2.',
+    },
+    backup: {
+        description: 'Skip 12 levels per find.',
+        file: 'Archive:  backup.zip\n  Length      Date    Time    Name\n---------  ---------- -----   ----\n{entries}',
+        entry: '{size}  {date}   {name}',
+    },
+    env: {
+        description: '+25% search efficiency per copy, up to 5 copies.',
+        file: 'RIDDLE_ROOT=/var/www/riddle\nANSWERS=lowercase\nWORDLIST=/usr/share/dict/words\nDEBUG=true',
+    },
+    walkthrough: {
+        description: 'Skip 25 levels per find.',
+        file: 'walkthrough (spoilers!)\n\n{entries}',
+        entry: 'level {level}: {url}',
+    },
+    source: {
+        description: '+$250 per find.',
+        file: 'riddle/\nriddle/make-levels.pl\nriddle/words.txt\nriddle/images/\nriddle/levels/\nriddle/README',
+    },
+} as const satisfies Record<string, { readonly description: string; readonly file: string; readonly entry?: string }>;
 
 export type FindingId = keyof typeof findingText;
 
@@ -207,6 +248,10 @@ export const uiText = {
     levelsSolved: 'levels solved',
     dismiss: 'Dismiss',
     noUpgrades: 'Nothing new to install right now.',
+    findingsFolder: 'C:\\findings',
+    openHint: 'Double-click a file to open it.',
+    foundCount: '{found} of {total} found',
+    notepadTitle: '{file} - Notepad',
 } as const;
 
 export const terminalText = {
@@ -215,7 +260,7 @@ export const terminalText = {
     toolCommand: '$ {tool} -u {folder} -w {list} -t {threads}',
     gobusterCommand: '$ gobuster dir -u {folder} -w {list} -t {threads}',
     ban: '429 · banned; captcha or wait',
-    found: 'FOUND',
+    found: '+ /{path} (CODE:200|SIZE:{size})',
     hand: 'solved by hand',
     indexed: 'indexed page',
     identicalResponse: '[identical response]',

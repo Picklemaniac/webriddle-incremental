@@ -5,7 +5,6 @@ import { isUpgradeRevealed } from '../content/act-one/progress.ts';
 import { labels, uiText } from '../content/act-one/text.ts';
 import { formatNumber } from '../format.ts';
 import { createButton, createElement } from './dom.ts';
-import { SetupWindows } from './setup-windows.ts';
 import { section } from './status-panel.ts';
 import type { Panel } from './panel.ts';
 
@@ -17,7 +16,6 @@ export class PurchasesPanel implements Panel {
     private readonly cards = new Map<string, UpgradeCard>();
     private readonly leaving = new Map<string, number>();
     private readonly empty = createElement('p', { className: 'panel-help', text: uiText.noUpgrades });
-    private readonly setup = new SetupWindows();
     private purchaseLockUntil = 0;
 
     constructor(game: Game) {
@@ -63,7 +61,6 @@ export class PurchasesPanel implements Panel {
     private purchase(item: Upgrade): void {
         const now = performance.now();
         if (now < this.purchaseLockUntil || !this.game.dispatch({ type: 'purchase', purchasableId: item.id })) return;
-        this.setup.show(item);
         // Keep the bought card's space while it fades so the next card does not slide under the cursor.
         this.leaving.set(item.id, now + 450);
         this.purchaseLockUntil = now + 600;

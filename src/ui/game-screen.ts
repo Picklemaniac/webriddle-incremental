@@ -8,6 +8,7 @@ import { FindingsPanel } from './findings-panel.ts';
 import { MessageBoxes } from './message-boxes.ts';
 import type { Panel } from './panel.ts';
 import { PurchasesPanel } from './purchases-panel.ts';
+import { SetupWindows } from './setup-windows.ts';
 import { SetupWizard } from './setup-wizard.ts';
 import { startSound } from './sound.ts';
 import { StatusPanel } from './status-panel.ts';
@@ -23,6 +24,7 @@ export class GameScreen {
     private readonly automate: HTMLButtonElement;
     private readonly prompt: HTMLElement;
     private readonly messageBoxes: MessageBoxes;
+    private readonly setupWindows: SetupWindows;
     private readonly dashboard: HTMLElement;
     private readonly wizard = new SetupWizard();
 
@@ -32,9 +34,10 @@ export class GameScreen {
         const terminal = new TerminalPanel(game);
         const status = new StatusPanel(game);
         const purchases = new PurchasesPanel(game);
-        const findings = new FindingsPanel(game, (url) => browser.navigate(url));
+        const findings = new FindingsPanel(game);
         this.panels = [browser, terminal, status, purchases, findings];
         this.messageBoxes = new MessageBoxes(game);
+        this.setupWindows = new SetupWindows(game);
         this.awaySummary = new AwaySummary(game.content);
         this.automate = createButton(labels.automate, () => this.wizard.open(() => game.dispatch({ type: 'automate' })));
         this.automate.className = 'automate-offer';

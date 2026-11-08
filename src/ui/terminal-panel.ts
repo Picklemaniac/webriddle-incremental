@@ -2,7 +2,7 @@ import type { Game } from '../core/game.ts';
 import type { GameEvent } from '../core/events.ts';
 import { currentSearch } from '../content/act-one/automation.ts';
 import { dirbustingScripts } from '../content/act-one/economy.ts';
-import { findings } from '../content/act-one/findings.ts';
+import { findingFile, findings } from '../content/act-one/findings.ts';
 import { isLearned, lessonFor } from '../content/act-one/lessons.ts';
 import { entrance, urlOfLevel } from '../content/act-one/levels.ts';
 import { effectiveRate, isBanned, requestedRate } from '../content/act-one/network.ts';
@@ -127,7 +127,11 @@ export class TerminalPanel implements Panel {
                 this.queueLine(`${method}  ${new URL(urlOfLevel(event.level)).pathname}`, 'hit');
                 break;
             }
-            case 'findingDiscovered': this.queueLine(`${terminalText.found}  ${findings.find((item) => item.id === event.findingId)?.path ?? event.findingId}  ×${event.count}`, 'finding'); break;
+            case 'findingDiscovered': {
+                const finding = findings.find((item) => item.id === event.findingId);
+                if (finding) this.queueLine(fill(terminalText.found, { path: finding.path, size: findingFile(finding, this.game.state).length }), 'finding');
+                break;
+            }
         }
     }
 

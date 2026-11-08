@@ -169,6 +169,11 @@ try {
     await sleep(900);
     await screenshot('working');
     await assertLayout(1440);
+    await evaluate(`[...document.querySelectorAll('.findings-window .file')].find((file) => !file.hidden && file.textContent.startsWith('sitemap'))?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
+    await waitFor(`document.querySelector('dialog[open] .notepad-text') !== null`);
+    assert.match(await evaluate(`document.querySelector('dialog[open] .notepad-text').textContent`), /<loc>http/, 'The sitemap lists real level addresses');
+    await screenshot('notepad');
+    await closeDialog();
     await toolbar('View Source');
     const inspectedPage = await evaluate(`document.querySelector('.browser-viewport').contentDocument.title`);
     const inspectedSource = await evaluate(`document.querySelector('.source-document').textContent`);
