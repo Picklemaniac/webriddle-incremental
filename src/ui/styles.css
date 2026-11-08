@@ -1,0 +1,204 @@
+* {
+    box-sizing: border-box;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+html,
+body,
+#game {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    font: 14px/1.4 system-ui, sans-serif;
+    color: #e8eaed;
+    background: #202124;
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
+.game-screen {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    height: 100%;
+}
+
+.browser {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: #dee1e6;
+}
+
+.browser-toolbar {
+    display: flex;
+    gap: 6px;
+    padding: 6px;
+    background: #f1f3f4;
+    border-bottom: 1px solid #c4c7c5;
+}
+
+.browser-address {
+    flex: 1;
+    padding: 6px 12px;
+    color: #202124;
+    background: #fff;
+    border: 1px solid #c4c7c5;
+    border-radius: 16px;
+}
+
+.browser-viewport,
+.browser-source {
+    flex: 1;
+    width: 100%;
+    border: 0;
+    background: #fff;
+}
+
+.browser-source {
+    margin: 0;
+    padding: 12px;
+    overflow: auto;
+    color: #202124;
+    font: 13px/1.4 ui-monospace, monospace;
+    white-space: pre-wrap;
+}
+
+.side-panels {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+    overflow-y: auto;
+}
+
+.panel {
+    padding: 12px;
+    background: #2b2c2f;
+    border-radius: 6px;
+}
+
+.panel h2 {
+    margin: 0 0 8px;
+    color: #9aa0a6;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.progress {
+    height: 6px;
+    margin: 6px 0 10px;
+    overflow: hidden;
+    background: #3c4043;
+    border-radius: 3px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #8ab4f8;
+}
+
+.purchase-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.purchase-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 8px;
+    align-items: center;
+}
+
+.purchase-owned,
+.purchase-cost {
+    color: #9aa0a6;
+    font-size: 12px;
+}
+
+.purchase-row button {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+}
+
+.away-summary {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 16px;
+    background: #2b2c2f;
+    border: 1px solid #5f6368;
+    border-radius: 6px;
+    transform: translateX(-50%);
+}
+
+.away-summary p {
+    margin: 0;
+}
+
+.dev-panel {
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    width: 380px;
+    max-height: 85vh;
+    padding: 10px 12px;
+    overflow-y: auto;
+    font: 12px/1.4 ui-monospace, monospace;
+    background: #111;
+    border: 1px solid #f9ab00;
+    border-radius: 6px;
+}
+
+.dev-panel h2 {
+    margin: 0 0 8px;
+    color: #f9ab00;
+    font-size: 12px;
+}
+
+.dev-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.dev-label {
+    width: 72px;
+    color: #9aa0a6;
+}
+
+.dev-row input,
+.dev-row select {
+    width: 110px;
+}
+
+.dev-row textarea {
+    width: 100%;
+}
+
+.dev-status {
+    margin: 8px 0 0;
+    color: #81c995;
+}
