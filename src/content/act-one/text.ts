@@ -206,15 +206,12 @@ export const uiText = {
 
 export const terminalText = {
     title: 'Request log',
-    session: 'Resuming the script.',
     booting: 'Starting script…',
     curlCommand: '$ while read name; do curl -I "{folder}$name.htm"; done < {list}',
     toolCommand: '$ {tool} -u {folder} -w {list} -t {threads}',
     gobusterCommand: '$ gobuster dir -u {folder} -w {list} -t {threads}',
     ban: '429 · banned; captcha or wait',
     unbanned: 'Connection restored.',
-    wrongCaptcha: 'Captcha rejected. Try again.',
-    purchased: 'Installed',
     found: 'FOUND',
     hand: 'solved by hand',
     indexed: 'indexed page',
