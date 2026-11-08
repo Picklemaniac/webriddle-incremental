@@ -1,6 +1,6 @@
 # webriddle-incremental
 
-An incremental browser game about getting through a very long webriddle by brute force, played in a fake 2006 web browser.
+An incremental browser game about getting through a very long webriddle by any means necessary.
 
 ## How to start
 
