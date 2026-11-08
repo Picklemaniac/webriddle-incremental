@@ -118,7 +118,7 @@ export class BrowserPanel implements Panel {
         if (this.page.html !== this.renderedHtml) {
             this.renderedHtml = this.page.html;
             this.viewport.srcdoc = this.page.html;
-            const title = this.page.title ? `${this.page.title} - ${browserName}` : browserName;
+            const title = `${this.page.title || browserUrl} - ${browserName}`;
             setText(this.title, title);
             document.title = title;
         }

@@ -7,7 +7,7 @@ import { findingDrops, findingModifiers, findingsEnabled } from './findings.ts';
 import { entrance } from './levels.ts';
 import { isBanned, network, networkCapacity, replaceProxy, requestedRate, setThrottle } from './network.ts';
 import { canonicalUrl, resolvePage } from './pages.ts';
-import { automationElapsed, isUpgradeRevealed, owns, solveLevel, wasNoticed } from './progress.ts';
+import { automationElapsed, isUpgradeRevealed, owns, solveLevel } from './progress.ts';
 import { homeUrl, startUrl } from './riddle.ts';
 import { labels } from './text.ts';
 import { capacityUpgrades, offeredUpgrades, upgrades, type Upgrade } from './upgrades.ts';
@@ -37,7 +37,7 @@ const reveals: GameSystem = {
         } else if (!state.flags.scriptsRevealed && game.stat('scriptSlots') >= 2) {
             state.flags.scriptsRevealed = true;
             state.flags.machineRevealed = true;
-        } else if (!state.flags.dataRevealed && wasNoticed(state, 'wordlistExhausted')) {
+        } else if (!state.flags.dataRevealed && state.flags.wordlistExhausted === true) {
             if (!isUpgradeRevealed(state, 'english10k')) {
                 revealBeforeCurrency(game, 'english10k');
                 return;

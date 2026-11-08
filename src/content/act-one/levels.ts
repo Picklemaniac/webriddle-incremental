@@ -2,7 +2,7 @@ import { encode, toLeet } from './encodings.ts';
 import { imageWithWord, levelImageCount } from './images.ts';
 import { textEncodingFor, wordClue, yearClue, type Clue } from './methods.ts';
 import { pickByUnit, ramp, riddleOrigin, salts, startUrl, unitHash } from './riddle.ts';
-import { clueLines, fill, handcraftedText, pageText } from './text.ts';
+import { clueLines, fill, handcraftedText, pageText, riddleName } from './text.ts';
 import { vocabularySize, wordAtRank } from './vocabulary.ts';
 import { folderNames } from './word-lists.ts';
 
@@ -57,6 +57,7 @@ const firstFolderLevel = 100;
 const commonWordShare = 0.25;
 const commonWordRanks = 300;
 const levelsPerFolder = 100;
+const untitledShare = 0.3;
 
 const wildcardFolders = new Set(['basalt', 'ember']);
 export const otherExtensions: readonly string[] = ['html', 'php', 'asp', 'txt'];
@@ -113,7 +114,7 @@ export function levelPage(level: number): LevelPage {
     return {
         level,
         url: urlOfLevel(level),
-        title: clue.title ? fill(pageText.levelTitleWithClue, { level, clue: clue.title }) : fill(pageText.levelTitle, { level }),
+        title: clue.title ?? defaultTitle(level),
         imageId: pageImage(level),
         imageName: clue.imageName ?? `${level}.jpg`,
         imageTitle: clue.imageTitle ?? null,
@@ -124,6 +125,10 @@ export function levelPage(level: number): LevelPage {
         hiddenText: clue.hiddenText ?? null,
         comments: [clue.comment, next.folder !== null && next.folder !== folderFor(level) ? fill(pageText.folderComment, { folder: next.folder }) : undefined].filter((comment) => comment !== undefined),
     };
+}
+
+function defaultTitle(level: number): string {
+    return level >= firstGeneratedLevel && unitHash(level, salts.title) < untitledShare ? '' : riddleName;
 }
 
 function handcraftedEntrance(level: number): Entrance {

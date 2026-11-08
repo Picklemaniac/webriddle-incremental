@@ -30,6 +30,7 @@ export const salts = {
     door: 17,
     username: 18,
     password: 19,
+    title: 20,
 } as const;
 
 export function unitHash(level: number, salt: number): number {

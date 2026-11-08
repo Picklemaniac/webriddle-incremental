@@ -49,7 +49,7 @@ export const dirbuster: GameSystem = {
             if (notice) noticeOnce(game, notice);
             if (plan.blockedBy !== null) break;
             if (plan.bruteForce) noticeOnce(game, 'bruteForce');
-            if (plan.bruteForce && wordlistKinds.has(target.kind)) noticeOnce(game, 'wordlistExhausted');
+            if (plan.bruteForce && wordlistKinds.has(target.kind)) state.flags.wordlistExhausted = true;
             if (target.kind === 'leet') noticeOnce(game, 'leetAnswer');
             if (target.kind === 'number') noticeOnce(game, 'numberAnswer');
             if (target.kind === 'twoWords') noticeOnce(game, 'twoWordsAnswer');

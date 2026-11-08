@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { actOneContent } from '../content/act-one/index.ts';
 import { urlOfLevel } from '../content/act-one/levels.ts';
-import { automationElapsed, isUpgradeRevealed, wasNoticed } from '../content/act-one/progress.ts';
+import { automationElapsed, isUpgradeRevealed } from '../content/act-one/progress.ts';
 import { Game } from '../core/game.ts';
 import { createInitialState } from '../core/state.ts';
 import { actOneStrategy } from './act-one-strategy.ts';
@@ -89,7 +89,7 @@ describe('Act I onboarding', () => {
             game.advance(1);
             if (cardSecond === undefined && isUpgradeRevealed(game.state, 'english10k')) cardSecond = second;
         }
-        expect(wasNoticed(game.state, 'wordlistExhausted')).toBe(true);
+        expect(game.state.flags.wordlistExhausted).toBe(true);
         expect(game.state.flags.dataRevealed).toBe(true);
         expect(second - cardSecond!).toBeGreaterThanOrEqual(6);
     });

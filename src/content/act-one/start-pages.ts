@@ -108,7 +108,7 @@ function riddleHome(rendered: boolean): string {
 
 function riddleSubpage(heading: string, content: readonly string[]): Site {
     return {
-        title: fill(riddleHomeText.subpageTitle, { name: riddleName, page: heading }),
+        title: riddleName,
         body: (rendered) => [
             '<center>',
             '<br>',

@@ -41,7 +41,6 @@ export const notices = {
     extensionBlock: 'No .htm page matches. The next level has a different file extension.',
     wildcardBlock: 'This folder returns a page for every name, so every guess looks like a hit.',
     credentialsBlock: '401 Unauthorized. The next level asks for a user name and a password.',
-    wordlistExhausted: 'The next answer is not in words.txt. DirBuster is now trying every combination of letters, which will take a very long time.',
     leetAnswer: 'The next answer uses digits in place of some letters, so it is not in any wordlist. Brute force will take a long time.',
     numberAnswer: 'The next answer is a number. DirBuster is trying every number from 0000 to 9999.',
     twoWordsAnswer: 'The next answer is two words written together, and your wordlists only have one word per line.',
@@ -59,7 +58,7 @@ export const handcraftedText = {
     level3: 'get to the source of the problem.',
     level3Comment: 'beneath.htm',
     level4: 'it\'s dark down here.',
-    level5Title: 'it blinks.',
+    level5Title: 'it blinks',
     level6: 'i have a GIFT for you.',
     level7Tooltip: 'hidden',
     level8Title: 'half moon',
@@ -68,10 +67,10 @@ export const handcraftedText = {
 } as const;
 
 export const methodHints = {
-    caesar: 'veni, vidi, vici.',
-    keyboardRight: 'one step to the right.',
-    keyboardLeft: 'one step to the left.',
-    pollux: 'one four seven, two five eight, and the rest is silence.',
+    caesar: 'veni, vidi, vici',
+    keyboardRight: 'one step to the right',
+    keyboardLeft: 'one step to the left',
+    pollux: 'one four seven, two five eight, and the rest is silence',
     gif: 'a GIFT, wrapped the wrong way.',
     txt: 'just TXT me.',
     json: 'ask JSON.',
@@ -132,15 +131,12 @@ export const riddleHomeText = {
     hallOfFameHeading: 'Hall of Fame',
     hallOfFameColumns: ['#', 'Name', 'Date'],
     hallOfFame: 'Nobody has finished {name} yet.',
-    subpageTitle: '{name} - {page}',
     back: 'Back',
     visitors: 'Visitors since November 2005',
     updated: 'Last updated: 14 March 2006',
 } as const;
 
 export const pageText = {
-    levelTitle: 'Level {level}',
-    levelTitleWithClue: 'Level {level}: {clue}',
     folderComment: 'new levels go in /{folder}/',
     wildcardPage: 'nothing here.',
 } as const;

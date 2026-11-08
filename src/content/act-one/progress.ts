@@ -40,14 +40,11 @@ export function solveLevel(game: Game, method: SolveMethod): void {
 }
 
 export function noticeOnce(game: Game, noticeId: NoticeId): void {
-    if (!wasNoticed(game.state, noticeId)) {
-        game.state.flags[`notice:${noticeId}`] = true;
+    const flag = `notice:${noticeId}`;
+    if (game.state.flags[flag] !== true) {
+        game.state.flags[flag] = true;
         game.announce({ type: 'notice', noticeId });
     }
-}
-
-export function wasNoticed(state: GameState, noticeId: NoticeId): boolean {
-    return state.flags[`notice:${noticeId}`] === true;
 }
 
 export function increment(state: GameState, statisticId: string, amount = 1): void {
