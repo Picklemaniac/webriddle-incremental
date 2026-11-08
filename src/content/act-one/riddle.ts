@@ -31,6 +31,9 @@ export const salts = {
     username: 18,
     password: 19,
     title: 20,
+    layer: 21,
+    layerEncoding: 22,
+    key: 23,
 } as const;
 
 export function unitHash(level: number, salt: number): number {

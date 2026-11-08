@@ -1,6 +1,6 @@
-export type Encoding = 'reversed' | 'a1z26' | 'rot13' | 'caesar' | 'atbash' | 'keyboard' | 'morse' | 'nato' | 'phone' | 'braille'
+export type Encoding = 'reversed' | 'a1z26' | 'rot13' | 'caesar' | 'shift' | 'atbash' | 'keyboard' | 'morse' | 'nato' | 'phone' | 'braille'
     | 'tap' | 'bacon' | 'polybius' | 'adfgvx' | 'binary' | 'octal' | 'hex' | 'ascii' | 'roman' | 'arithmetic' | 'url' | 'entities'
-    | 'base64' | 'dna' | 'codepoints' | 'pollux';
+    | 'base64' | 'dna' | 'codepoints' | 'pollux' | 'rot47' | 'railFence' | 'upsideDown' | 'dvorak';
 
 const morseAlphabet: Readonly<Record<string, string>> = {
     a: '.-', b: '-...', c: '-.-.', d: '-..', e: '.', f: '..-.', g: '--.', h: '....', i: '..', j: '.---',
@@ -19,6 +19,14 @@ const tapGrid = 'abcdefghijlmnopqrstuvwxyz';
 const squareGrid = 'abcdefghijklmnopqrstuvwxyz0123456789';
 const adfgvxLabels = 'ADFGVX';
 const dnaBases = 'ACGT';
+const upsideDownLetters = [...'ɐqɔpǝɟƃɥᴉɾʞlɯuodbɹsʇnʌʍxʎz'];
+const qwertyKeys = 'qwertyuiopasdfghjkl;zxcvbnm,./';
+const dvorakKeys = '\',.pyfgcrlaoeuidhtns;qjkxbmwvz';
+const letterShifts = Array.from({ length: 25 }, (_, index) => index + 1).filter((shift) => shift !== 3 && shift !== 13);
+const elementSymbols = ('H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn Ga Ge As Se Br Kr Rb Sr Y Zr Nb Mo Tc Ru Rh '
+    + 'Pd Ag Cd In Sn Sb Te I Xe Cs Ba La Ce Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu Hf Ta W Re Os Ir Pt Au Hg Tl Pb Bi Po At Rn Fr Ra Ac Th Pa '
+    + 'U Np Pu Am Cm Bk Cf Es Fm Md No Lr Rf Db Sg Bh Hs Mt Ds Rg').split(' ');
+const atomicNumbers = new Map(elementSymbols.map((symbol, index) => [symbol.toLowerCase(), index + 1]));
 
 const romanNumerals: readonly (readonly [number, string])[] = [
     [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'],
@@ -37,6 +45,16 @@ export function encode(text: string, encoding: Encoding, unit = 0): string {
             return shiftLetters(text, 13);
         case 'caesar':
             return shiftLetters(text, 3);
+        case 'shift':
+            return shiftLetters(text, letterShifts[Math.floor(unit * letterShifts.length)]!);
+        case 'rot47':
+            return text.replace(/[!-~]/g, (character) => String.fromCharCode(33 + ((character.charCodeAt(0) - 33 + 47) % 94)));
+        case 'railFence':
+            return railFence(text, 3);
+        case 'dvorak':
+            return [...text].map((character) => qwertyKeys[dvorakKeys.indexOf(character)] ?? character).join('');
+        case 'upsideDown':
+            return [...text].reverse().map((character) => upsideDownLetters[character.charCodeAt(0) - 97] ?? character).join('');
         case 'atbash':
             return text.replace(/[a-z]/g, (letter) => String.fromCharCode(219 - letter.charCodeAt(0)));
         case 'keyboard':
@@ -86,6 +104,50 @@ export function encode(text: string, encoding: Encoding, unit = 0): string {
 
 export function keyboardShift(unit: number): number {
     return unit < 0.5 ? 1 : -1;
+}
+
+export function vigenere(text: string, key: string): string {
+    let position = 0;
+    return text.replace(/[a-z]/g, (letter) => shiftLetters(letter, key.charCodeAt(position++ % key.length) - 97));
+}
+
+export function atomicNumberSpelling(word: string): string | null {
+    const spellings: (number[] | null)[] = [[], ...Array.from({ length: word.length }, () => null)];
+    for (let end = 1; end <= word.length; end++) {
+        for (const length of [2, 1]) {
+            const before = spellings[end - length];
+            const number = atomicNumbers.get(word.slice(end - length, end));
+            if (before !== null && before !== undefined && number !== undefined) {
+                spellings[end] = [...before, number];
+                break;
+            }
+        }
+    }
+    return spellings[word.length]?.join(' ') ?? null;
+}
+
+export function characterColors(text: string): string[] {
+    const codes = [...text].map((character) => character.charCodeAt(0));
+    while (codes.length % 3 !== 0) codes.push(0);
+    return Array.from({ length: codes.length / 3 }, (_, index) => `#${codes.slice(index * 3, index * 3 + 3).map((code) => code.toString(16).padStart(2, '0')).join('')}`);
+}
+
+export function morseCode(character: string): string | undefined {
+    return morseAlphabet[character];
+}
+
+export function brailleDots(letter: string): number {
+    return (brailleAlphabet.codePointAt(letter.charCodeAt(0) - 97) ?? 0x2800) - 0x2800;
+}
+
+function railFence(text: string, rails: number): string {
+    const rows = Array.from({ length: rails }, () => '');
+    const cycle = 2 * (rails - 1);
+    [...text].forEach((character, index) => {
+        const position = index % cycle;
+        rows[position < rails ? position : cycle - position] += character;
+    });
+    return rows.join('');
 }
 
 function shiftLetters(text: string, shift: number): string {

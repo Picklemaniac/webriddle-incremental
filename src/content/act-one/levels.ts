@@ -1,8 +1,10 @@
+import type { Drawing } from './drawings.ts';
 import { encode, toLeet } from './encodings.ts';
 import { imageWithWord, levelImageCount } from './images.ts';
-import { textEncodingFor, wordClue, yearClue, type Clue } from './methods.ts';
+import { encodedClue, textEncodingFor, wordClue, yearClue, type Clue } from './methods.ts';
 import { pickByUnit, ramp, riddleOrigin, salts, startUrl, unitHash } from './riddle.ts';
-import { clueLines, fill, handcraftedText, pageText, riddleName } from './text.ts';
+import type { Sound } from './sounds.ts';
+import { alternateFiles, clueLines, fill, handcraftedText, linkedFiles, pageText, riddleName } from './text.ts';
 import { vocabularySize, wordAtRank } from './vocabulary.ts';
 import { folderNames } from './word-lists.ts';
 
@@ -29,6 +31,14 @@ export interface Entrance {
     readonly positionUnit: number;
 }
 
+type FileContent = { readonly text: string } | { readonly drawing: Drawing } | { readonly sound: Sound };
+
+export interface LevelFile {
+    readonly name: string;
+    readonly linked: 'image' | 'sound' | 'stylesheet' | 'script' | null;
+    readonly content: FileContent;
+}
+
 export interface LevelPage {
     readonly level: number;
     readonly url: string;
@@ -36,12 +46,16 @@ export interface LevelPage {
     readonly imageId: number;
     readonly imageName: string;
     readonly imageTitle: string | null;
+    readonly imageNote: string | null;
     readonly colors: readonly string[];
-    readonly alternate: NonNullable<Clue['alternate']> | null;
     readonly link: string | null;
     readonly lines: readonly string[];
     readonly hiddenText: string | null;
+    readonly belowFold: readonly string[];
+    readonly meta: string | null;
     readonly comments: readonly string[];
+    readonly farComment: string | null;
+    readonly files: readonly LevelFile[];
 }
 
 interface HandcraftedEntrance {
@@ -111,20 +125,51 @@ export function folderFor(level: number): string | null {
 export function levelPage(level: number): LevelPage {
     const next = entrance(level + 1);
     const clue = next.clue;
+    const url = urlOfLevel(level);
+    const imageName = clue.imageName ?? `${level}.jpg`;
     return {
         level,
-        url: urlOfLevel(level),
+        url,
         title: clue.title ?? defaultTitle(level),
         imageId: pageImage(level),
-        imageName: clue.imageName ?? `${level}.jpg`,
+        imageName,
         imageTitle: clue.imageTitle ?? null,
+        imageNote: clue.imageNote ?? null,
         colors: clue.colors ?? [],
-        alternate: clue.alternate ?? null,
         link: clue.imageLink === true ? next.url : null,
         lines: [...(clue.lines ?? []), ...(level === 404 ? [handcraftedText.easterEgg404] : level === 418 ? [handcraftedText.easterEgg418] : [])],
         hiddenText: clue.hiddenText ?? null,
+        belowFold: clue.belowFold ?? [],
+        meta: clue.meta ?? null,
         comments: [clue.comment, next.folder !== null && next.folder !== folderFor(level) ? fill(pageText.folderComment, { folder: next.folder }) : undefined].filter((comment) => comment !== undefined),
+        farComment: clue.farComment ?? null,
+        files: levelFiles(level, clue, imageName, url, next.url),
     };
+}
+
+function levelFiles(level: number, clue: Clue, imageName: string, url: string, nextUrl: string): LevelFile[] {
+    const files: LevelFile[] = [];
+    if (clue.drawing !== undefined) files.push({ name: `${level}b.gif`, linked: 'image', content: { drawing: clue.drawing } });
+    if (clue.sound !== undefined) files.push({ name: `${level}.wav`, linked: 'sound', content: { sound: clue.sound } });
+    if (clue.stylesheet !== undefined) files.push({ name: `${level}.css`, linked: 'stylesheet', content: { text: fill(linkedFiles.stylesheet, { text: clue.stylesheet }) } });
+    if (clue.script !== undefined) {
+        const text = fill(linkedFiles.script, { expression: clue.script, address: scriptAddress(url, nextUrl) });
+        files.push({ name: `${level}.js`, linked: 'script', content: { text } });
+    }
+    if (clue.alternate !== undefined) {
+        const { extension, text } = clue.alternate;
+        const name = imageName.replace(/\.jpg$/, `.${extension}`);
+        const content: FileContent = extension === 'gif' ? { drawing: { kind: 'gift', text } }
+            : extension === 'wav' ? { sound: { kind: 'morse', text } }
+            : { text: fill(alternateFiles[extension], { word: text, name }) };
+        files.push({ name, linked: null, content });
+    }
+    return files;
+}
+
+function scriptAddress(from: string, to: string): string {
+    const folder = (address: string): string => address.slice(0, address.lastIndexOf('/') + 1);
+    return folder(from) === folder(to) ? 'password + ".htm"' : `"${new URL(folder(to)).pathname}" + password + ".htm"`;
 }
 
 function defaultTitle(level: number): string {
@@ -161,12 +206,12 @@ function generatedEntrance(level: number, attempt = 0): Entrance {
     switch (kind) {
         case 'word': {
             const word = unit(salts.common) < commonWordShare ? sampleCommonWord(unit(salts.rank), commonWordRanks, 10) : sampleWord(level, unit(salts.rank));
-            return buildEntrance(level, kind, word, 'htm', [word], null, wordClue(level, word), folder);
+            return buildEntrance(level, kind, word, 'htm', [word], null, wordClue(level, word, wordPageName), folder);
         }
         case 'extension': {
             const word = sampleWord(level, unit(salts.rank));
             const extension = pickByUnit(otherExtensions, unit(salts.extension));
-            const wordHint = wordClue(level, word, false);
+            const wordHint = wordClue(level, word, wordPageName, false);
             const clue: Clue = {
                 ...wordHint,
                 imageName: `${wordHint.imageName?.replace(/\.jpg$/, '') ?? level}.${extension}.jpg`,
@@ -177,12 +222,12 @@ function generatedEntrance(level: number, attempt = 0): Entrance {
         case 'leet': {
             const word = sampleWord(level, unit(salts.rank));
             const answer = toLeet(word, unit(salts.leet));
-            const clue: Clue = { comment: encode(answer, pickByUnit(['reversed', 'rot13', 'base64', 'hex'] as const, unit(salts.encoding))) };
+            const clue = encodedClue(answer, pickByUnit(['reversed', 'rot13', 'base64', 'hex'] as const, unit(salts.encoding)), level, unit(salts.clue));
             return buildEntrance(level, kind, answer, 'htm', [word], null, clue, folder);
         }
         case 'number': {
             const year = 1000 + Math.floor(unit(salts.year) * 1100);
-            const clue: Clue = { lines: [yearClue(year, level, unit(salts.clue))] };
+            const clue = yearClue(year, level, unit(salts.clue));
             return buildEntrance(level, kind, String(year), 'htm', [], null, clue, folder);
         }
         case 'credentials': {
@@ -196,15 +241,14 @@ function generatedEntrance(level: number, attempt = 0): Entrance {
         case 'twoWords': {
             const first = sampleCommonWord(unit(salts.rank), 300, 7);
             const second = sampleCommonWord(unit(salts.secondWord), 300, 7, first);
-            const clue: Clue = { comment: encode(`${first} ${second}`, textEncodingFor(level, unit(salts.encoding))) };
+            const clue = encodedClue(`${first} ${second}`, textEncodingFor(level, unit(salts.encoding)), level, unit(salts.clue));
             return buildEntrance(level, kind, `${first}${second}`, 'htm', [first, second], null, clue, folder);
         }
         case 'phrase': {
             const wordCount = 3 + Math.floor(unit(salts.phraseLength) * 2);
             const phraseSalts = [salts.rank, salts.secondWord, salts.thirdWord, salts.fourthWord];
             const words = phraseSalts.slice(0, wordCount).map((salt) => sampleCommonWord(unit(salt), 600, 7));
-            const encoding = textEncodingFor(level, unit(salts.encoding));
-            const clue: Clue = { comment: encode(words.join(' '), encoding) };
+            const clue = encodedClue(words.join(' '), textEncodingFor(level, unit(salts.encoding)), level, unit(salts.clue));
             return buildEntrance(level, kind, words.join(''), 'htm', words, null, clue, folder);
         }
         case 'fixed':
@@ -239,6 +283,11 @@ function buildEntrance(
         indexUnit: level < firstGeneratedLevel ? 1 : unitHash(level, salts.index),
         positionUnit: unitHash(level, salts.position),
     };
+}
+
+function wordPageName(level: number): string | null {
+    const named = entrance(level);
+    return named.kind === 'word' ? named.answer : null;
 }
 
 function chooseKind(level: number): EntranceKind {
@@ -278,8 +327,6 @@ function sampleCommonWord(unit: number, maximum: number, maximumLength: number, 
     }
     return wordAtRank(startRank);
 }
-
-
 
 function binaryLines(word: string): string[] {
     const bytes = encode(word, 'binary').split(' ');

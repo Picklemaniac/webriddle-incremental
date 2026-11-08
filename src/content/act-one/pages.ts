@@ -2,11 +2,12 @@ import type { Page } from '../../core/content.ts';
 import type { CaptchaChallenge, GameState } from '../../core/state.ts';
 import { findingFile, findings } from './findings.ts';
 import { imagePath } from './images.ts';
-import { entrance, inWildcardFolder, levelPage, urlOfLevel, type LevelPage } from './levels.ts';
-import { giftImage } from './pixel-images.ts';
+import { drawPicture } from './drawings.ts';
+import { entrance, inWildcardFolder, levelPage, urlOfLevel, type LevelFile, type LevelPage } from './levels.ts';
 import { riddleOrigin } from './riddle.ts';
+import { soundData, type Sound } from './sounds.ts';
 import { startPage } from './start-pages.ts';
-import { alternateFiles, captchaText, errorPages, fill, pageText } from './text.ts';
+import { captchaText, errorPages, fill, pageText } from './text.ts';
 
 const scrollbarStyle = "::-webkit-scrollbar { width: 16px; height: 16px; }::-webkit-scrollbar-track { background: repeating-conic-gradient(#c0c0c0 0% 25%, #fff 0% 50%) 0 0 / 2px 2px; }::-webkit-scrollbar-thumb { background: #c0c0c0; box-shadow: inset -1px -1px #000, inset 1px 1px #dfdfdf, inset -2px -2px #808080, inset 2px 2px #fff; }::-webkit-scrollbar-button:vertical:start:decrement, ::-webkit-scrollbar-button:vertical:end:increment, ::-webkit-scrollbar-button:horizontal:start:decrement, ::-webkit-scrollbar-button:horizontal:end:increment { display: block; width: 16px; height: 16px; background-color: #c0c0c0; background-repeat: no-repeat; background-position: center; box-shadow: inset -1px -1px #000, inset 1px 1px #dfdfdf, inset -2px -2px #808080, inset 2px 2px #fff; }::-webkit-scrollbar-button:vertical:start:decrement { background-image: url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='7' height='4' shape-rendering='crispEdges'><path d='M3 0h1v1h1v1h1v1h1v1H0V3h1V2h1V1h1z'/></svg>\"); }::-webkit-scrollbar-button:vertical:end:increment { background-image: url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='7' height='4' shape-rendering='crispEdges'><path d='M0 0h7v1H6v1H5v1H4v1H3V3H2V2H1V1H0z'/></svg>\"); }::-webkit-scrollbar-button:horizontal:start:decrement { background-image: url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='7' shape-rendering='crispEdges'><path d='M3 0h1v7H3V6H2V5H1V4H0V3h1V2h1V1h1z'/></svg>\"); }::-webkit-scrollbar-button:horizontal:end:increment { background-image: url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='7' shape-rendering='crispEdges'><path d='M0 0h1v1h1v1h1v1h1v1H3v1H2v1H1v1H0z'/></svg>\"); }::-webkit-scrollbar-button:active { box-shadow: inset 1px 1px #808080; }::-webkit-scrollbar-corner { background: #c0c0c0; }";
 
@@ -18,15 +19,18 @@ const pictureStyle = '.picture{position:relative;display:block;border:2px solid 
     '.number{position:absolute;left:10px;top:7px;font:bold 28px/1 Verdana,Tahoma,sans-serif;color:#fff;text-shadow:-2px -2px 0 #000,2px -2px 0 #000,-2px 2px 0 #000,2px 2px 0 #000,0 -2px 0 #000,0 2px 0 #000,-2px 0 0 #000,2px 0 0 #000,0 0 12px rgba(255,255,255,.8)}';
 
 const levelStyle = '*{box-sizing:border-box}html,body{height:100%}' +
-    'body{margin:0;padding:12px 16px;background:#000;color:#ddd;font:18px "Times New Roman",Times,serif;text-align:center;display:flex;flex-direction:column;justify-content:center}' +
-    `.picture{width:min(${pictureWidth + 4}px,100%,calc((100vh - 120px) * 1.5));margin:0 auto}${pictureStyle}` +
-    '.swatches{display:flex;justify-content:center;gap:8px;margin-top:16px}.swatches span{width:26px;height:26px;border:1px solid #555}p{margin:16px 0 0;white-space:nowrap}p+p{margin-top:6px}.hidden{color:#000}a{color:#fff}::selection{background:#3459b1;color:#fff}';
+    'body{margin:0;padding:12px 16px;background:#000;color:#ddd;font:18px "Times New Roman",Times,serif;text-align:center;display:flex;flex-direction:column;justify-content:safe center}' +
+    `.picture{width:min(${pictureWidth + 4}px,100%,calc((100vh - var(--reserved,120px)) * 1.5));margin:0 auto}${pictureStyle}` +
+    '.swatches{display:flex;justify-content:center;gap:8px;margin-top:16px}.swatches span{width:26px;height:26px;border:1px solid #555}p{margin:16px 0 0;white-space:nowrap}p+p{margin-top:6px}.hidden{color:#000}a{color:#fff}::selection{background:#3459b1;color:#fff}' +
+    '.drawing img{display:block;max-width:100%;height:auto;margin:0 auto;image-rendering:pixelated}audio{display:block;width:300px;height:32px;margin:0 auto;color-scheme:dark}.far{position:absolute;left:0;right:0;top:300vh;padding-bottom:16px}';
 
 const imageStyle = `*{box-sizing:border-box}body{margin:8px;background:#000}img{display:block;width:${pictureWidth}px;image-rendering:pixelated}.picture{width:${pictureWidth + 4}px}${pictureStyle}`;
 
 const textFileStyle = 'body{margin:8px;background:#000;color:#ddd}pre{margin:0;font:13px "Courier New",monospace}';
 
-const gifStyle = 'body{margin:8px;background:#000}img{display:block;max-width:100%;height:auto}';
+const gifStyle = 'body{margin:8px;background:#000}img{display:block;max-width:100%;height:auto;image-rendering:pixelated}';
+
+const soundStyle = 'html,body{height:100%}body{margin:0;background:#000;display:flex;align-items:center;justify-content:center}audio{width:300px;color-scheme:dark}';
 
 const captchaStyle = 'body{margin:16px 20px;background:#fff;color:#000;font:16px "Times New Roman",Times,serif}h1{margin:0 0 12px;font-size:28px}p{margin:10px 0}.captcha{display:block;max-width:100%;height:auto;border:1px solid #808080}.error{color:#c00000}input{font:15px "Courier New",monospace}button{font:13px Tahoma,Arial,sans-serif}.link{padding:0;border:0;background:none;color:#0000ee;text-decoration:underline;cursor:pointer;font:16px "Times New Roman",Times,serif}hr{border:0;border-top:1px solid #808080;margin:18px 0 8px}address{font-style:italic;font-size:14px}';
 
@@ -45,13 +49,17 @@ function textFilePage(name: string, text: string): Page {
     return documentPage(name, `<pre>${escapeHtml(text)}</pre>`, 200, textFileStyle, text);
 }
 
-function imageFilePage(name: string, body: string, style: string): Page {
-    return documentPage(name, body, 200, style, binaryText(name));
+function imageFilePage(name: string, body: string, style: string, note: string | null = null): Page {
+    return documentPage(name, body, 200, style, binaryText(name, note));
 }
 
-function binaryText(name: string): string {
+function soundFilePage(name: string, sound: Sound): Page {
+    return documentPage(name, `<audio controls src="${soundData(sound)}"></audio>`, 200, soundStyle, binaryText(name));
+}
+
+function binaryText(name: string, note: string | null = null): string {
     let seed = [...name].reduce((hash, character) => Math.imul(hash ^ character.charCodeAt(0), 16777619), 2166136261);
-    let text = name.endsWith('.gif') ? 'GIF89a' : 'ÿØÿà JFIF  H H  ÿÛ C ';
+    let text = name.endsWith('.gif') ? 'GIF89a' : name.endsWith('.wav') ? 'RIFF$ü  WAVEfmt        @   @     data ü ' : `ÿØÿà JFIF  H H  ${note === null ? '' : `ÿþ ${note} `}ÿÛ C `;
     for (let index = 0; index < 2400; index++) {
         seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
         const byte = seed >>> 24;
@@ -73,33 +81,61 @@ function relativeLink(from: string, to: string): string {
 function renderLevel(level: number): Page {
     const page = levelPage(level);
     const link = page.link === null ? null : relativeLink(page.url, page.link);
+    let reserved = 120;
+    const embedded = page.files.map((file) => {
+        if (file.linked === 'image' && 'drawing' in file.content) {
+            const drawing = drawPicture(file.content.drawing);
+            reserved += drawing.height + 16;
+            return `<p class="drawing">${drawing.tag}</p>`;
+        }
+        if (file.linked === 'sound' && 'sound' in file.content) {
+            reserved += 48;
+            return `<p><audio controls src="${soundData(file.content.sound)}"></audio></p>`;
+        }
+        return '';
+    });
     const body = [
         link === null ? picture(page) : `<a href="${link}">${picture(page)}</a>`,
         ...page.lines.map((line) => `<p>${escapeHtml(line)}</p>`),
+        ...embedded,
         page.colors.length === 0 ? '' : `<div class="swatches">${page.colors.map((color) => `<span style="background:${color}"></span>`).join('')}</div>`,
         page.hiddenText === null ? '' : `<p class="hidden">${escapeHtml(page.hiddenText)}</p>`,
+        page.belowFold.length === 0 ? '' : `<div class="far">${page.belowFold.map((line) => `<p>${escapeHtml(line)}</p>`).join('')}</div>`,
     ].join('');
-    return { ...documentPage(page.title, body, 200, levelStyle), source: levelSource(page, link) };
+    const style = reserved === 120 ? levelStyle : `:root{--reserved:${Math.min(reserved, 420)}px}${levelStyle}`;
+    return { ...documentPage(page.title, body, 200, style), source: levelSource(page, link) };
 }
 
 function levelSource(page: LevelPage, link: string | null): string {
     const title = page.imageTitle === null ? '' : ` title="${escapeHtml(page.imageTitle)}"`;
     const image = `<img src="${page.imageName}" width="${pictureWidth}" height="${pictureHeight}" border="0"${title}>`;
+    const font = (line: string): string => `<p><font face="Times New Roman" size="4">${escapeHtml(line)}</font></p>`;
+    const linked = (kind: LevelFile['linked'], tag: (file: LevelFile) => string): string[] => page.files.filter((file) => file.linked === kind).map(tag);
     return [
         '<html>',
         '<head>',
         `<title>${escapeHtml(page.title)}</title>`,
+        ...(page.meta === null ? [] : [`<meta name="description" content="${escapeHtml(page.meta)}">`]),
+        ...linked('stylesheet', (file) => `<link rel="stylesheet" type="text/css" href="${file.name}">`),
+        ...linked('script', (file) => `<script type="text/javascript" src="${file.name}"></script>`),
         '</head>',
         '<body bgcolor="#000000" text="#DDDDDD" link="#FFFFFF" vlink="#FFFFFF">',
         '<center>',
         link === null ? image : `<a href="${link}">${image}</a>`,
-        ...page.lines.map((line) => `<p><font face="Times New Roman" size="4">${escapeHtml(line)}</font></p>`),
+        ...page.lines.map(font),
+        ...linked('image', (file) => {
+            const drawing = 'drawing' in file.content ? drawPicture(file.content.drawing) : null;
+            return `<p><img src="${file.name}" width="${drawing?.width ?? 0}" height="${drawing?.height ?? 0}" border="0"></p>`;
+        }),
+        ...linked('sound', (file) => `<p><embed src="${file.name}" autostart="false" width="300" height="45"></p>`),
         ...(page.colors.length === 0 ? [] : [`<table border="0" cellspacing="6"><tr>${page.colors.map((color) => `<td bgcolor="${color}" width="26" height="26"></td>`).join('')}</tr></table>`]),
         ...(page.hiddenText === null ? [] : [`<p><font color="#000000">${escapeHtml(page.hiddenText)}</font></p>`]),
         '</center>',
+        ...(page.belowFold.length === 0 ? [] : ['<br>'.repeat(60), '<center>', ...page.belowFold.map(font), '</center>']),
         ...page.comments.map((comment) => `<!-- ${comment.replaceAll('-->', '--&gt;')} -->`),
         '</body>',
         '</html>',
+        ...(page.farComment === null ? [] : [`${'\n'.repeat(80)}<!-- ${page.farComment.replaceAll('-->', '--&gt;')} -->`]),
     ].join('\n');
 }
 
@@ -117,18 +153,12 @@ export function resolvePage(url: string, state: GameState): Page {
     const start = startPage(address, scrollbarStyle, pictureStyle);
     if (start !== null) return start;
     if (!address.startsWith(`${riddleOrigin}/`)) return errorPage('unavailable');
-    if (address === `${riddleOrigin}/present.gif`) return imageFilePage('present.gif', giftImage(entrance(7).answer), gifStyle);
+    if (address === `${riddleOrigin}/present.gif`) return imageFilePage('present.gif', drawPicture({ kind: 'gift', text: entrance(7).answer }).tag, gifStyle);
     const known = state.visitedLevels[address];
     if (known !== undefined) return renderLevel(known);
     if (address === urlOfLevel(state.currentLevel)) return renderLevel(state.currentLevel);
-    const alternate = alternatePage(address, state);
-    if (alternate !== null) return alternate;
-    if (address.endsWith('.jpg')) {
-        for (const level of [state.currentLevel, ...Object.values(state.visitedLevels)]) {
-            const page = levelPage(level);
-            if (address === canonicalUrl(new URL(page.imageName, page.url).href)) return imageFilePage(page.imageName, picture(page), imageStyle);
-        }
-    }
+    const file = levelFilePage(address, state);
+    if (file !== null) return file;
     const next = entrance(state.currentLevel + 1);
     if (address === next.url && next.credentials !== null) return { ...errorPage('unauthorized'), loginRealm: next.folder ?? 'riddle' };
     const finding = findings.find((candidate) => address === `${riddleOrigin}/${candidate.path}` && state.findings[candidate.id]);
@@ -137,17 +167,21 @@ export function resolvePage(url: string, state: GameState): Page {
     return errorPage('notFound');
 }
 
-function alternatePage(address: string, state: GameState): Page | null {
+function levelFilePage(address: string, state: GameState): Page | null {
     for (const level of [state.currentLevel, ...Object.values(state.visitedLevels)]) {
-        const { alternate, imageName, url } = levelPage(level);
-        if (alternate === null) continue;
-        const name = imageName.replace(/\.jpg$/, `.${alternate.extension}`);
-        if (address !== canonicalUrl(new URL(name, url).href)) continue;
-        return alternate.extension === 'gif'
-            ? imageFilePage(name, giftImage(alternate.text), gifStyle)
-            : textFilePage(name, fill(alternateFiles[alternate.extension], { word: alternate.text }));
+        const page = levelPage(level);
+        const at = (name: string): boolean => address === canonicalUrl(new URL(name, page.url).href);
+        if (at(page.imageName)) return imageFilePage(page.imageName, picture(page), imageStyle, page.imageNote);
+        const file = page.files.find((candidate) => at(candidate.name));
+        if (file !== undefined) return filePage(file);
     }
     return null;
+}
+
+function filePage({ name, content }: LevelFile): Page {
+    if ('drawing' in content) return imageFilePage(name, drawPicture(content.drawing).tag, gifStyle);
+    if ('sound' in content) return soundFilePage(name, content.sound);
+    return textFilePage(name, content.text);
 }
 
 function errorPage(kind: 'notFound' | 'unavailable' | 'unauthorized'): Page {

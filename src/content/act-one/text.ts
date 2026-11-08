@@ -71,16 +71,30 @@ export const methodHints = {
     keyboardRight: 'one step to the right',
     keyboardLeft: 'one step to the left',
     pollux: 'one four seven, two five eight, and the rest is silence',
+    railFence: 'off the rails',
+    elements: 'it\'s elementary',
+    imageNote: 'there is more to this picture than meets the eye.',
+    earlierAnswers: 'you have been here before.',
     gif: 'a GIFT, wrapped the wrong way.',
     txt: 'just TXT me.',
     json: 'ask JSON.',
     css: 'it is all a matter of style.',
+    xml: 'XML marks the spot.',
+    wav: 'i WAVed at you.',
+    zip: 'my lips are ZIPped.',
 } as const;
 
 export const alternateFiles = {
     txt: '{word}',
     json: '{ "next": "{word}.htm" }',
     css: ':root { --next: "{word}"; }',
+    xml: '<?xml version="1.0" encoding="UTF-8"?>\n<level>\n    <next>{word}.htm</next>\n</level>',
+    zip: 'Archive:  {name}\n  Length      Date    Time    Name\n---------  ---------- -----   ----\n      512  03-14-2006 21:12   {word}.htm\n---------                     -------\n      512                     1 file',
+} as const;
+
+export const linkedFiles = {
+    script: 'var password = prompt("Password:", "");\nif (password == {expression}) {\n    location.href = {address};\n}',
+    stylesheet: 'body {\n    background-color: #000000;\n    color: #dddddd;\n}\n\n/* {text} */',
 } as const;
 
 export const clueLines = {

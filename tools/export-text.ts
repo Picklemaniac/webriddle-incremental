@@ -9,12 +9,15 @@ import { planSearch, searchCapabilities } from '../src/content/act-one/search.ts
 import { upgrades } from '../src/content/act-one/upgrades.ts';
 import { folderNames, subjects } from '../src/content/act-one/word-lists.ts';
 import { createInitialState } from '../src/core/state.ts';
+import { levelTextDocument } from './level-text.ts';
+import { codeBlock, table } from './markdown.ts';
 
 type TextEntry = readonly [key: string, value: string];
 
 const outputUrl = new URL('../docs/text-inventory.md', import.meta.url);
+const levelTextUrl = new URL('../docs/level-text.md', import.meta.url);
 const tabledGroups = new Set(['browserName', 'upgradeText', 'findingText']);
-const pageColumns = ['Page', 'URL', 'Title', 'Visible text', 'Source comments', 'Hidden text', 'Image name', 'Next URL'];
+const pageColumns = ['Page', 'URL', 'Title', 'Visible text', 'Source comments', 'Hidden text', 'Image name', 'Files', 'Next URL'];
 const sections: string[] = [
     '# Act I text inventory',
     'A read-only view of every player-facing string, generated with `npm run export-text`. Edit wording in [text.ts](../src/content/act-one/text.ts), the one file that holds it, then regenerate. This file contains puzzle answers and belongs in the ignored `docs/` folder.',
@@ -67,13 +70,15 @@ sections.push('## upgradeText', 'Cards in the order the game lists them. Cost an
 );
 
 const markdown = `${sections.join('\n\n')}\n`;
+const levelText = `${levelTextDocument()}\n`;
 if (process.argv.includes('--check')) {
-    if (await readFile(outputUrl, 'utf8') !== markdown) throw new Error('Text inventory is out of date. Run npm run export-text.');
-    console.log('Text inventory is up to date.');
+    if (await readFile(outputUrl, 'utf8') !== markdown || await readFile(levelTextUrl, 'utf8') !== levelText) throw new Error('Text exports are out of date. Run npm run export-text.');
+    console.log('Text exports are up to date.');
 } else {
     await mkdir(new URL('../docs/', import.meta.url), { recursive: true });
     await writeFile(outputUrl, markdown, 'utf8');
-    console.log(`Exported ${stringCount} strings, ${upgrades.length} upgrades, ${findings.length} findings and generated pages to docs/text-inventory.md.`);
+    await writeFile(levelTextUrl, levelText, 'utf8');
+    console.log(`Exported ${stringCount} strings, ${upgrades.length} upgrades, ${findings.length} findings and generated pages to docs/text-inventory.md, and the numbered level text to docs/level-text.md.`);
 }
 
 function flattenText(key: string, value: unknown): TextEntry[] {
@@ -82,23 +87,9 @@ function flattenText(key: string, value: unknown): TextEntry[] {
     return Object.entries(value).flatMap(([child, entry]) => flattenText(`${key}.${child}`, entry));
 }
 
-function table(headers: readonly string[], rows: readonly (readonly string[])[]): string {
-    return [headers, headers.map(() => '---'), ...rows].map((row) => `| ${row.map(cell).join(' | ')} |`).join('\n');
-}
-
-function cell(value: string): string {
-    return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('|', '&#124;').replaceAll('`', '&#96;').replaceAll('\r', '').replaceAll('\n', '<br>') || '—';
-}
-
-function codeBlock(value: string): string {
-    const longestFence = Math.max(2, ...[...value.matchAll(/`+/g)].map((match) => match[0].length));
-    const fence = '`'.repeat(longestFence + 1);
-    return `${fence}text\n${value}\n${fence}`;
-}
-
 function pageRow(level: number): readonly string[] {
     const page = levelPage(level);
-    return [String(level), page.url, page.title, page.lines.join('\n'), page.comments.join('\n'), page.hiddenText ?? '', page.imageName, entrance(level + 1).url];
+    return [String(level), page.url, page.title, page.lines.join('\n'), page.comments.join('\n'), page.hiddenText ?? '', page.imageName, page.files.map((file) => file.name).join('\n'), entrance(level + 1).url];
 }
 
 function generatedExamples(): number[] {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { encode } from './encodings.ts';
+import { atomicNumberSpelling, brailleDots, encode, vigenere } from './encodings.ts';
 
 describe('encodings', () => {
     it.each([
@@ -27,6 +27,10 @@ describe('encodings', () => {
         ['base64', 'owl', 'b3ds'],
         ['dna', 'a', 'CGAC'],
         ['codepoints', 'hi', 'String.fromCharCode(104, 105)'],
+        ['rot47', 'hi', '9:'],
+        ['railFence', 'bridge', 'bgrdei'],
+        ['upsideDown', 'dusk', 'ʞsnp'],
+        ['dvorak', 'dusk', 'hf;v'],
     ] as const)('encodes with %s', (encoding, text, expected) => {
         expect(encode(text, encoding)).toBe(expected);
     });
@@ -34,6 +38,22 @@ describe('encodings', () => {
     it('splits character codes into sums that add up', () => {
         const sums = encode('owl', 'arithmetic', 0.37).split('  ');
         expect(sums.map((sum) => String.fromCharCode(sum.split('+').reduce((total, part) => total + Number(part), 0))).join('')).toBe('owl');
+    });
+
+    it('shifts by an amount other than the Caesar and ROT13 shifts', () => {
+        for (const unit of [0, 0.3, 0.6, 0.99]) {
+            const shift = (encode('a', 'shift', unit).charCodeAt(0) - 97 + 26) % 26;
+            expect([0, 3, 13]).not.toContain(shift);
+            expect(encode('zebra', 'shift', unit)).toBe([...'zebra'].map((letter) => String.fromCharCode(((letter.charCodeAt(0) - 97 + shift) % 26) + 97)).join(''));
+        }
+    });
+
+    it('applies a Vigenère key and spells words with element symbols', () => {
+        expect(vigenere('attackatdawn', 'lemon')).toBe('lxfopvefrnhr');
+        expect(atomicNumberSpelling('bacon')).toBe('56 27 7');
+        expect(atomicNumberSpelling('jam')).toBeNull();
+        expect(brailleDots('a')).toBe(1);
+        expect(brailleDots('z')).toBe(0b110101);
     });
 
     it('writes Morse as Pollux digits', () => {

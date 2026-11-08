@@ -3,7 +3,9 @@ import { Game } from '../../core/game.ts';
 import { createInitialState } from '../../core/state.ts';
 import { parseSave, serializeSave } from '../../persistence/save.ts';
 import { actOneContent } from './index.ts';
+import { encode } from './encodings.ts';
 import { entrance, levelPage, urlOfLevel } from './levels.ts';
+import { canonicalUrl } from './pages.ts';
 import { hallOfFameUrl, hintsUrl, riddleHomeUrl, rulesUrl } from './riddle.ts';
 import { createCaptcha } from './captchas.ts';
 import { effectiveRate, networkCapacity, requestedRate } from './network.ts';
@@ -62,6 +64,51 @@ describe('Act I', () => {
         }
         expect(entrance(1150)).toEqual(structuredClone(entrance(1150)));
         expect(levelPage(99).comments).toContain('new levels go in /amber/');
+    });
+
+    it('never shows an answer in plain form and serves every file a page refers to', () => {
+        const game = newGame();
+        for (let level = 11; level <= 1400; level++) {
+            const page = levelPage(level);
+            const answer = entrance(level + 1).answer;
+            const texts = [page.title, ...page.lines, page.lines.join(''), ...page.comments, page.farComment, page.hiddenText, page.imageTitle, page.imageName.replace(/\.jpg$/, ''),
+                ...page.belowFold, page.meta, page.imageNote];
+            expect(texts.some((text) => text?.trim().toLowerCase() === answer), `level ${level} shows ${answer}`).toBe(false);
+            game.state.currentLevel = level;
+            for (const file of page.files) expect(game.content.resolvePage(new URL(file.name, page.url).href, game.state).statusCode, `${level}: ${file.name}`).toBe(200);
+        }
+    });
+
+    it('makes every password script lead to the next level', () => {
+        let checked = 0;
+        for (let level = 11; level <= 1400; level++) {
+            const page = levelPage(level);
+            const script = page.files.find((file) => file.linked === 'script');
+            if (script === undefined || !('text' in script.content)) continue;
+            const next = entrance(level + 1);
+            const location = { href: '' };
+            new Function('prompt', 'location', script.content.text)(() => next.answer, location);
+            expect(canonicalUrl(new URL(location.href, page.url).href), `level ${level}`).toBe(next.url);
+            checked++;
+        }
+        expect(checked).toBeGreaterThan(5);
+    });
+
+    it('spells answers from letters of earlier page names', () => {
+        let checked = 0;
+        for (let level = 11; level <= 1400; level++) {
+            const next = entrance(level + 1);
+            if (next.clue.method !== 'earlierAnswers') continue;
+            const page = levelPage(level);
+            const texts = [page.title, ...page.lines, ...page.comments, page.farComment, page.hiddenText, page.imageTitle, ...page.belowFold, page.meta, page.imageNote,
+                ...page.files.map((file) => ('text' in file.content ? file.content.text : ''))].join(' ');
+            const pairs = texts.match(/\d+:\d+(?: \d+:\d+)*/)![0].split(' ').map((pair) => pair.split(':').map(Number));
+            expect(pairs.every(([earlier]) => earlier! < level), `level ${level}`).toBe(true);
+            const spelled = pairs.map(([earlier, position]) => entrance(earlier!).answer[position! - 1]).join('');
+            expect([next.answer, encode(next.answer, 'reversed'), encode(next.answer, 'atbash'), encode(next.answer, 'rot13')], `level ${level}`).toContain(spelled);
+            checked++;
+        }
+        expect(checked).toBeGreaterThan(5);
     });
 
     it('keeps all generated levels solvable by hand, including credentials', () => {
