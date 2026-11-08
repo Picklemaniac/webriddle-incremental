@@ -5,7 +5,7 @@ import { createElement } from './dom.ts';
 
 const messageBoxNotices: ReadonlySet<NoticeId> = new Set<NoticeId>([
     'firstRateLimit', 'userAgentBlock', 'folderBlock', 'extensionBlock', 'wildcardBlock', 'credentialsBlock',
-    'leetAnswer', 'numberAnswer', 'twoWordsAnswer', 'phraseWall',
+    'wordlistExhausted', 'leetAnswer', 'numberAnswer', 'twoWordsAnswer', 'phraseWall',
 ]);
 
 export class MessageBoxes {

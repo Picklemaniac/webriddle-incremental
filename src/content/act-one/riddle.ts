@@ -6,6 +6,7 @@ export const hallOfFameUrl = `${riddleOrigin}/halloffame.htm`;
 export const homeUrl = 'http://www.enigmaweb.net/';
 export const enigmaticsUrl = 'https://enigmatics.org/';
 export const nordinhoUrl = 'https://www.nordinho.net/';
+export const toolUrls = { dcode: 'https://www.dcode.fr/en', cyberChef: 'https://gchq.github.io/CyberChef/', rumkin: 'https://rumkin.com/tools/cipher/' } as const;
 
 const riddleSeed = 0x2026_1108;
 

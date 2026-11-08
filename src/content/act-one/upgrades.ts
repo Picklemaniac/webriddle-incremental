@@ -6,6 +6,7 @@ import { planSearch, searchCapabilities, type BlockReason } from './search.ts';
 import { upgradeText, type UpgradeId } from './text.ts';
 
 export interface Upgrade extends PurchasableDefinition {
+    readonly effect?: string;
     readonly price: ResourceAmounts;
     readonly level: number;
     readonly requires: readonly string[];

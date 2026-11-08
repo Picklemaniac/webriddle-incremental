@@ -59,7 +59,7 @@ export class FindingsPanel implements Panel {
             setText(file.label, copies > 1 ? `${finding.path} ×${copies}` : finding.path);
         }
         setText(this.count, fill(uiText.foundCount, { found, total: findings.length }));
-        setText(this.info, this.selected === null ? uiText.openHint : `${this.selected.path} · ${this.selected.description}`);
+        setText(this.info, this.selected === null ? uiText.openHint : `${this.selected.path}: ${this.selected.description}`);
     }
 
     private select(finding: Finding): void {
@@ -74,7 +74,7 @@ export class FindingsPanel implements Panel {
 
     private showOdds(): void {
         const total = findings.reduce((sum, item) => sum + item.weight, 0);
-        const rows = findings.map((item) => createElement('p', { className: 'odds-row', text: `${this.game.state.findings[item.id] ? item.path : uiText.unknownFinding} · ${item.rarity} · ${(item.weight / total * 100).toFixed(0)}%` }));
+        const rows = findings.map((item) => createElement('p', { className: 'odds-row', text: `${this.game.state.findings[item.id] ? item.path : uiText.unknownFinding}, ${item.rarity}, ${(item.weight / total * 100).toFixed(0)}%` }));
         this.notepad.show(uiText.findingsOddsTitle, [createElement('p', { text: uiText.findingsHelp }), ...rows]);
     }
 }

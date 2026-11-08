@@ -6,7 +6,7 @@ import { clueLines, fill, handcraftedText, pageText } from './text.ts';
 import { vocabularySize, wordAtRank } from './vocabulary.ts';
 import { folderNames } from './word-lists.ts';
 
-type EntranceKind = 'fixed' | 'word' | 'extension' | 'leet' | 'number' | 'credentials' | 'twoWords' | 'phrase';
+export type EntranceKind = 'fixed' | 'word' | 'extension' | 'leet' | 'number' | 'credentials' | 'twoWords' | 'phrase';
 
 interface Credentials {
     readonly username: string;

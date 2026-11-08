@@ -1,6 +1,6 @@
 import type { GameSystem } from '../../core/content.ts';
 import type { Game } from '../../core/game.ts';
-import { entrance } from './levels.ts';
+import { entrance, type EntranceKind } from './levels.ts';
 import { effectiveRate } from './network.ts';
 import { automationBootSeconds, automationElapsed, increment, noticeOnce, solveLevel } from './progress.ts';
 import { capabilitySignature, planSearch, searchCapabilities, type BlockReason, type SearchPlan } from './search.ts';
@@ -10,6 +10,7 @@ const blockedNotices: Readonly<Partial<Record<BlockReason, NoticeId>>> = {
     userAgent: 'userAgentBlock', folder: 'folderBlock', extension: 'extensionBlock',
     wildcard: 'wildcardBlock', credentials: 'credentialsBlock',
 };
+const wordlistKinds: ReadonlySet<EntranceKind> = new Set<EntranceKind>(['word', 'extension', 'credentials']);
 const plans = new Map<string, SearchPlan>();
 
 export function currentSearch(game: Game): SearchPlan {
@@ -48,6 +49,7 @@ export const dirbuster: GameSystem = {
             if (notice) noticeOnce(game, notice);
             if (plan.blockedBy !== null) break;
             if (plan.bruteForce) noticeOnce(game, 'bruteForce');
+            if (plan.bruteForce && wordlistKinds.has(target.kind)) noticeOnce(game, 'wordlistExhausted');
             if (target.kind === 'leet') noticeOnce(game, 'leetAnswer');
             if (target.kind === 'number') noticeOnce(game, 'numberAnswer');
             if (target.kind === 'twoWords') noticeOnce(game, 'twoWordsAnswer');

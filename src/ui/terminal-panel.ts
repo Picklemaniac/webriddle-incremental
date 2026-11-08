@@ -74,10 +74,11 @@ export class TerminalPanel implements Panel {
         setText(this.command, command);
         this.command.title = command;
         let footer = uiText.waiting as string;
-        if (isBanned(game)) footer = `${terminalText.ban} · ${formatDuration(game.state.network.bannedUntil - game.state.elapsedSeconds)}`;
+        if (isBanned(game)) footer = fill(terminalText.banned, { time: formatDuration(game.state.network.bannedUntil - game.state.elapsedSeconds) });
         else if (dirbustingScripts(game) === 0) footer = uiText.paused;
         else if (plan.blockedBy) footer = terminalText.blocks[plan.blockedBy];
-        else if (phase) footer = `${phase.label} · ${formatNumber(spent)} / ${formatNumber(phase.size)} · ${formatDuration((phase.size - spent) / Math.max(0.001, rate * game.stat('searchEfficiency')))} ${uiText.exhaust}`;
+        else if (phase) footer = fill(terminalText.progress, { list: phase.label, tried: formatNumber(spent), total: formatNumber(phase.size),
+            time: formatDuration((phase.size - spent) / Math.max(0.001, rate * game.stat('searchEfficiency'))) });
         setText(this.footer, footer);
         this.footer.title = footer;
         this.footer.classList.toggle('warning', isBanned(game) || plan.blockedBy !== null);

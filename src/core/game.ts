@@ -32,6 +32,10 @@ export class Game {
         return this.cachedStats[statId] ?? 0;
     }
 
+    statWith(statId: string, extraModifiers: readonly Modifier[]): number {
+        return calculateStats(this.content.baseStats, [...this.collectModifiers(), ...extraModifiers])[statId] ?? 0;
+    }
+
     random(): number {
         return nextRandom(this.currentState);
     }

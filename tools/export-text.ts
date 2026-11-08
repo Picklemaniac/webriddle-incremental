@@ -33,10 +33,11 @@ for (const [group, value] of Object.entries(text)) {
 }
 
 const totalWeight = findings.reduce((sum, finding) => sum + finding.weight, 0);
-sections.push('## upgradeText', 'Cards in the order the game lists them. Cost and level come from [upgrades.ts](../src/content/act-one/upgrades.ts).',
-    table(['ID', 'Name', 'Description', 'Cost', 'From level'], upgrades.map((item) => [
-        item.id, item.name, item.description ?? '',
-        Object.entries(item.price).map(([resource, amount]) => resource === 'money' ? `$${amount.toLocaleString('en-US')}` : `${amount.toLocaleString('en-US')} ${resource}`).join(' · '),
+sections.push('## upgradeText', 'Cards in the order the game lists them. Cost and level come from [upgrades.ts](../src/content/act-one/upgrades.ts). Under the written effect, each card also shows a line per stat it changes, built from `statText` (for example "Threads per script: 1 → 4").',
+    table(['ID', 'Name', 'Description', 'Written effect', 'Stats changed', 'Cost', 'From level'], upgrades.map((item) => [
+        item.id, item.name, item.description ?? '', item.effect ?? '',
+        (item.modifiers?.(1) ?? []).map((modifier) => `${modifier.statId} ${modifier.operation === 'multiply' ? '×' : '+'}${modifier.value}`).join('\n'),
+        Object.entries(item.price).map(([resource, amount]) => resource === 'money' ? `$${amount.toLocaleString('en-US')}` : `${amount.toLocaleString('en-US')} ${resource}`).join(', '),
         String(item.level),
     ])),
     '## findingText', 'Chances are conditional on a finding dropping. Rarity and weight come from [findings.ts](../src/content/act-one/findings.ts).',

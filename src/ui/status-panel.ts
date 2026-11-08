@@ -2,7 +2,7 @@ import type { Game } from '../core/game.ts';
 import { assignedScripts, cooldownRemaining, dirbustingScripts, insightPerSecond, isJobUnlocked, moneyPerSecond, scriptSlots, wordsPerSecond, type JobId } from '../content/act-one/economy.ts';
 import { effectiveRate, isBanned, liveProxies, networkCapacity, requestedRate } from '../content/act-one/network.ts';
 import { owns } from '../content/act-one/progress.ts';
-import { connectionNames, labels, toolNames, uiText } from '../content/act-one/text.ts';
+import { connectionNames, fill, labels, toolNames, uiText } from '../content/act-one/text.ts';
 import { formatDuration, formatNumber } from '../format.ts';
 import { createButton, createElement, setText } from './dom.ts';
 import type { Panel } from './panel.ts';
@@ -103,14 +103,14 @@ export class StatusPanel implements Panel {
         for (const [id, value] of Object.entries({ connection: connectionNames[connection]!, tool, slots: String(scriptSlots(game)), threads: String(game.stat('threadsPerScript')), efficiency: `${game.stat('searchEfficiency').toFixed(1)}×` })) setText(this.machineValues.get(id)!, value);
         this.machineElement.hidden = !game.state.flags.machineRevealed;
         this.networkElement.hidden = !game.state.flags.networkRevealed;
-        for (const [id, value] of Object.entries({ sending: `${formatNumber(owns(game.state, 'throttle') ? effectiveRate(game) : requestedRate(game))}/s`, allowed: `${formatNumber(networkCapacity(game))}/s`, ips: `${1 + liveProxies(game) + game.stat('extraAddresses')}`, status: isBanned(game) ? `${labels.banned} · ${formatDuration(game.state.network.bannedUntil - game.state.elapsedSeconds)}` : `${Math.round(game.state.network.heat)}%` })) setText(this.networkValues.get(id)!, value);
+        for (const [id, value] of Object.entries({ sending: `${formatNumber(owns(game.state, 'throttle') ? effectiveRate(game) : requestedRate(game))}/s`, allowed: `${formatNumber(networkCapacity(game))}/s`, ips: `${1 + liveProxies(game) + game.stat('extraAddresses')}`, status: isBanned(game) ? fill(labels.banned, { time: formatDuration(game.state.network.bannedUntil - game.state.elapsedSeconds) }) : `${Math.round(game.state.network.heat)}%` })) setText(this.networkValues.get(id)!, value);
         this.heat.style.width = `${game.state.network.heat}%`;
         const aliveCount = liveProxies(game);
         const deadCount = game.state.network.proxies.length - aliveCount;
         this.proxies.hidden = game.state.network.proxies.length === 0;
         this.replaceDead.hidden = deadCount === 0;
         this.proxySummary.classList.toggle('has-dead-proxies', deadCount > 0);
-        setText(this.proxySummary, `${aliveCount} ${labels.proxyAlive} · ${deadCount} ${labels.proxyDead}`);
+        setText(this.proxySummary, fill(uiText.proxyCount, { working: aliveCount, dead: deadCount }));
         game.state.network.proxies.forEach((proxy, index) => {
             let row = this.proxyRows[index];
             if (!row) {

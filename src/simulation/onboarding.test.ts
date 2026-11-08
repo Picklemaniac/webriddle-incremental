@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { actOneContent } from '../content/act-one/index.ts';
 import { urlOfLevel } from '../content/act-one/levels.ts';
-import { automationElapsed } from '../content/act-one/progress.ts';
+import { automationElapsed, isUpgradeRevealed, wasNoticed } from '../content/act-one/progress.ts';
 import { Game } from '../core/game.ts';
 import { createInitialState } from '../core/state.ts';
 import { actOneStrategy } from './act-one-strategy.ts';
@@ -69,11 +69,28 @@ describe('Act I onboarding', () => {
         expect(introductions[1]).toEqual({ seconds: 82, id: 'insightRevealed' });
         expect(introductions.some(({ id }) => id === 'moneyRevealed')).toBe(true);
         expect(introductions.some(({ id }) => id === 'networkRevealed')).toBe(true);
-        expect(introductions.some(({ id }) => id === 'wordsRevealed')).toBe(true);
         for (let index = 1; index < introductions.length; index++) {
             const { seconds, id } = introductions[index]!;
             const followsItsFirstPrice = id === 'insightRevealed' || id === 'moneyRevealed' || id === 'wordsRevealed';
             expect(seconds - introductions[index - 1]!.seconds).toBeGreaterThanOrEqual(followsItsFirstPrice ? 6 : 30);
         }
+    });
+
+    it('introduces words only once DirBuster runs out of words.txt', () => {
+        const game = startAutomation();
+        Object.assign(game.state.flags, { 'seen:curlBatch': true, insightRevealed: true, moneyRevealed: true });
+        game.state.purchases.fakeUserAgent = 1;
+        game.advance(60);
+        expect(isUpgradeRevealed(game.state, 'english10k')).toBe(false);
+        game.state.currentLevel = 80;
+        let cardSecond: number | undefined;
+        let second = 0;
+        for (; second < 60 && game.state.flags.wordsRevealed !== true; second++) {
+            game.advance(1);
+            if (cardSecond === undefined && isUpgradeRevealed(game.state, 'english10k')) cardSecond = second;
+        }
+        expect(wasNoticed(game.state, 'wordlistExhausted')).toBe(true);
+        expect(game.state.flags.wordsRevealed).toBe(true);
+        expect(second - cardSecond!).toBeGreaterThanOrEqual(6);
     });
 });

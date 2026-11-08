@@ -117,14 +117,14 @@ strong { font-weight: 600; }
 .panel { min-width: 0; margin-bottom: 28px; animation: reveal .4s ease; }
 .panel h2 { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 10px; padding: 0 0 6px; border-bottom: 1px solid var(--rule); color: #fff; font: bold 13px Tahoma, Verdana, sans-serif; white-space: nowrap; }
 .panel-help { font-size: 11px; margin: 0 0 10px; line-height: 1.6; }
-.resource-row { display: grid; grid-template-columns: minmax(50px, 1fr) minmax(45px, auto) 52px 118px; align-items: center; gap: 8px; min-height: 33px; white-space: nowrap; }
+.resource-row { display: grid; grid-template-columns: minmax(50px, 1fr) minmax(45px, auto) 52px 118px; align-items: center; gap: 8px; min-height: 33px; white-space: nowrap; animation: reveal .4s ease; }
 .resource-row strong, .income-rate { text-align: right; font-weight: normal; }
 .resource-row strong { color: #fff; }
 .income-rate { font-size: 11px; }
 .dashboard .resource-action { --cooldown: 0%; --pad-y: 3px; --pad-x: 5px; width: 118px; height: 26px; background: linear-gradient(to right, #9c9c9c var(--cooldown, 0%), #c0c0c0 var(--cooldown, 0%)); }
 .stat-row { display: flex; gap: 12px; justify-content: space-between; align-items: center; min-height: 27px; white-space: nowrap; }
 .stat-row strong { font-weight: normal; }
-.worker-row { display: grid; grid-template-columns: 1fr 26px 30px 26px; align-items: center; gap: 7px; min-height: 32px; white-space: nowrap; }
+.worker-row { display: grid; grid-template-columns: 1fr 26px 30px 26px; align-items: center; gap: 7px; min-height: 32px; white-space: nowrap; animation: reveal .4s ease; }
 .worker-row strong { text-align: center; font-weight: normal; }
 .dashboard .worker-row button { --pad-y: 0px; --pad-x: 0px; width: 26px; height: 23px; font-size: 13px; }
 .upgrade-list { display: flex; flex-direction: column; gap: 8px; max-height: 660px; overflow-y: auto; padding-right: 2px; }
@@ -133,6 +133,8 @@ strong { font-weight: 600; }
 .upgrade-heading strong { font: bold 12px Tahoma, Arial, sans-serif; }
 .upgrade-cost { font-size: 11px; }
 .upgrade-description { font-size: 11px; line-height: 1.45; }
+.upgrade-effect { margin-top: 4px; font-size: 11px; line-height: 1.45; white-space: pre-line; }
+.upgrade-effect:empty { display: none; }
 .heat-track { height: 12px; margin: 8px 0 12px; padding: 1px; background: #000; border: 1px solid; border-color: var(--sunken); }
 .heat-fill { height: 100%; background: var(--problem); }
 .proxy-row { display: grid; grid-template-columns: minmax(0, 1fr) 45px 65px; gap: 8px; align-items: center; margin: 5px 0; white-space: nowrap; font-size: 10px; }

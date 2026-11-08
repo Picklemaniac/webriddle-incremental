@@ -30,7 +30,7 @@
 .dashboard .proxy-row { grid-template-columns: minmax(0, 1fr) 44px 65px; gap: 6px; font-size: 11px; }
 
 .dashboard .upgrade-card { --pad-y: 6px; --pad-x: 10px; min-height: 46px; white-space: normal; }
-.dashboard .upgrade-heading strong, .dashboard .upgrade-description { line-height: 15px; }
+.dashboard .upgrade-heading strong, .dashboard .upgrade-description, .dashboard .upgrade-effect { line-height: 15px; }
 .dashboard .upgrade-heading { margin-bottom: 3px; }
 .dashboard .upgrade-card.unaffordable { color: #505050; text-shadow: none; }
 .dashboard .upgrade-heading { flex-wrap: wrap; column-gap: 10px; row-gap: 4px; }
