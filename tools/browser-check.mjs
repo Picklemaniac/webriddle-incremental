@@ -65,9 +65,20 @@ try {
     await waitFor(`document.querySelector('.browser-viewport')?.contentDocument?.title === 'Welcome to Enigma Web'`);
     assert.equal(await evaluate(`document.querySelector('.follow-current').hidden`), true, 'No return button before entering the riddle');
     await screenshot('start-page');
+    await evaluate(`(() => {
+        window.open = (url) => { window.openedUrl = url; return null; };
+        [...document.querySelector('.browser-viewport').contentDocument.querySelectorAll('a')].findLast((link) => link.textContent === 'Enigmatics').click();
+    })()`);
+    assert.equal(await evaluate('window.openedUrl'), 'https://enigmatics.org/', 'Community links open the real site in a new window');
+    assert.equal(await evaluate(`document.querySelector('.browser-status').textContent.startsWith('Done')`), true, 'Community links leave the browser where it is');
     await evaluate(`document.querySelector('.browser-viewport').contentDocument.querySelector('a').click()`);
     await waitFor(`document.querySelector('.browser-viewport')?.contentDocument?.title === 'Notfinite'`);
     await screenshot('riddle-home');
+    await evaluate(`[...document.querySelector('.browser-viewport').contentDocument.querySelectorAll('a')].find((link) => link.textContent === 'rules').click()`);
+    await waitFor(`document.querySelector('.browser-viewport')?.contentDocument?.title === 'Notfinite - rules'`);
+    await screenshot('riddle-rules');
+    await evaluate(`[...document.querySelector('.browser-viewport').contentDocument.querySelectorAll('a')].find((link) => link.textContent === 'back').click()`);
+    await waitFor(`document.querySelector('.browser-viewport')?.contentDocument?.title === 'Notfinite'`);
     await evaluate(`[...document.querySelector('.browser-viewport').contentDocument.querySelectorAll('a')].find((link) => link.textContent === 'enter').click()`);
     await waitFor(`document.querySelector('.browser-viewport')?.contentDocument?.title === 'Level 1' && document.querySelector('.browser-viewport').contentDocument.querySelector('img').naturalWidth > 0`);
     await screenshot('opening');

@@ -91,16 +91,16 @@ export const riddleName = 'Notfinite';
 
 export const startPageText = {
     title: 'Welcome to Enigma Web',
-    tagline: 'Your start page on the World Wide Web',
     welcome: 'Welcome to Enigma Web',
-    intro: 'Everything worth clicking, one click away.',
     riddlesHeading: 'Riddles',
     communitiesHeading: 'Communities',
     featuredHeading: 'Featured riddle',
-    featuredBlurb: 'Nobody has finished it. Nobody even knows how long it is.',
+    featuredBlurb: 'A new webriddle!',
+    enigmatics: 'Enigmatics',
     enigmaticsBlurb: 'Puzzles, riddles and enigmas.',
+    nordinho: 'Nordinho',
     nordinhoBlurb: 'The forum. Hints, if you ask nicely.',
-    footer: '© 2003 Enigma Web. Best viewed at 800 × 600.',
+    footer: '© 2006 Enigma Web.',
 } as const;
 
 export const riddleHomeText = {
@@ -110,39 +110,10 @@ export const riddleHomeText = {
     rules: ['no posting answers on Nordinho.', 'no brute forcing.', 'have fun.'],
     hallOfFameHeading: 'hall of fame',
     hallOfFame: 'nobody has finished {name} yet.',
+    subpageTitle: '{name} - {page}',
+    back: 'back',
     counter: 'visitors',
-    updated: 'last updated 14 march 2003',
-} as const;
-
-export const enigmaticsText = {
-    tagline: 'puzzles · riddles · enigmas',
-    navigation: ['home', 'riddle list', 'forum'],
-    listHeading: 'riddle list',
-    columns: ['riddle', 'length'],
-    riddles: [['Notpron', 'very-long'], ['Polychromasia', '—'], ['ZED', '—'], ['Waste of Time II', '—']],
-    notfiniteLength: 'very-long (100+)',
-    footer: 'riddlers helping riddlers since 1999',
-} as const;
-
-export const nordinhoText = {
-    title: 'Nordinho Forums',
-    navigation: ['FAQ', 'Search', 'Memberlist', 'Register', 'Log in'],
-    board: 'Webriddles',
-    columns: ['Topics', 'Replies', 'Author', 'Last post'],
-    topics: [
-        ['Notfinite: the hint thread (no answers!)', '4211', 'grimoire', 'Today 03:14'],
-        ['Has anyone finished Notfinite?', '312', 'lurker42', 'Yesterday 23:50'],
-        ['[Notfinite] stuck on level 2 lol', '87', 'newbie', '12 Mar 2003'],
-        ['my first riddle, please test', '9', 'jdoe', '02 Mar 2003'],
-    ],
-    posted: 'Posted: {date}',
-    posts: [
-        ['grimoire', 'Hints only. Post an answer and you are out.', '02 Feb 2003'],
-        ['lurker42', 'how many levels does this thing even have', '19 Feb 2003'],
-        ['grimoire', 'Nobody knows. The furthest anyone has got is level 312.', '19 Feb 2003'],
-        ['newbie', 'has anyone tried just guessing the addresses?', '12 Mar 2003'],
-        ['grimoire', 'Read the rules on the front page.', '12 Mar 2003'],
-    ],
+    updated: 'last updated 14 march 2006',
 } as const;
 
 export const pageText = {

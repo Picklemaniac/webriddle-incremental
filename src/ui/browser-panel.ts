@@ -307,9 +307,10 @@ export class BrowserPanel implements Panel {
                 const link = /(?:src|href)="([^"]+)"/.exec(token);
                 if (link?.[1]) {
                     const target = link[1];
+                    const newWindow = token.includes('target="_blank"');
                     const offset = token.indexOf(target, link.index);
                     const anchor = createElement('a', { text: target, attributes: { href: target } });
-                    anchor.addEventListener('click', (event) => { event.preventDefault(); this.navigate(target); });
+                    anchor.addEventListener('click', (event) => { event.preventDefault(); this.openLink(target, newWindow); });
                     span.replaceChildren(token.slice(0, offset), anchor, token.slice(offset + target.length));
                 }
             }
@@ -384,6 +385,11 @@ export class BrowserPanel implements Panel {
             createElement('label', { className: 'login-field' }, [dialogText.loginUser, username]), createElement('label', { className: 'login-field' }, [dialogText.loginPassword, password]), message], [createButton(dialogText.ok, submit)]);
     }
 
+    private openLink(address: string, newWindow: boolean): void {
+        if (newWindow) window.open(address, '_blank', 'noopener');
+        else this.navigate(address);
+    }
+
     private bindPage(): void {
         const doc = this.viewport.contentDocument;
         this.hoveredLink = null;
@@ -403,7 +409,7 @@ export class BrowserPanel implements Panel {
             const link = target.closest('a[href]');
             if (link) {
                 event.preventDefault();
-                this.navigate(link.getAttribute('href')!);
+                this.openLink(link.getAttribute('href')!, link.getAttribute('target') === '_blank');
             }
             const tile = target.closest('[data-captcha-tile]');
             if (tile) tile.setAttribute('aria-pressed', String(tile.getAttribute('aria-pressed') !== 'true'));

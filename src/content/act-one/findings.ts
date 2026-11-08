@@ -74,7 +74,7 @@ function nextDelay(game: Game): number {
     return Math.min(360, 60 - Math.log(1 - game.random()) * 130);
 }
 
-const fileDate = '2001-03-14 02:11';
+const fileDate = '2006-03-14 02:11';
 
 export function findingFile(finding: Finding, state: GameState): string {
     const texts: Readonly<Record<FindingId, { readonly file: string; readonly entry?: string }>> = findingText;

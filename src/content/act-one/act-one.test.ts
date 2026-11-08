@@ -4,7 +4,7 @@ import { createInitialState } from '../../core/state.ts';
 import { parseSave, serializeSave } from '../../persistence/save.ts';
 import { actOneContent } from './index.ts';
 import { entrance, levelPage, urlOfLevel } from './levels.ts';
-import { nordinhoTopicUrl } from './riddle.ts';
+import { hallOfFameUrl, riddleHomeUrl, rulesUrl } from './riddle.ts';
 import { createCaptcha } from './captchas.ts';
 import { effectiveRate, networkCapacity } from './network.ts';
 import { planSearch, searchCapabilities } from './search.ts';
@@ -48,17 +48,10 @@ describe('Act I', () => {
         for (let level = 1; level <= 9; level++) expect(gamePage(level).html).toContain(`<span class="number">${level}</span>`);
     });
 
-    it('keeps query strings on community sites but canonicalizes riddle addresses', () => {
-        const game = newGame();
-        game.dispatch({ type: 'navigate', url: `${nordinhoTopicUrl}?t=4211` });
-        expect(game.state.browserUrl).toBe(`${nordinhoTopicUrl}?t=4211`);
-        expect(game.content.resolvePage(game.state.browserUrl, game.state).statusCode).toBe(200);
-        game.dispatch({ type: 'navigate', url: `${urlOfLevel(1).toUpperCase()}?from=nordinho` });
-        expect(game.state.browserUrl).toBe(urlOfLevel(1));
-    });
-
     it('generates unique stable URLs and a usable clue on every page through the wall', () => {
-        const urls = new Set<string>();
+        const game = newGame();
+        const urls = new Set<string>([`${riddleHomeUrl}index.htm`, rulesUrl, hallOfFameUrl]);
+        for (const url of urls) expect(game.content.resolvePage(url, game.state).statusCode).toBe(200);
         for (let level = 1; level <= 1400; level++) {
             const url = urlOfLevel(level);
             expect(urls.has(url), `duplicate at ${level}: ${url}`).toBe(false);

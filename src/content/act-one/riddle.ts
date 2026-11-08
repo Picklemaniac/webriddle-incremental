@@ -1,10 +1,11 @@
 export const riddleOrigin = 'http://www.notfinite.net';
 export const startUrl = `${riddleOrigin}/beginning.htm`;
 export const riddleHomeUrl = `${riddleOrigin}/`;
+export const rulesUrl = `${riddleOrigin}/rules.htm`;
+export const hallOfFameUrl = `${riddleOrigin}/halloffame.htm`;
 export const homeUrl = 'http://www.enigmaweb.net/';
-export const enigmaticsUrl = 'http://www.enigmatics.org/';
-export const nordinhoUrl = 'http://www.nordinho.net/';
-export const nordinhoTopicUrl = 'http://www.nordinho.net/viewtopic.php';
+export const enigmaticsUrl = 'https://enigmatics.org/';
+export const nordinhoUrl = 'https://www.nordinho.net/';
 
 const riddleSeed = 0x2026_1108;
 
