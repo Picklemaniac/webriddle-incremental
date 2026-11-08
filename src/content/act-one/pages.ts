@@ -4,7 +4,7 @@ import { findingFile, findings } from './findings.ts';
 import { imagePath } from './images.ts';
 import { entrance, inWildcardFolder, levelPage, presentImageId, urlOfLevel, type LevelPage } from './levels.ts';
 import { riddleOrigin } from './riddle.ts';
-import { captchaText, errorPages, pageText } from './text.ts';
+import { alternateFiles, captchaText, errorPages, fill, pageText } from './text.ts';
 
 const scrollbarStyle = "::-webkit-scrollbar { width: 16px; height: 16px; }::-webkit-scrollbar-track { background: repeating-conic-gradient(#c0c0c0 0% 25%, #fff 0% 50%) 0 0 / 2px 2px; }::-webkit-scrollbar-thumb { background: #c0c0c0; box-shadow: inset -1px -1px #000, inset 1px 1px #dfdfdf, inset -2px -2px #808080, inset 2px 2px #fff; }::-webkit-scrollbar-button:vertical:start:decrement, ::-webkit-scrollbar-button:vertical:end:increment, ::-webkit-scrollbar-button:horizontal:start:decrement, ::-webkit-scrollbar-button:horizontal:end:increment { display: block; width: 16px; height: 16px; background-color: #c0c0c0; background-repeat: no-repeat; background-position: center; box-shadow: inset -1px -1px #000, inset 1px 1px #dfdfdf, inset -2px -2px #808080, inset 2px 2px #fff; }::-webkit-scrollbar-button:vertical:start:decrement { background-image: url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='7' height='4' shape-rendering='crispEdges'><path d='M3 0h1v1h1v1h1v1h1v1H0V3h1V2h1V1h1z'/></svg>\"); }::-webkit-scrollbar-button:vertical:end:increment { background-image: url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='7' height='4' shape-rendering='crispEdges'><path d='M0 0h7v1H6v1H5v1H4v1H3V3H2V2H1V1H0z'/></svg>\"); }::-webkit-scrollbar-button:horizontal:start:decrement { background-image: url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='7' shape-rendering='crispEdges'><path d='M3 0h1v7H3V6H2V5H1V4H0V3h1V2h1V1h1z'/></svg>\"); }::-webkit-scrollbar-button:horizontal:end:increment { background-image: url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='7' shape-rendering='crispEdges'><path d='M0 0h1v1h1v1h1v1h1v1H3v1H2v1H1v1H0z'/></svg>\"); }::-webkit-scrollbar-button:active { box-shadow: inset 1px 1px #808080; }::-webkit-scrollbar-corner { background: #c0c0c0; }";
 
@@ -18,11 +18,13 @@ const pictureStyle = '.picture{position:relative;display:block;border:2px solid 
 const levelStyle = '*{box-sizing:border-box}html,body{height:100%}' +
     'body{margin:0;padding:12px 16px;background:#000;color:#ddd;font:18px "Times New Roman",Times,serif;text-align:center;display:flex;flex-direction:column;justify-content:center}' +
     `.picture{width:min(${pictureWidth + 4}px,100%,calc((100vh - 120px) * 1.5));margin:0 auto}${pictureStyle}` +
-    'p{margin:16px 0 0;white-space:nowrap}p+p{margin-top:6px}.hidden{color:#000}a{color:#fff}::selection{background:#3459b1;color:#fff}';
+    '.swatches{display:flex;justify-content:center;gap:8px;margin-top:16px}.swatches span{width:26px;height:26px;border:1px solid #555}p{margin:16px 0 0;white-space:nowrap}p+p{margin-top:6px}.hidden{color:#000}a{color:#fff}::selection{background:#3459b1;color:#fff}';
 
 const imageStyle = `*{box-sizing:border-box}body{margin:8px;background:#000}img{display:block;width:${pictureWidth}px;image-rendering:pixelated}.picture{width:${pictureWidth + 4}px}${pictureStyle}`;
 
 const textFileStyle = 'body{margin:8px;background:#000;color:#ddd}pre{margin:0;font:13px "Courier New",monospace}';
+
+const drawnTextStyle = 'body{margin:8px;background:#000}.drawn{display:inline-block;padding:28px 36px;background:#101010;color:#f0f0f0;border:2px solid #f2f2f2;font:bold 44px "Courier New",monospace;letter-spacing:4px}';
 
 const errorStyle = 'body{background:#111;color:#ccc;margin:36px;font:13px Verdana,sans-serif;line-height:1.8}h2{font-size:20px}hr{border:0;border-top:1px solid #444}';
 
@@ -36,7 +38,8 @@ function documentPage(title: string, body: string, statusCode: number, style: st
 }
 
 function picture(page: LevelPage): string {
-    return `<span class="picture"><img src="${imagePath(page.imageId)}" alt=""><span class="number">${page.level}</span></span>`;
+    const title = page.imageTitle === null ? '' : ` title="${escapeHtml(page.imageTitle)}"`;
+    return `<span class="picture"><img src="${imagePath(page.imageId)}" alt=""${title}><span class="number">${page.level}</span></span>`;
 }
 
 function relativeLink(from: string, to: string): string {
@@ -50,13 +53,15 @@ function renderLevel(level: number): Page {
     const body = [
         link === null ? picture(page) : `<a href="${link}">${picture(page)}</a>`,
         ...page.lines.map((line) => `<p>${escapeHtml(line)}</p>`),
+        page.colors.length === 0 ? '' : `<div class="swatches">${page.colors.map((color) => `<span style="background:${color}"></span>`).join('')}</div>`,
         page.hiddenText === null ? '' : `<p class="hidden">${escapeHtml(page.hiddenText)}</p>`,
     ].join('');
     return { ...documentPage(page.title, body, 200, levelStyle), source: levelSource(page, link) };
 }
 
 function levelSource(page: LevelPage, link: string | null): string {
-    const image = `<img src="${page.imageName}" width="${pictureWidth}" height="${pictureHeight}" border="0">`;
+    const title = page.imageTitle === null ? '' : ` title="${escapeHtml(page.imageTitle)}"`;
+    const image = `<img src="${page.imageName}" width="${pictureWidth}" height="${pictureHeight}" border="0"${title}>`;
     return [
         '<html>',
         '<head>',
@@ -66,6 +71,7 @@ function levelSource(page: LevelPage, link: string | null): string {
         '<center>',
         link === null ? image : `<a href="${link}">${image}</a>`,
         ...page.lines.map((line) => `<p><font face="Times New Roman" size="4">${escapeHtml(line)}</font></p>`),
+        ...(page.colors.length === 0 ? [] : [`<table border="0" cellspacing="6"><tr>${page.colors.map((color) => `<td bgcolor="${color}" width="26" height="26"></td>`).join('')}</tr></table>`]),
         ...(page.hiddenText === null ? [] : [`<p><font color="#000000">${escapeHtml(page.hiddenText)}</font></p>`]),
         '</center>',
         ...page.comments.map((comment) => `<!-- ${comment.replaceAll('-->', '--&gt;')} -->`),
@@ -89,6 +95,8 @@ export function resolvePage(url: string, state: GameState): Page {
     const known = state.visitedLevels[address];
     if (known !== undefined) return renderLevel(known);
     if (address === urlOfLevel(state.currentLevel)) return renderLevel(state.currentLevel);
+    const alternate = alternatePage(address, state);
+    if (alternate !== null) return alternate;
     if (address.endsWith('.jpg')) {
         for (const level of [state.currentLevel, ...Object.values(state.visitedLevels)]) {
             const page = levelPage(level);
@@ -101,6 +109,19 @@ export function resolvePage(url: string, state: GameState): Page {
     if (finding) return documentPage(finding.path, `<pre>${escapeHtml(findingFile(finding, state))}</pre>`, 200, textFileStyle);
     if (inWildcardFolder(address)) return documentPage('', `<p>${pageText.wildcardPage}</p>`, 200, levelStyle);
     return errorPage('notFound');
+}
+
+function alternatePage(address: string, state: GameState): Page | null {
+    for (const level of [state.currentLevel, ...Object.values(state.visitedLevels)]) {
+        const { alternate, imageName, url } = levelPage(level);
+        if (alternate === null) continue;
+        const name = imageName.replace(/\.jpg$/, `.${alternate.extension}`);
+        if (address !== canonicalUrl(new URL(name, url).href)) continue;
+        return alternate.extension === 'gif'
+            ? documentPage(name, `<div class="drawn">${escapeHtml(alternate.text)}</div>`, 200, drawnTextStyle)
+            : documentPage(name, `<pre>${escapeHtml(fill(alternateFiles[alternate.extension], { word: alternate.text }))}</pre>`, 200, textFileStyle);
+    }
+    return null;
 }
 
 function errorPage(kind: 'notFound' | 'unavailable' | 'unauthorized'): Page {

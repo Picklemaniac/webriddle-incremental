@@ -1,20 +1,12 @@
-import { encode, toLeet, toRomanNumerals, type Encoding } from './encodings.ts';
+import { encode, toLeet } from './encodings.ts';
 import { imageForSubject, imageWithWord, levelImageCount } from './images.ts';
+import { textEncodingFor, wordClue, yearClue, type Clue } from './methods.ts';
 import { pickByUnit, ramp, riddleOrigin, salts, startUrl, unitHash } from './riddle.ts';
 import { clueLines, fill, handcraftedText, pageText } from './text.ts';
 import { vocabularySize, wordAtRank } from './vocabulary.ts';
 import { folderNames } from './word-lists.ts';
 
 type EntranceKind = 'fixed' | 'word' | 'extension' | 'leet' | 'number' | 'credentials' | 'twoWords' | 'phrase';
-
-interface Clue {
-    readonly title?: string;
-    readonly lines?: readonly string[];
-    readonly comment?: string;
-    readonly hiddenText?: string;
-    readonly imageName?: string;
-    readonly imageLink?: boolean;
-}
 
 interface Credentials {
     readonly username: string;
@@ -43,6 +35,9 @@ export interface LevelPage {
     readonly title: string;
     readonly imageId: number;
     readonly imageName: string;
+    readonly imageTitle: string | null;
+    readonly colors: readonly string[];
+    readonly alternate: NonNullable<Clue['alternate']> | null;
     readonly link: string | null;
     readonly lines: readonly string[];
     readonly hiddenText: string | null;
@@ -121,6 +116,9 @@ export function levelPage(level: number): LevelPage {
         title: clue.title ? fill(pageText.levelTitleWithClue, { level, clue: clue.title }) : fill(pageText.levelTitle, { level }),
         imageId: pageImage(level),
         imageName: clue.imageName ?? `${level}.jpg`,
+        imageTitle: clue.imageTitle ?? null,
+        colors: clue.colors ?? [],
+        alternate: clue.alternate ?? null,
         link: clue.imageLink === true ? next.url : null,
         lines: [...(clue.lines ?? []), ...(level === 404 ? [handcraftedText.easterEgg404] : level === 418 ? [handcraftedText.easterEgg418] : [])],
         hiddenText: clue.hiddenText ?? null,
@@ -167,7 +165,7 @@ function generatedEntrance(level: number, attempt = 0): Entrance {
         case 'extension': {
             const word = sampleWord(level, unit(salts.rank));
             const extension = pickByUnit(otherExtensions, unit(salts.extension));
-            const wordHint = wordClue(level, word);
+            const wordHint = wordClue(level, word, false);
             const clue: Clue = {
                 ...wordHint,
                 imageName: `${wordHint.imageName?.replace(/\.jpg$/, '') ?? level}.${extension}.jpg`,
@@ -183,28 +181,28 @@ function generatedEntrance(level: number, attempt = 0): Entrance {
         }
         case 'number': {
             const year = 1000 + Math.floor(unit(salts.year) * 1100);
-            const clue: Clue = { lines: [toRomanNumerals(year)] };
+            const clue: Clue = { lines: [yearClue(year, level, unit(salts.clue))] };
             return buildEntrance(level, kind, String(year), 'htm', [], null, clue, folder);
         }
         case 'credentials': {
             const door = sampleCommonWord(unit(salts.door), 400, 9);
             const username = sampleCommonWord(unit(salts.username), 300, 9);
             const password = sampleCommonWord(unit(salts.password), 300, 9, username);
-            const encoding = encodingFor(level, unit(salts.encoding));
+            const encoding = textEncodingFor(level, unit(salts.encoding));
             const clue: Clue = { imageLink: true, lines: [clueLines.credentials], comment: encode(`${username} ${password}`, encoding) };
             return buildEntrance(level, kind, door, '', [door, username, password], { username, password }, clue, folder);
         }
         case 'twoWords': {
             const first = sampleCommonWord(unit(salts.rank), 300, 7);
             const second = sampleCommonWord(unit(salts.secondWord), 300, 7, first);
-            const clue: Clue = { comment: encode(`${first} ${second}`, encodingFor(level, unit(salts.encoding))) };
+            const clue: Clue = { comment: encode(`${first} ${second}`, textEncodingFor(level, unit(salts.encoding))) };
             return buildEntrance(level, kind, `${first}${second}`, 'htm', [first, second], null, clue, folder);
         }
         case 'phrase': {
             const wordCount = 3 + Math.floor(unit(salts.phraseLength) * 2);
             const phraseSalts = [salts.rank, salts.secondWord, salts.thirdWord, salts.fourthWord];
             const words = phraseSalts.slice(0, wordCount).map((salt) => sampleCommonWord(unit(salt), 600, 7));
-            const encoding = pickByUnit<Encoding>(['plain', 'rot13', 'reversed'], unit(salts.encoding));
+            const encoding = textEncodingFor(level, unit(salts.encoding));
             const clue: Clue = { comment: encode(words.join(' '), encoding) };
             return buildEntrance(level, kind, words.join(''), 'htm', words, null, clue, folder);
         }
@@ -280,36 +278,7 @@ function sampleCommonWord(unit: number, maximum: number, maximumLength: number, 
     return wordAtRank(startRank);
 }
 
-function encodingFor(level: number, unit: number): Encoding {
-    const available: Encoding[] = ['plain'];
-    if (level >= 60) {
-        available.push('reversed', 'a1z26');
-    }
-    if (level >= 200) {
-        available.push('rot13');
-    }
-    if (level >= 400) {
-        available.push('morse');
-    }
-    return pickByUnit(available, unit);
-}
 
-function wordClue(level: number, word: string): Clue {
-    const encoding = encodingFor(level, unitHash(level, salts.encoding));
-    const style = pickByUnit(['title', 'comment', 'comment', 'hidden', 'filename', 'visible', 'visible'] as const, unitHash(level, salts.clue));
-    switch (style) {
-        case 'title':
-            return { title: encoding === 'reversed' ? encode(word, 'reversed') : word };
-        case 'comment':
-            return { comment: encode(word, encoding) };
-        case 'hidden':
-            return { hiddenText: word };
-        case 'filename':
-            return { imageName: `${word}.jpg` };
-        case 'visible':
-            return { lines: [encode(word, encoding)] };
-    }
-}
 
 function binaryLines(word: string): string[] {
     const bytes = encode(word, 'binary').split(' ');

@@ -65,6 +65,23 @@ export const handcraftedText = {
     easterEgg418: 'i am a teapot.',
 } as const;
 
+export const methodHints = {
+    caesar: 'veni, vidi, vici.',
+    keyboardRight: 'one step to the right.',
+    keyboardLeft: 'one step to the left.',
+    pollux: 'one four seven, two five eight, and the rest is silence.',
+    gif: 'a GIFT, wrapped the wrong way.',
+    txt: 'just TXT me.',
+    json: 'ask JSON.',
+    css: 'it is all a matter of style.',
+} as const;
+
+export const alternateFiles = {
+    txt: '{word}',
+    json: '{ "next": "{word}.htm" }',
+    css: ':root { --next: "{word}"; }',
+} as const;
+
 export const clueLines = {
     credentials: 'members only.',
     extension: ['it\'s all in the ending.', 'same name, different ending.'],
