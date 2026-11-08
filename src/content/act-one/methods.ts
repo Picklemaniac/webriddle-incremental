@@ -27,18 +27,13 @@ const lineWidth = 36;
 const acrosticRanks = 3000;
 
 const methods: readonly Method[] = [
-    { fromLevel: 11, clue: (word) => ({ title: word }) },
-    { fromLevel: 11, clue: (word) => ({ comment: word }) },
-    { fromLevel: 11, clue: (word) => ({ hiddenText: word }) },
-    { fromLevel: 11, usesImage: true, clue: (word) => ({ imageName: `${word}.jpg` }) },
     cipher('reversed', 11),
-    cipher('a1z26', 14),
-    { fromLevel: 18, clue: (word) => ({ imageTitle: word }) },
-    cipher('rot13', 20),
-    { fromLevel: 24, usesImage: true, clue: (word, _level, unit) => alternate(word, unit) },
-    cipher('atbash', 28),
-    cipher('morse', 32),
-    cipher('nato', 36),
+    cipher('a1z26', 12),
+    cipher('rot13', 16),
+    { fromLevel: 20, usesImage: true, clue: (word, _level, unit) => alternate(word, unit) },
+    cipher('atbash', 24),
+    cipher('morse', 28),
+    cipher('nato', 32),
     { fromLevel: 45, clue: (word, _level, unit) => ({ title: methodHints.caesar, ...placed(encode(word, 'caesar'), unit) }) },
     cipher('binary', 55),
     cipher('phone', 65),
@@ -65,7 +60,7 @@ const methods: readonly Method[] = [
 ];
 
 const textEncodings: readonly (readonly [Encoding, number])[] = [
-    ['plain', 0], ['reversed', 11], ['a1z26', 14], ['rot13', 20], ['atbash', 28], ['morse', 32], ['nato', 36],
+    ['reversed', 11], ['a1z26', 12], ['rot13', 16], ['atbash', 24], ['morse', 28], ['nato', 32],
     ['binary', 55], ['hex', 140], ['ascii', 155], ['base64', 280],
 ];
 
@@ -91,7 +86,12 @@ function cipher(encoding: Encoding, fromLevel: number): Method {
 }
 
 function placed(text: string, unit: number): Clue {
-    return fraction(unit * 7) < 0.65 ? { lines: lineUp(text) } : { comment: text };
+    const spot = fraction(unit * 7);
+    if (spot < 0.5 || (spot >= 0.7 && text.length > lineWidth)) return { lines: lineUp(text) };
+    if (spot < 0.7) return { comment: text };
+    if (spot < 0.8) return { title: text };
+    if (spot < 0.9) return { hiddenText: text };
+    return { imageTitle: text };
 }
 
 function alternate(word: string, unit: number): Clue {

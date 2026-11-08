@@ -172,7 +172,7 @@ function generatedEntrance(level: number, attempt = 0): Entrance {
         case 'leet': {
             const word = sampleWord(level, unit(salts.rank));
             const answer = toLeet(word, unit(salts.leet));
-            const clue: Clue = unit(salts.clue) < 0.5 ? { title: answer } : { comment: answer };
+            const clue: Clue = { comment: encode(answer, pickByUnit(['reversed', 'rot13', 'base64', 'hex'] as const, unit(salts.encoding))) };
             return buildEntrance(level, kind, answer, 'htm', [word], null, clue, folder);
         }
         case 'number': {

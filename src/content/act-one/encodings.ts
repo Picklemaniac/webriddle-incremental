@@ -1,4 +1,4 @@
-export type Encoding = 'plain' | 'reversed' | 'a1z26' | 'rot13' | 'caesar' | 'atbash' | 'keyboard' | 'morse' | 'nato' | 'phone' | 'braille'
+export type Encoding = 'reversed' | 'a1z26' | 'rot13' | 'caesar' | 'atbash' | 'keyboard' | 'morse' | 'nato' | 'phone' | 'braille'
     | 'tap' | 'bacon' | 'polybius' | 'adfgvx' | 'binary' | 'octal' | 'hex' | 'ascii' | 'roman' | 'arithmetic' | 'url' | 'entities'
     | 'base64' | 'dna' | 'codepoints' | 'pollux';
 
@@ -29,8 +29,6 @@ const leetSubstitutions: Readonly<Record<string, string>> = { a: '4', e: '3', i:
 
 export function encode(text: string, encoding: Encoding, unit = 0): string {
     switch (encoding) {
-        case 'plain':
-            return text;
         case 'reversed':
             return [...text].reverse().join('');
         case 'a1z26':
