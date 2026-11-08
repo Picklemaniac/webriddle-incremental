@@ -3,11 +3,11 @@ import type { GameEvent } from '../core/events.ts';
 import { currentSearch } from '../content/act-one/automation.ts';
 import { dirbustingScripts } from '../content/act-one/economy.ts';
 import { findings } from '../content/act-one/findings.ts';
-import { urlOfLevel } from '../content/act-one/levels.ts';
+import { entrance, urlOfLevel } from '../content/act-one/levels.ts';
 import { effectiveRate, isBanned, requestedRate } from '../content/act-one/network.ts';
 import { automationBootSeconds, automationElapsed, owns } from '../content/act-one/progress.ts';
 import { riddleOrigin } from '../content/act-one/riddle.ts';
-import { notices, terminalText, uiText } from '../content/act-one/text.ts';
+import { fill, notices, terminalText, uiText } from '../content/act-one/text.ts';
 import { wordAtRank } from '../content/act-one/vocabulary.ts';
 import { formatDuration, formatNumber } from '../format.ts';
 import { createElement, setText } from './dom.ts';
@@ -17,6 +17,7 @@ export class TerminalPanel implements Panel {
     readonly element = createElement('section', { className: 'terminal', attributes: { 'aria-label': terminalText.title } });
     private readonly command = createElement('div', { className: 'terminal-command' });
     private readonly lines = createElement('div', { className: 'terminal-lines', attributes: { role: 'log', 'aria-live': 'off' } });
+    private readonly live = createElement('div', { className: 'terminal-line live', attributes: { 'aria-hidden': 'true' } });
     private readonly rate = createElement('span');
     private readonly footer = createElement('div', { className: 'terminal-footer' });
     private readonly progress = createElement('div', { className: 'terminal-progress-fill' });
@@ -30,7 +31,7 @@ export class TerminalPanel implements Panel {
 
     constructor(game: Game) {
         this.game = game;
-        this.element.append(createElement('div', { className: 'terminal-heading' }, [createElement('span', { text: terminalText.title }), this.rate]), this.explanation, this.command, this.lines,
+        this.element.append(createElement('div', { className: 'terminal-heading' }, [createElement('span', { text: terminalText.title }), this.rate]), this.explanation, this.command, this.lines, this.live,
             createElement('div', { className: 'terminal-progress' }, [this.progress]), this.footer);
         game.subscribe((event) => this.onEvent(event));
         if (game.state.flags.automated) this.queueLine(`# ${terminalText.session}`, 'notice');
@@ -48,13 +49,14 @@ export class TerminalPanel implements Panel {
             setText(this.explanation, '');
             setText(this.rate, '');
             setText(this.footer, terminalText.booting);
+            setText(this.live, '');
             this.footer.classList.remove('warning');
             this.progress.style.width = '0%';
             this.lastLineAt = performance.now();
             return;
         }
         const plan = currentSearch(game);
-        const blockNotices = { unguessable: 'Read the page to find the next address.', userAgent: notices.userAgentBlock, folder: notices.folderBlock, extension: notices.extensionBlock, wildcard: notices.wildcardBlock, credentials: notices.credentialsBlock };
+        const blockNotices = { unguessable: terminalText.readPage, userAgent: notices.userAgentBlock, folder: notices.folderBlock, extension: notices.extensionBlock, wildcard: notices.wildcardBlock, credentials: notices.credentialsBlock };
         setText(this.explanation, isBanned(game) ? notices.firstBan : plan.blockedBy ? blockNotices[plan.blockedBy] : this.latestNotice);
         let spent = game.state.search.requestsSpent;
         let phase = plan.phases[0];
@@ -69,9 +71,8 @@ export class TerminalPanel implements Panel {
         const tool = owns(game.state, 'ffuf') ? 'ffuf' : owns(game.state, 'gobuster') ? 'gobuster' : owns(game.state, 'dirb') ? 'dirb' : 'curl';
         const list = phase?.label ?? 'words.txt';
         const folder = new URL(urlOfLevel(game.state.currentLevel)).pathname.replace(/[^/]*$/, '');
-        const command = tool === 'curl'
-            ? `$ while read name; do curl -I "${riddleOrigin}${folder}$name.htm"; done < ${list}`
-            : `$ ${tool} ${tool === 'gobuster' ? 'dir ' : ''}-u ${riddleOrigin}${folder} -w ${list} -t ${game.stat('threadsPerScript')}`;
+        const command = fill(tool === 'curl' ? terminalText.curlCommand : tool === 'gobuster' ? terminalText.gobusterCommand : terminalText.toolCommand,
+            { tool, folder: `${riddleOrigin}${folder}`, list, threads: game.stat('threadsPerScript') });
         setText(this.command, command);
         this.command.title = command;
         let footer = uiText.waiting as string;
@@ -83,18 +84,25 @@ export class TerminalPanel implements Panel {
         this.footer.title = footer;
         this.footer.classList.toggle('warning', isBanned(game) || plan.blockedBy !== null);
         this.progress.style.width = `${phase ? Math.min(100, spent / phase.size * 100) : 0}%`;
+        const target = entrance(game.state.currentLevel + 1);
+        const targetFolder = target.folder === null ? '/' : `/${target.folder}/`;
+        const searched = phase !== undefined && plan.blockedBy === null && !isBanned(game) && dirbustingScripts(game) > 0 && rate > 0 ? phase : null;
+        const request = (index: number): string => {
+            const candidate = searched ? searched.candidate(Math.floor(index)) : `${wordAtRank(1 + this.sampleIndex * 47 % 1200)}.htm`;
+            return candidate.startsWith('/') ? candidate : `${searched ? targetFolder : folder}${candidate}`;
+        };
+        setText(this.live, searched ? `${terminalText.testing} ${request(spent)}` : '');
         const now = performance.now();
         const nextLine = this.pendingLines[0];
         if (nextLine && now - this.lastLineAt >= (seconds < 600 ? 1500 : 700)) {
             this.pendingLines.shift();
             this.line(nextLine.text, nextLine.style);
-        } else if (!nextLine && requestedRate(game) > 0 && now - this.lastLineAt >= (seconds < 600 ? 3500 : 1200) &&
+        } else if (!nextLine && requestedRate(game) > 0 && now - this.lastLineAt >= sampleInterval(rate) &&
             (game.state.statistics.requestsSent ?? 0) > this.lastSampledRequests && !isBanned(game)) {
             this.lastSampledRequests = game.state.statistics.requestsSent ?? 0;
             this.sampleIndex++;
             const code = plan.blockedBy === 'credentials' ? 401 : plan.blockedBy === 'userAgent' ? 403 : plan.blockedBy === 'wildcard' ? 200 : 404;
-            const word = wordAtRank(1 + this.sampleIndex * 47 % 1200);
-            this.line(`${String(code)}  ${folder}${word}.htm${plan.blockedBy === 'wildcard' ? `  ${terminalText.identicalResponse}` : ''}`, code === 404 ? 'miss' : 'warning');
+            this.line(`${String(code)}  ${request(Math.max(0, spent - 1))}${plan.blockedBy === 'wildcard' ? `  ${terminalText.identicalResponse}` : ''}`, code === 404 ? 'miss' : 'warning');
         }
     }
 
@@ -148,4 +156,8 @@ export class TerminalPanel implements Panel {
         while (this.lines.childElementCount > 150) this.lines.firstElementChild?.remove();
         if (nearBottom) this.lines.scrollTop = this.lines.scrollHeight;
     }
+}
+
+function sampleInterval(requestsPerSecond: number): number {
+    return Math.min(3500, Math.max(250, 6000 / Math.sqrt(Math.max(1, requestsPerSecond))));
 }

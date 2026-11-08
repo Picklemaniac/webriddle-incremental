@@ -7,7 +7,6 @@ export const salts = {
     kind: 1,
     rank: 2,
     clue: 3,
-    image: 4,
     extension: 5,
     encoding: 6,
     flavor: 7,

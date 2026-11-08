@@ -1,7 +1,7 @@
 import { encode, toLeet, toRomanNumerals, type Encoding } from './encodings.ts';
-import { imageForSubject, imageForUnit, imageWithWord, pictureSubjects } from './images.ts';
+import { imageForSubject, imageIdsWithSubject, imageWithWord, levelImageCount, pictureSubjects } from './images.ts';
 import { pickByUnit, ramp, riddleOrigin, salts, startUrl, unitHash } from './riddle.ts';
-import { clueLines, handcraftedText, picturePrompts } from './text.ts';
+import { clueLines, fill, handcraftedText, pageText, picturePrompts } from './text.ts';
 import { vocabularySize, wordAtRank } from './vocabulary.ts';
 import { folderNames } from './word-lists.ts';
 
@@ -15,7 +15,6 @@ interface Clue {
     readonly imageName?: string;
     readonly pictureSubject?: string;
     readonly imageLink?: boolean;
-    readonly doorLink?: boolean;
 }
 
 interface Credentials {
@@ -45,11 +44,10 @@ export interface LevelPage {
     readonly title: string;
     readonly imageId: number;
     readonly imageName: string;
-    readonly imageLink: string | null;
+    readonly link: string | null;
     readonly lines: readonly string[];
     readonly hiddenText: string | null;
-    readonly comment: string | null;
-    readonly doorLink: string | null;
+    readonly comments: readonly string[];
 }
 
 interface HandcraftedEntrance {
@@ -65,7 +63,7 @@ const firstFolderLevel = 100;
 const levelsPerFolder = 100;
 
 const wildcardFolders = new Set(['basalt', 'ember']);
-const otherExtensions: readonly string[] = ['html', 'php', 'asp', 'txt'];
+export const otherExtensions: readonly string[] = ['html', 'php', 'asp', 'txt'];
 
 const handcraftedEntrances: Readonly<Record<number, HandcraftedEntrance>> = {
     2: { kind: 'fixed', answer: 'level2', clue: { imageLink: true, lines: [handcraftedText.level1] } },
@@ -74,14 +72,17 @@ const handcraftedEntrances: Readonly<Record<number, HandcraftedEntrance>> = {
     5: { kind: 'word', answer: 'lighthouse', clue: { title: 'rot13', lines: [handcraftedText.level4] } },
     6: { kind: 'word', answer: 'midnight', positionUnit: 0.08, clue: { lines: [handcraftedText.level5], hiddenText: 'midnight' } },
     7: { kind: 'word', answer: 'bridge', clue: { lines: [handcraftedText.level6], imageName: 'present.jpg' } },
-    8: { kind: 'word', answer: 'owl', clue: { pictureSubject: 'owl', lines: [] } },
+    8: { kind: 'word', answer: 'moon', clue: { lines: [] } },
     9: { kind: 'word', answer: 'mirror', clue: { lines: [handcraftedText.level8] } },
     10: { kind: 'word', answer: 'dusk', clue: { lines: [handcraftedText.level9] } },
 };
 
 const handcraftedPageImageWords: Readonly<Record<number, string>> = {
-    1: 'path', 2: 'foggy', 3: 'cave', 4: 'ruins', 5: 'night', 6: 'bouquet', 7: 'twilight', 8: 'moon', 9: 'reflection',
+    1: 'path', 2: 'foggy', 3: 'cave', 4: 'ruins', 5: 'night', 6: 'bouquet', 7: 'moon', 8: 'mirror', 9: 'reflection',
 };
+
+const handcraftedPageImages = new Set(Object.values(handcraftedPageImageWords).map(imageWithWord));
+const generatedPageImages = Array.from({ length: levelImageCount }, (_, imageId) => imageId).filter((imageId) => !handcraftedPageImages.has(imageId));
 
 const entranceCache = new Map<number, Entrance>();
 
@@ -113,20 +114,17 @@ export function folderFor(level: number): string | null {
 export function levelPage(level: number): LevelPage {
     const next = entrance(level + 1);
     const clue = next.clue;
-    const imageId = clue.pictureSubject === undefined
-        ? pageImage(level)
-        : imageForSubject(clue.pictureSubject, unitHash(level, salts.picture));
+    const imageId = clue.pictureSubject === undefined ? pageImage(level) : subjectImage(clue.pictureSubject, level);
     return {
         level,
         url: urlOfLevel(level),
-        title: clue.title ? `Level ${level} · ${clue.title}` : `Level ${level}`,
+        title: clue.title ? fill(pageText.levelTitleWithClue, { level, clue: clue.title }) : fill(pageText.levelTitle, { level }),
         imageId,
         imageName: clue.imageName ?? `${level}.jpg`,
-        imageLink: clue.imageLink === true ? next.url : null,
+        link: clue.imageLink === true ? next.url : null,
         lines: [...(clue.lines ?? []), ...(level === 404 ? [handcraftedText.easterEgg404] : level === 418 ? [handcraftedText.easterEgg418] : [])],
         hiddenText: clue.hiddenText ?? null,
-        comment: [clue.comment, next.folder !== folderFor(level) ? `folder: /${next.folder}/` : undefined].filter(Boolean).join('\n') || null,
-        doorLink: clue.doorLink === true ? next.url : null,
+        comments: [clue.comment, next.folder !== folderFor(level) ? `folder: /${next.folder}/` : undefined].filter((comment) => comment !== undefined),
     };
 }
 
@@ -196,7 +194,7 @@ function generatedEntrance(level: number, attempt = 0): Entrance {
             const username = sampleCommonWord(unit(salts.username), 300, 9);
             const password = sampleCommonWord(unit(salts.password), 300, 9, username);
             const encoding = encodingFor(level, unit(salts.encoding));
-            const clue: Clue = { doorLink: true, lines: [clueLines.credentials], comment: encode(`${username} ${password}`, encoding) };
+            const clue: Clue = { imageLink: true, lines: [clueLines.credentials], comment: encode(`${username} ${password}`, encoding) };
             return buildEntrance(level, kind, door, '', [door, username, password], { username, password }, clue, folder);
         }
         case 'twoWords': {
@@ -316,8 +314,13 @@ function wordClue(level: number, word: string): Clue {
     }
 }
 
+function subjectImage(subject: string, level: number): number {
+    const candidates = imageIdsWithSubject(subject).filter((imageId) => !handcraftedPageImages.has(imageId));
+    return pickByUnit(candidates.length > 0 ? candidates : [pageImage(level)], unitHash(level, salts.picture));
+}
+
 function pageImage(level: number): number {
     const handcraftedWord = handcraftedPageImageWords[level];
-    return handcraftedWord === undefined ? imageForUnit(unitHash(level, salts.image)) : imageWithWord(handcraftedWord);
+    return handcraftedWord === undefined ? generatedPageImages[(level * 7919) % generatedPageImages.length]! : imageWithWord(handcraftedWord);
 }
 

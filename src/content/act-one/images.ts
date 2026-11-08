@@ -17,10 +17,6 @@ export function imagePath(imageId: number): string {
     return `/levels/${imageId}.jpg`;
 }
 
-export function imageForUnit(unit: number): number {
-    return Math.floor(unit * levelImageCount) % levelImageCount;
-}
-
 export function imageForSubject(subject: string, unit: number): number {
     return pickByUnit(imageIdsBySubject.get(subject) ?? [0], unit);
 }

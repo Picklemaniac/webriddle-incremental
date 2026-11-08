@@ -82,7 +82,7 @@ try {
     assert.equal(await evaluate(`document.querySelector('.automate-prompt').hidden`), false);
     await screenshot('automate');
     await toolbar('Back');
-    await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === 'Level 4 · rot13'`);
+    await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === 'Level 4: rot13'`);
     await toolbar('Forward');
     await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === 'Level 5'`);
     await toolbar('Back');
@@ -125,7 +125,7 @@ try {
     await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === 'present.gif'`);
     await toolbar('View Source');
     await navigate('bridge.htm');
-    await navigate('owl.htm');
+    await navigate('moon.htm');
     assert.match(await evaluate(`document.querySelector('.browser-viewport').contentDocument.body.textContent`), /13 9 18 18 15 18/);
     await navigate('mirror.htm');
     assert.match(await evaluate(`document.querySelector('.browser-viewport').contentDocument.body.textContent`), /ksud/);

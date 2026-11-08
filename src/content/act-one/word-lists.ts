@@ -61,4 +61,4 @@ export const folderNames: readonly string[] = [
     'umber', 'vapor', 'willow', 'xenon', 'yarrow', 'zenith',
 ];
 
-export const handcraftedAnswerWords: readonly string[] = ['beneath', 'lighthouse', 'midnight', 'bridge', 'owl', 'mirror', 'dusk'];
+export const handcraftedAnswerWords: readonly string[] = ['beneath', 'lighthouse', 'midnight', 'bridge', 'moon', 'mirror', 'dusk'];

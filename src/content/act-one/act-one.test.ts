@@ -38,12 +38,12 @@ describe('Act I', () => {
     it('uses URL, source, cipher, and hidden-text clues in the opening', () => {
         expect(levelPage(1).lines).toEqual(['Enter the forest']);
         expect(levelPage(2).lines).toEqual(['Look at the URL.']);
-        expect(levelPage(3).comment).toBe('beneath.htm');
+        expect(levelPage(3).comments).toEqual(['beneath.htm']);
         expect(levelPage(4).lines).toEqual(['yvtugubhfr']);
         expect(levelPage(4).title).toContain('rot13');
         expect(levelPage(5).hiddenText).toBe('midnight');
         expect(entrance(6).kind).toBe('word');
-        for (let level = 1; level <= 9; level++) expect(gamePage(level).html).toContain(`<h1>Level ${level}</h1>`);
+        for (let level = 1; level <= 9; level++) expect(gamePage(level).html).toContain(`<span class="number">${level}</span>`);
     });
 
     it('generates unique stable URLs and a usable clue on every page through the wall', () => {
@@ -57,7 +57,7 @@ describe('Act I', () => {
             expect(gamePage(level).html).toContain('<title>');
         }
         expect(entrance(1150)).toEqual(structuredClone(entrance(1150)));
-        expect(levelPage(99).comment).toContain('/amber/');
+        expect(levelPage(99).comments).toContain('folder: /amber/');
     });
 
     it('keeps all generated levels solvable by hand, including credentials', () => {

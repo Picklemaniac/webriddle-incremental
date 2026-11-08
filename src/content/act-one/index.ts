@@ -9,6 +9,7 @@ import { isBanned, network, networkCapacity, replaceProxy, requestedRate } from 
 import { canonicalUrl, resolvePage } from './pages.ts';
 import { automationElapsed, isUpgradeRevealed, noticeOnce, owns, solveLevel } from './progress.ts';
 import { startUrl } from './riddle.ts';
+import { labels } from './text.ts';
 import { offeredUpgrades, upgrades, type Upgrade } from './upgrades.ts';
 
 const reveals: GameSystem = {
@@ -101,7 +102,7 @@ function reveal(game: Game, flag: 'moneyRevealed' | 'wordsRevealed'): void {
 export const actOneContent: GameContent = {
     tickSeconds: 0.25,
     startUrl,
-    resources: [{ id: 'money', name: 'Money' }, { id: 'words', name: 'Words' }, { id: 'insight', name: 'Insight' }],
+    resources: [{ id: 'money', name: labels.money }, { id: 'words', name: labels.words }, { id: 'insight', name: labels.insight }],
     baseStats: { requestsPerThread: 2, threadsPerScript: 1, scriptSlots: 1, ticketValue: 3, scourValue: 25,
         ticketBotRate: 0.8, scraperRate: 12, proxySlots: 0, extraAddresses: 0, searchEfficiency: 1, dorkChance: 0 },
     purchasables: upgrades.map((item) => ({
@@ -109,7 +110,7 @@ export const actOneContent: GameContent = {
             (item.id !== 'crackHtpasswd' || (state.findings.htpasswd ?? 0) > 0),
     })),
     milestones: [
-        { id: 'automated', name: 'Automate', isReached: (state) => state.flags.automated === true },
+        { id: 'automated', name: labels.automate, isReached: (state) => state.flags.automated === true },
         { id: 'firstUpgrade', name: 'First upgrade', isReached: (state) => Object.keys(state.purchases).length > 0 },
         ...[10, 50, 100, 200, 300, 500, 700, 1000].map((level) => ({ id: `level${level}`, name: `Level ${level}`, isReached: (state: Game['state']) => state.currentLevel >= level })),
     ],

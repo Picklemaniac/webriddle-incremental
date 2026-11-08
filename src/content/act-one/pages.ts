@@ -2,34 +2,74 @@ import type { Page } from '../../core/content.ts';
 import type { CaptchaChallenge, GameState } from '../../core/state.ts';
 import { findings } from './findings.ts';
 import { imagePath } from './images.ts';
-import { entrance, levelPage, presentImageId, urlOfLevel } from './levels.ts';
+import { entrance, levelPage, presentImageId, urlOfLevel, type LevelPage } from './levels.ts';
 import { riddleOrigin } from './riddle.ts';
-import { captchaText, clueLines, errorPages } from './text.ts';
+import { captchaText, errorPages } from './text.ts';
+
+const pictureWidth = 440;
+const pictureHeight = 294;
+
+const pictureStyle = '.picture{position:relative;display:block;border:2px solid #f2f2f2;box-shadow:0 0 0 1px #000,0 0 8px 1px rgba(255,255,255,.55),0 0 26px 6px rgba(255,255,255,.14)}' +
+    '.picture img{display:block;width:100%;height:auto;image-rendering:pixelated}' +
+    '.number{position:absolute;left:10px;top:7px;font:bold 28px/1 Verdana,Tahoma,sans-serif;color:#fff;text-shadow:-2px -2px 0 #000,2px -2px 0 #000,-2px 2px 0 #000,2px 2px 0 #000,0 -2px 0 #000,0 2px 0 #000,-2px 0 0 #000,2px 0 0 #000,0 0 12px rgba(255,255,255,.8)}';
+
+const levelStyle = '*{box-sizing:border-box}html,body{height:100%}' +
+    'body{margin:0;padding:12px 16px;background:#000;color:#ddd;font:18px "Times New Roman",Times,serif;text-align:center;display:flex;flex-direction:column;justify-content:center}' +
+    `.picture{width:min(${pictureWidth + 4}px,100%,calc((100vh - 120px) * 1.5));margin:0 auto}${pictureStyle}` +
+    'p{margin:16px 0 0;white-space:nowrap}p+p{margin-top:6px}.hidden{color:#000}a{color:#fff}::selection{background:#3459b1;color:#fff}';
+
+const imageStyle = `*{box-sizing:border-box}body{margin:8px;background:#000}img{display:block;width:${pictureWidth}px;image-rendering:pixelated}.picture{width:${pictureWidth + 4}px}${pictureStyle}`;
+
+const textFileStyle = 'body{margin:8px;background:#000;color:#ddd}pre{margin:0;font:13px "Courier New",monospace}';
+
+const errorStyle = 'body{background:#111;color:#ccc;margin:36px;font:13px Verdana,sans-serif;line-height:1.8}h2{font-size:20px}hr{border:0;border-top:1px solid #444}';
 
 function escapeHtml(text: string): string {
     return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 }
 
-const riddleStyle = `*{box-sizing:border-box}html{background:#000}body{margin:0;min-height:100vh;padding:14px 18px;background:#000;color:#fff;font:18px "Times New Roman",serif;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center}h1{font:14px Arial,sans-serif;margin:0 0 12px;color:#aaa}img{display:block;width:440px;max-width:100%;max-height:calc(100vh - 140px);object-fit:contain;image-rendering:pixelated;border:0}p{margin:10px 0 0}a{color:#a5bfff;max-width:100%}::selection{background:#3459b1;color:#fff}`;
-
-function documentPage(title: string, body: string, statusCode = 200, style = riddleStyle): Page {
+function documentPage(title: string, body: string, statusCode: number, style: string): Page {
     const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${style}</style></head><body>${body}</body></html>`;
     return { title, html, source: html, statusCode };
 }
 
+function picture(page: LevelPage): string {
+    return `<span class="picture"><img src="${imagePath(page.imageId)}" alt=""><span class="number">${page.level}</span></span>`;
+}
+
+function relativeLink(from: string, to: string): string {
+    const folder = from.slice(0, from.lastIndexOf('/') + 1);
+    return to.startsWith(folder) ? to.slice(folder.length) : new URL(to).pathname;
+}
+
 function renderLevel(level: number): Page {
     const page = levelPage(level);
-    const body = (image: string): string => [
-        `<h1>Level ${level}</h1>`,
-        page.imageLink ? `<a href="${page.imageLink}"><img src="${image}" alt=""></a>` : `<img src="${image}" alt="">`,
-        ...page.lines.map((line) => `<p>${page.imageLink ? `<a href="${page.imageLink}">${escapeHtml(line)}</a>` : escapeHtml(line)}</p>`),
-        page.hiddenText ? `<p style="color:#000">${escapeHtml(page.hiddenText)}</p>` : '',
-        page.doorLink ? `<p><a href="${page.doorLink}">${clueLines.enter}</a></p>` : '',
-        page.comment ? `<!-- ${page.comment.replaceAll('-->', '--&gt;')} -->` : '',
-    ].filter(Boolean).join('\n');
-    const rendered = documentPage(page.title, body(imagePath(page.imageId)));
-    const source = `<html lang="en">\n<head>\n<title>${escapeHtml(page.title)}</title>\n</head>\n<body style="background:#000;color:#fff;text-align:center">\n${body(page.imageName)}\n</body>\n</html>`;
-    return { ...rendered, source };
+    const link = page.link === null ? null : relativeLink(page.url, page.link);
+    const body = [
+        link === null ? picture(page) : `<a href="${link}">${picture(page)}</a>`,
+        ...page.lines.map((line) => `<p>${escapeHtml(line)}</p>`),
+        page.hiddenText === null ? '' : `<p class="hidden">${escapeHtml(page.hiddenText)}</p>`,
+    ].join('');
+    return { ...documentPage(page.title, body, 200, levelStyle), source: levelSource(page, link) };
+}
+
+function levelSource(page: LevelPage, link: string | null): string {
+    const image = `<img src="${page.imageName}" width="${pictureWidth}" height="${pictureHeight}" border="0">`;
+    return [
+        '<html>',
+        '<head>',
+        `<title>${escapeHtml(page.title)}</title>`,
+        '</head>',
+        '<body bgcolor="#000000" text="#DDDDDD" link="#FFFFFF" vlink="#FFFFFF">',
+        '<center>',
+        link === null ? image : `<a href="${link}">${image}</a>`,
+        ...page.lines.map((line) => `<p><font face="Times New Roman" size="4">${escapeHtml(line)}</font></p>`),
+        ...(page.hiddenText === null ? [] : [`<p><font color="#000000">${escapeHtml(page.hiddenText)}</font></p>`]),
+        '</center>',
+        ...page.comments.map((comment) => `<!-- ${comment.replaceAll('-->', '--&gt;')} -->`),
+        '</body>',
+        '</html>',
+    ].join('\n');
 }
 
 export function canonicalUrl(url: string): string {
@@ -42,33 +82,32 @@ export function canonicalUrl(url: string): string {
 export function resolvePage(url: string, state: GameState): Page {
     if (state.captcha !== null && state.network.bannedUntil > state.elapsedSeconds) return captchaPage(state.captcha, state.flags.captchaRejected === true);
     const address = canonicalUrl(url);
-    if (!address.startsWith(`${riddleOrigin}/`)) return errorPage(true);
-    if (address === `${riddleOrigin}/present.gif`) return documentPage('present.gif', `<img src="${imagePath(presentImageId())}" alt="">`);
+    if (!address.startsWith(`${riddleOrigin}/`)) return errorPage('unavailable');
+    if (address === `${riddleOrigin}/present.gif`) return documentPage('present.gif', `<img src="${imagePath(presentImageId())}" alt="">`, 200, imageStyle);
     const known = state.visitedLevels[address];
     if (known !== undefined) return renderLevel(known);
     if (address === urlOfLevel(state.currentLevel)) return renderLevel(state.currentLevel);
     if (address.endsWith('.jpg')) {
-        const levels = [state.currentLevel, ...Object.values(state.visitedLevels)];
-        for (const level of levels) {
+        for (const level of [state.currentLevel, ...Object.values(state.visitedLevels)]) {
             const page = levelPage(level);
-            if (address === canonicalUrl(new URL(page.imageName, page.url).href)) {
-                return documentPage(page.imageName, `<img src="${imagePath(page.imageId)}" alt="">`);
-            }
+            if (address === canonicalUrl(new URL(page.imageName, page.url).href)) return documentPage(page.imageName, picture(page), 200, imageStyle);
         }
     }
     const next = entrance(state.currentLevel + 1);
-    if (address === next.url && next.credentials !== null) {
-        return { ...documentPage(errorPages.unauthorizedTitle, `<p>${errorPages.unauthorizedBody}</p>`, 401), loginRealm: next.folder ?? 'riddle' };
-    }
+    if (address === next.url && next.credentials !== null) return { ...errorPage('unauthorized'), loginRealm: next.folder ?? 'riddle' };
     const finding = findings.find((candidate) => address === `${riddleOrigin}/${candidate.path}` && state.findings[candidate.id]);
-    if (finding) return documentPage(finding.path, `<pre>${escapeHtml(finding.fileContent)}</pre>`);
-    return errorPage(false);
+    if (finding) return documentPage(finding.path, `<pre>${escapeHtml(finding.file)}</pre>`, 200, textFileStyle);
+    return errorPage('notFound');
 }
 
-function errorPage(unavailable: boolean): Page {
-    const title = unavailable ? errorPages.unavailableTitle : errorPages.notFoundTitle;
-    return documentPage(title, `<h2>${title}</h2><p>${unavailable ? errorPages.unavailableBody : errorPages.notFoundBody}</p><hr><p>${errorPages.pleaseTry}</p><ul>${errorPages.notFoundTips.map((tip) => `<li>${tip}</li>`).join('')}</ul><small>${unavailable ? errorPages.unavailableCode : errorPages.notFoundCode}</small>`, unavailable ? 0 : 404,
-        'body{background:#111;color:#ccc;margin:36px;font:13px Verdana,sans-serif;line-height:1.8}h2{font-size:20px}hr{border:0;border-top:1px solid #444}');
+function errorPage(kind: 'notFound' | 'unavailable' | 'unauthorized'): Page {
+    const text = {
+        notFound: { title: errorPages.notFoundTitle, body: errorPages.notFoundBody, tips: errorPages.notFoundTips, code: errorPages.notFoundCode, statusCode: 404 },
+        unavailable: { title: errorPages.unavailableTitle, body: errorPages.unavailableBody, tips: errorPages.notFoundTips, code: errorPages.unavailableCode, statusCode: 0 },
+        unauthorized: { title: errorPages.unauthorizedTitle, body: errorPages.unauthorizedBody, tips: errorPages.unauthorizedTips, code: errorPages.unauthorizedCode, statusCode: 401 },
+    }[kind];
+    return documentPage(text.title, `<h2>${text.title}</h2><p>${text.body}</p><hr><p>${errorPages.pleaseTry}</p><ul>${text.tips.map((tip) => `<li>${tip}</li>`).join('')}</ul><small>${text.code}</small>`,
+        text.statusCode, errorStyle);
 }
 
 function captchaPage(challenge: CaptchaChallenge, rejected: boolean): Page {

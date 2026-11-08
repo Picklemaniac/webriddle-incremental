@@ -18,8 +18,8 @@ export class BrowserPanel implements Panel {
     private readonly status = createElement('span', { className: 'status-cell' });
     private readonly throbber = createElement('img', { className: 'throbber', attributes: { src: '/branding/enigma-web.png', alt: '', 'aria-hidden': 'true' } });
     private readonly dialog = new GameDialog();
-    private readonly sourceDocument = createElement('pre', { className: 'source-document', attributes: { tabindex: '0', 'aria-label': 'Page source' } });
-    private readonly sourcePane = createElement('section', { className: 'source-pane', attributes: { 'aria-label': 'Page source', id: 'page-source' } });
+    private readonly sourceDocument = createElement('pre', { className: 'source-document', attributes: { tabindex: '0', 'aria-label': uiText.pageSource } });
+    private readonly sourcePane = createElement('section', { className: 'source-pane', attributes: { 'aria-label': uiText.pageSource, id: 'page-source' } });
     private readonly content = createElement('div', { className: 'browser-content' });
     private readonly sourceButton: HTMLButtonElement;
     private addressEdited = false;
@@ -38,6 +38,7 @@ export class BrowserPanel implements Panel {
     private pendingNavigation: ReturnType<typeof setTimeout> | undefined;
     private followOnArrival = false;
     private loginAddress = '';
+    private hoveredLink: string | null = null;
 
     constructor(game: Game) {
         this.game = game;
@@ -55,8 +56,8 @@ export class BrowserPanel implements Panel {
         this.sourceButton = this.tool('≡', uiText.source, () => this.showSource());
         this.sourceButton.setAttribute('aria-controls', 'page-source');
         const sourceClose = createButton('×', () => this.closeSource());
-        sourceClose.setAttribute('aria-label', 'Close source');
-        this.sourcePane.append(createElement('div', { className: 'source-heading' }, [createElement('strong', { text: 'Page source' }), createElement('span', { text: 'Ctrl+U' }), sourceClose]), this.sourceDocument);
+        sourceClose.setAttribute('aria-label', uiText.closeSource);
+        this.sourcePane.append(createElement('div', { className: 'source-heading' }, [createElement('strong', { text: uiText.pageSource }), createElement('span', { text: uiText.sourceShortcut }), sourceClose]), this.sourceDocument);
         this.content.append(this.viewport, this.sourcePane);
         this.updateSourceVisibility();
         const titleBar = createElement('header', { className: 'title-bar' }, [createElement('img', { className: 'browser-icon', attributes: { src: '/branding/enigma-web.png', alt: '' } }), this.title, createElement('span', { className: 'window-decoration', text: '▱  ▣', attributes: { 'aria-hidden': 'true' } })]);
@@ -110,7 +111,10 @@ export class BrowserPanel implements Panel {
             setText(this.title, title);
             document.title = title;
         }
-        if (!this.pendingNavigation) setText(this.status, `${menuText.statusDone}${this.page.statusCode === 200 ? '' : ` (${this.page.statusCode || 'DNS'})`}`);
+        if (!this.pendingNavigation) {
+            setText(this.status, this.hoveredLink !== null ? `${menuText.statusShortcut} ${this.hoveredLink}`
+                : `${menuText.statusDone}${this.page.statusCode === 200 ? '' : ` (${this.page.statusCode || 'DNS'})`}`);
+        }
         this.back.disabled = this.historyIndex <= 0;
         this.forward.disabled = this.historyIndex >= this.history.length - 1;
         this.stop.disabled = !this.pendingNavigation;
@@ -321,13 +325,18 @@ export class BrowserPanel implements Panel {
             if (accepted) { this.dialog.close(); this.render(); } else message.textContent = uiText.wrongCredentials;
         };
         password.addEventListener('keydown', (event) => { if (event.key === 'Enter') submit(); });
-        this.dialog.show(dialogText.loginTitle, [createElement('p', { text: dialogText.loginPrompt }), createElement('p', { text: `${dialogText.loginRealm}: ${realm}` }),
+        this.dialog.show(dialogText.loginTitle, [createElement('p', { text: dialogText.loginPrompt }), createElement('p', { text: `${dialogText.loginSite}: ${new URL(url).host}` }), createElement('p', { text: `${dialogText.loginRealm}: ${realm}` }),
             createElement('label', { className: 'login-field' }, [dialogText.loginUser, username]), createElement('label', { className: 'login-field' }, [dialogText.loginPassword, password]), message], [createButton(dialogText.ok, submit)]);
     }
 
     private bindPage(): void {
         const doc = this.viewport.contentDocument;
+        this.hoveredLink = null;
         if (!doc) return;
+        doc.addEventListener('mouseover', (event) => {
+            this.hoveredLink = (event.target as Element).closest('a[href]')?.getAttribute('href') ?? null;
+        });
+        doc.addEventListener('mouseout', (event) => { if (event.relatedTarget === null) this.hoveredLink = null; });
         doc.addEventListener('click', (event) => {
             const target = event.target as Element;
             const link = target.closest('a[href]');

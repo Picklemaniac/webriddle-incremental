@@ -2,7 +2,7 @@ import type { Game } from '../core/game.ts';
 import { assignedScripts, cooldownRemaining, dirbustingScripts, isJobUnlocked, moneyPerSecond, scriptSlots, wordsPerSecond } from '../content/act-one/economy.ts';
 import { effectiveRate, isBanned, liveProxies, networkCapacity, requestedRate } from '../content/act-one/network.ts';
 import { owns } from '../content/act-one/progress.ts';
-import { connectionNames, labels, uiText } from '../content/act-one/text.ts';
+import { connectionNames, labels, toolNames, uiText } from '../content/act-one/text.ts';
 import { formatDuration, formatNumber } from '../format.ts';
 import { createButton, createElement, setText } from './dom.ts';
 import type { Panel } from './panel.ts';
@@ -13,7 +13,7 @@ interface WorkerRow { element: HTMLElement; count: HTMLElement; minus: HTMLButto
 export class StatusPanel implements Panel {
     readonly element = createElement('div', { className: 'status-panels' });
     readonly networkElement = section(labels.networkPanel);
-    readonly machineElement = createElement('details', { className: 'panel machine-details' }, [createElement('summary', { text: 'Machine details' })]);
+    readonly machineElement = createElement('details', { className: 'panel machine-details' }, [createElement('summary', { text: uiText.machineDetails })]);
     private readonly game: Game;
     private readonly resources = new Map<string, ResourceRow>();
     private readonly scripts = section(labels.scriptsPanel);
@@ -63,13 +63,13 @@ export class StatusPanel implements Panel {
             });
             this.render();
         });
-        setText(this.replaceDead, 'Replace dead proxies');
+        setText(this.replaceDead, uiText.replaceDeadProxies);
         this.replaceDead.className = 'replace-dead-proxies';
         this.replaceDead.title = uiText.replacement;
         this.proxies.append(
-            createElement('div', { className: 'stat-row' }, [createElement('span', { text: 'Proxies' }), this.proxySummary]),
+            createElement('div', { className: 'stat-row' }, [createElement('span', { text: uiText.proxies }), this.proxySummary]),
             this.replaceDead,
-            createElement('details', { className: 'proxy-details' }, [createElement('summary', { text: 'Individual proxies' }), this.proxyList]),
+            createElement('details', { className: 'proxy-details' }, [createElement('summary', { text: uiText.individualProxies }), this.proxyList]),
         );
         this.networkElement.classList.add('network-panel');
         this.networkElement.append(createElement('div', { className: 'heat-track' }, [this.heat]), this.proxies);
@@ -102,7 +102,7 @@ export class StatusPanel implements Panel {
             row.plus.disabled = dirbustingScripts(game) === 0;
         }
         const connection = owns(game.state, 'fiber') ? 4 : owns(game.state, 'cable') ? 3 : owns(game.state, 'adsl') ? 2 : owns(game.state, 'isdn') ? 1 : 0;
-        const tool = owns(game.state, 'ffuf') ? 'ffuf' : owns(game.state, 'gobuster') ? 'gobuster' : owns(game.state, 'dirb') ? 'dirb' : 'bash loop';
+        const tool = toolNames[owns(game.state, 'ffuf') ? 3 : owns(game.state, 'gobuster') ? 2 : owns(game.state, 'dirb') ? 1 : 0]!;
         for (const [id, value] of Object.entries({ connection: connectionNames[connection]!, tool, slots: String(scriptSlots(game)), threads: String(game.stat('threadsPerScript')), efficiency: `${game.stat('searchEfficiency').toFixed(1)}×` })) setText(this.machineValues.get(id)!, value);
         this.machineElement.hidden = !game.state.flags.machineRevealed;
         this.networkElement.hidden = !game.state.flags.networkRevealed;

@@ -27,7 +27,7 @@ export class FindingsPanel implements Panel {
         const odds = createButton(uiText.findingsOdds, () => {
             const dialog = new GameDialog();
             const total = findings.reduce((sum, item) => sum + item.weight, 0);
-            dialog.show(uiText.findingsOddsTitle, [createElement('p', { text: uiText.findingsHelp }), ...findings.map((item) => createElement('p', { className: 'odds-row', text: `${game.state.findings[item.id] ? item.path : '????'} · ${item.rarity} · ${(item.weight / total * 100).toFixed(0)}%` }))]);
+            dialog.show(uiText.findingsOddsTitle, [createElement('p', { text: uiText.findingsHelp }), ...findings.map((item) => createElement('p', { className: 'odds-row', text: `${game.state.findings[item.id] ? item.path : uiText.unknownFinding} · ${item.rarity} · ${(item.weight / total * 100).toFixed(0)}%` }))]);
             dialog.element.addEventListener('close', () => dialog.element.remove(), { once: true });
         });
         odds.className = 'text-button';
