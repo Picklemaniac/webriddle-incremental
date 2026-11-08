@@ -18,7 +18,7 @@ export class BrowserPanel implements Panel {
     private readonly viewport = createElement('iframe', { className: 'browser-viewport', attributes: { sandbox: 'allow-same-origin', title: uiText.pageTitle } });
     private readonly title = createElement('strong');
     private readonly status = createElement('span', { className: 'status-cell' });
-    private readonly throbber = createElement('img', { className: 'throbber', attributes: { src: '/branding/enigma-web.png', alt: '', 'aria-hidden': 'true' } });
+    private readonly throbber = createElement('img', { className: 'throbber', attributes: { src: 'branding/enigma-web.png', alt: '', 'aria-hidden': 'true' } });
     private readonly dialog = new GameDialog();
     private readonly sourceDocument = createElement('pre', { className: 'source-document', attributes: { tabindex: '0', 'aria-label': uiText.pageSource } });
     private readonly sourcePane = createElement('section', { className: 'source-pane', attributes: { 'aria-label': uiText.pageSource, id: 'page-source' } });
@@ -63,7 +63,7 @@ export class BrowserPanel implements Panel {
         this.sourcePane.append(createElement('div', { className: 'source-heading' }, [createElement('strong', { text: uiText.pageSource }), createElement('span', { text: uiText.sourceShortcut }), sourceClose]), this.sourceDocument);
         this.content.append(this.viewport, this.sourcePane);
         this.updateSourceVisibility();
-        const titleBar = createTitleBar([createElement('img', { className: 'browser-icon', attributes: { src: '/branding/enigma-web.png', alt: '' } }), this.title]);
+        const titleBar = createTitleBar([createElement('img', { className: 'browser-icon', attributes: { src: 'branding/enigma-web.png', alt: '' } }), this.title]);
         const toolbar = createElement('div', { className: 'browser-toolbar' }, [this.back, this.forward, this.stop,
             this.tool('↻', menuText.refresh, () => this.navigate(this.viewedUrl, false)),
             this.tool('⌂', menuText.home, () => this.navigate(game.content.homeUrl)),

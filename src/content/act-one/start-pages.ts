@@ -69,7 +69,7 @@ function enigmaWebHome(rendered: boolean): string {
     return [
         '<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="masthead" bgcolor="#000080">',
         '<table cellpadding="0" cellspacing="0" border="0"><tr>',
-        `<td><img src="${rendered ? '/branding/enigma-web.png' : 'images/logo.gif'}" width="40" height="40" alt=""></td>`,
+        `<td><img src="${rendered ? 'branding/enigma-web.png' : 'images/logo.gif'}" width="40" height="40" alt=""></td>`,
         `<td class="brand"><font face="Tahoma" size="5" color="#FFFFFF"><b>${browserName}</b></font></td>`,
         '</tr></table>',
         '</td></tr></table>',

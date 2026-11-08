@@ -5,8 +5,8 @@ import { dirbustingScripts } from './economy.ts';
 import { increment, noticeOnce, owns } from './progress.ts';
 
 const requestsPerAddress = 10;
-const banSeconds = 90;
-const heatPerExcessRatio = 2;
+const banSeconds = 300;
+const heatPerExcessRatio = 3;
 
 export function liveProxies(game: Game): number {
     return game.state.network.proxies.filter((proxy) => proxy.diesAtSeconds > game.state.elapsedSeconds).length;

@@ -3,7 +3,7 @@ import { levelImages } from './generated/level-images.ts';
 export const levelImageCount = levelImages.length;
 
 export function imagePath(imageId: number): string {
-    return `/levels/${imageId}.jpg`;
+    return `levels/${imageId}.jpg`;
 }
 
 export function imageWithWord(word: string): number {
