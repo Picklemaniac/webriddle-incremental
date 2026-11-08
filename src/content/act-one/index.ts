@@ -8,7 +8,7 @@ import { entrance } from './levels.ts';
 import { isBanned, network, networkCapacity, replaceProxy, requestedRate } from './network.ts';
 import { canonicalUrl, resolvePage } from './pages.ts';
 import { automationElapsed, isUpgradeRevealed, owns, solveLevel } from './progress.ts';
-import { startUrl } from './riddle.ts';
+import { homeUrl, startUrl } from './riddle.ts';
 import { labels } from './text.ts';
 import { offeredUpgrades, upgrades, type Upgrade } from './upgrades.ts';
 
@@ -116,6 +116,7 @@ function reveal(game: Game, flag: 'insightRevealed' | 'moneyRevealed' | 'wordsRe
 
 export const actOneContent: GameContent = {
     tickSeconds: 0.25,
+    homeUrl,
     startUrl,
     resources: [{ id: 'insight', name: labels.insight }, { id: 'money', name: labels.money }, { id: 'words', name: labels.words }],
     baseStats: { requestsPerThread: 2, threadsPerScript: 1, scriptSlots: 1, ticketValue: 3, scourValue: 25, riddleValue: 1,
@@ -135,6 +136,7 @@ export const actOneContent: GameContent = {
     handleNavigation(game, address) {
         const url = canonicalUrl(address);
         game.state.browserUrl = url;
+        if (url === startUrl) game.state.flags.entered = true;
         const next = entrance(game.state.currentLevel + 1);
         if (!isBanned(game) && next.url === url && next.credentials === null) solveLevel(game, 'hand');
     },

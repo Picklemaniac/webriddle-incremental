@@ -40,6 +40,7 @@ export interface Page {
 
 export interface GameContent {
     readonly tickSeconds?: number;
+    readonly homeUrl: string;
     readonly startUrl: string;
     readonly resources: readonly ResourceDefinition[];
     readonly baseStats: Readonly<Record<string, number>>;

@@ -57,7 +57,7 @@ export function createInitialState(content: GameContent, seed: number): GameStat
         randomState: seed,
         currentLevel: 1,
         levelProgress: 0,
-        browserUrl: content.startUrl,
+        browserUrl: content.homeUrl,
         resources: Object.fromEntries(content.resources.map((resource) => [resource.id, 0])),
         purchases: {},
         reachedMilestones: {},

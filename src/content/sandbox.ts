@@ -90,6 +90,7 @@ function levelMilestone(level: number): MilestoneDefinition {
 }
 
 export const sandboxContent: GameContent = {
+    homeUrl: levelUrl(1),
     startUrl: levelUrl(1),
     resources: [{ id: points, name: 'Points' }],
     baseStats: { [solvingPower]: 1 },

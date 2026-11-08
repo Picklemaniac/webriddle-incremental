@@ -1,6 +1,7 @@
 import type { GameContent } from '../core/content.ts';
 
 export const testContent: GameContent = {
+    homeUrl: 'http://riddle.example/',
     startUrl: 'http://riddle.example/',
     resources: [
         { id: 'points', name: 'Points' },

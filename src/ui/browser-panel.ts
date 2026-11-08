@@ -64,7 +64,7 @@ export class BrowserPanel implements Panel {
         const titleBar = createTitleBar([createElement('img', { className: 'browser-icon', attributes: { src: '/branding/enigma-web.png', alt: '' } }), this.title]);
         const toolbar = createElement('div', { className: 'browser-toolbar' }, [this.back, this.forward, this.stop,
             this.tool('↻', menuText.refresh, () => this.navigate(this.viewedUrl, false)),
-            this.tool('⌂', menuText.home, () => this.navigate(game.content.startUrl)),
+            this.tool('⌂', menuText.home, () => this.navigate(game.content.homeUrl)),
             createElement('span', { className: 'toolbar-divider' }),
             this.sourceButton,
             createElement('span', { className: 'toolbar-divider' }),
@@ -126,7 +126,7 @@ export class BrowserPanel implements Panel {
         this.back.disabled = this.historyIndex <= 0;
         this.forward.disabled = this.historyIndex >= this.history.length - 1;
         this.stop.disabled = !this.pendingNavigation;
-        this.follow.hidden = canonicalUrl(browserUrl) === urlOfLevel(this.game.state.currentLevel);
+        this.follow.hidden = canonicalUrl(browserUrl) === urlOfLevel(this.game.state.currentLevel) || (this.game.state.currentLevel === 1 && this.game.state.flags.entered !== true);
         if (this.dialog.element.open && this.dialog.element.querySelector('input[type="password"]') &&
             (this.loginAddress !== browserUrl || !this.page.loginRealm)) this.dialog.close();
         if (this.page.loginRealm && this.loginAddress !== browserUrl) {

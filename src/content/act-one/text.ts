@@ -87,6 +87,31 @@ export const clueLines = {
     extension: ['it\'s all in the ending.', 'same name, different ending.'],
 } as const;
 
+export const riddleName = 'Infinitum';
+
+export const startPageText = {
+    title: 'Enigma Web Start Page',
+    tagline: 'Your start page on the World Wide Web',
+    riddlesHeading: 'Riddles',
+    riddleBlurb: 'Nobody has finished it.',
+    communitiesHeading: 'Communities',
+    enigmaticsBlurb: 'puzzles, riddles and enigmas',
+    nordinhoBlurb: 'the forum, for hints',
+    footer: 'Enigma Web 1.0 · best viewed at 800 × 600',
+    underConstruction: 'This page is under construction.',
+} as const;
+
+export const riddleHomeText = {
+    tagline: 'a webriddle',
+    enter: 'enter',
+    rulesHeading: 'rules',
+    rules: ['no posting answers on Nordinho.', 'no brute forcing.', 'have fun.'],
+    hallOfFameHeading: 'hall of fame',
+    hallOfFame: 'nobody has finished {name} yet.',
+    counter: 'you are visitor no. {count}',
+    updated: 'last updated 14 march 2003',
+} as const;
+
 export const pageText = {
     levelTitle: 'Level {level}',
     levelTitleWithClue: 'Level {level}: {clue}',

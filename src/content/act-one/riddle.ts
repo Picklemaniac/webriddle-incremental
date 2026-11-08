@@ -1,5 +1,9 @@
 export const riddleOrigin = 'http://riddle.example';
 export const startUrl = `${riddleOrigin}/beginning.htm`;
+export const riddleHomeUrl = `${riddleOrigin}/`;
+export const homeUrl = 'http://home.enigmaweb.example/';
+export const enigmaticsUrl = 'http://www.enigmatics.org/';
+export const nordinhoUrl = 'http://www.nordinho.net/';
 
 const riddleSeed = 0x2026_1108;
 
