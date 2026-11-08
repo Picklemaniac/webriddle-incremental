@@ -1,6 +1,6 @@
 export type Encoding = 'reversed' | 'a1z26' | 'rot13' | 'caesar' | 'shift' | 'atbash' | 'keyboard' | 'morse' | 'nato' | 'phone' | 'braille'
     | 'tap' | 'bacon' | 'polybius' | 'adfgvx' | 'binary' | 'octal' | 'hex' | 'ascii' | 'roman' | 'arithmetic' | 'url' | 'entities'
-    | 'base64' | 'dna' | 'codepoints' | 'pollux' | 'rot47' | 'railFence' | 'upsideDown' | 'dvorak';
+    | 'base64' | 'dna' | 'codepoints' | 'pollux' | 'rot47' | 'railFence' | 'upsideDown' | 'dvorak' | 'base36' | 'keyboardGrid' | 'utf16';
 
 const morseAlphabet: Readonly<Record<string, string>> = {
     a: '.-', b: '-...', c: '-.-.', d: '-..', e: '.', f: '..-.', g: '--.', h: '....', i: '..', j: '.---',
@@ -51,6 +51,12 @@ export function encode(text: string, encoding: Encoding, unit = 0): string {
             return text.replace(/[!-~]/g, (character) => String.fromCharCode(33 + ((character.charCodeAt(0) - 33 + 47) % 94)));
         case 'railFence':
             return railFence(text, 3);
+        case 'utf16':
+            return (text.match(/[\s\S]{1,2}/g) ?? []).map((pair) => String.fromCharCode(pair.charCodeAt(0) | ((pair.charCodeAt(1) || 0) << 8))).join('');
+        case 'base36':
+            return text.split(' ').map((word) => [...word].reduce((value, character) => value * 36n + BigInt(Number.parseInt(character, 36) || 0), 0n).toString()).join(' ');
+        case 'keyboardGrid':
+            return mapLetters(text, keyboardCoordinates, ' ', ' / ');
         case 'dvorak':
             return [...text].map((character) => qwertyKeys[dvorakKeys.indexOf(character)] ?? character).join('');
         case 'upsideDown':
@@ -190,6 +196,12 @@ function tapCode(index: number): string {
     const letter = String.fromCharCode(97 + index);
     const position = tapGrid.indexOf(letter === 'k' ? 'c' : letter);
     return `${'•'.repeat(Math.floor(position / 5) + 1)} ${'•'.repeat(position % 5 + 1)}`;
+}
+
+function keyboardCoordinates(index: number): string {
+    const letter = String.fromCharCode(97 + index);
+    const row = keyboardRows.findIndex((keys) => keys.includes(letter));
+    return `${'ABC'[row]}${keyboardRows[row]!.indexOf(letter) + 1}`;
 }
 
 function splitSum(code: number, unit: number): string {

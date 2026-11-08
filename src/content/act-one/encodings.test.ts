@@ -31,6 +31,9 @@ describe('encodings', () => {
         ['railFence', 'bridge', 'bgrdei'],
         ['upsideDown', 'dusk', 'ʞsnp'],
         ['dvorak', 'dusk', 'hf;v'],
+        ['base36', 'dusk', '646436'],
+        ['keyboardGrid', 'dusk', 'B3 A7 B2 B8'],
+        ['utf16', 'dusk', '\u7564\u6b73'],
     ] as const)('encodes with %s', (encoding, text, expected) => {
         expect(encode(text, encoding)).toBe(expected);
     });

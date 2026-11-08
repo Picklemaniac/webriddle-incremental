@@ -27,6 +27,13 @@ const puzzleNames: Readonly<Record<string, string>> = {
     bacon: 'Baconian cipher', morseSound: 'Morse sound file', dna: 'DNA bases', pixelsPicture: 'Coloured pixels picture', url: 'URL encoding',
     railFence: 'Rail fence', entities: 'HTML entities', octal: 'Octal', elements: 'Atomic numbers spelling element symbols', roman: 'Roman numerals',
     rot47: 'ROT47', base64: 'Base64', darkPicture: 'Nearly black picture', arithmetic: 'Sums of letter codes', codepoints: 'String.fromCharCode',
+    scrambled: 'Shuffled letters, put in order by class names in the source', letterGrid: 'Grid of letters where one letter draws the word',
+    squashedPicture: 'Picture squashed flat by the page', keyboardGrid: 'Keyboard coordinates', transparentPicture: 'Black text on a transparent picture',
+    base36: 'Base 36', renamed: 'Text file that is really a GIF', spectrogram: 'Text drawn in the spectrogram of a sound',
+    interleaved: 'Two lines with every other letter', boldLetters: 'Bold letters in a line of words', clocksPicture: 'Clock faces whose hands are semaphore flags',
+    fakeTags: 'Initials of made-up tags in the source', spacers: 'Widths of invisible spacer images', rotatedPicture: 'Picture of the text upside down',
+    caselessBase64: 'Base64 in lower case, with the capital positions in a comment', utf16: 'Text read in the wrong encoding',
+    sharesPicture: 'Two noise pictures that show the text when overlaid', delayedPicture: 'Picture that shows the text after a long wait',
     adfgvx: 'ADFGVX', pollux: 'Pollux', dvorak: 'Typed on a Dvorak keyboard', flashPicture: 'Picture that flashes the text for a moment', layered: 'Two encodings on top of each other', phoneTones: 'Phone tones sound file', sum: 'A sum',
 };
 
@@ -151,7 +158,17 @@ function placeRows(): string[][] {
             clue.hiddenText !== undefined && 'Black text on the black page', clue.imageTitle !== undefined && 'Picture tooltip', clue.belowFold !== undefined && 'Far below the picture',
             clue.meta !== undefined && 'Meta tag in the source', clue.stylesheet !== undefined && 'Comment in a linked .css file',
             clue.imageName !== undefined && !/\.\w+\.jpg$/.test(clue.imageName) && 'Name of the picture file', clue.imageNote !== undefined && 'Inside the picture file',
-            ...page.files.map((file) => file.linked === 'image' ? 'Extra picture under the photo' : file.linked === 'sound' ? 'Sound file on the page' : file.linked === null ? 'File with the same name as the picture' : false),
+            clue.zipped !== undefined && 'Zip file stuck to the end of the picture', clue.attribute !== undefined && 'Unused attribute on the picture in the source',
+            ...page.files.map((file) => {
+                switch (file.linked) {
+                    case 'image': return { hidden: 'Picture at zero size, only in the source', rollover: 'Picture shown when pointing at the photo', squashed: 'Extra picture under the photo' }[file.display ?? 'squashed'];
+                    case 'sound': return 'Sound file on the page';
+                    case 'hotspot': return 'Page behind an invisible link on the picture';
+                    case 'pictureLink': return 'File the picture links to';
+                    case null: return clue.alternate !== undefined && 'File with the same name as the picture';
+                    default: return false;
+                }
+            }),
         ].filter((place): place is string => typeof place === 'string');
         for (const place of new Set(found)) {
             const entry = places.get(place) ?? { first: level, count: 0 };

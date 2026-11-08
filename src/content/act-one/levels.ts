@@ -31,11 +31,12 @@ export interface Entrance {
     readonly positionUnit: number;
 }
 
-type FileContent = { readonly text: string } | { readonly drawing: Drawing } | { readonly sound: Sound };
+type FileContent = { readonly text: string } | { readonly drawing: Drawing } | { readonly sound: Sound } | { readonly page: string } | { readonly bytesOf: string };
 
 export interface LevelFile {
     readonly name: string;
-    readonly linked: 'image' | 'sound' | 'stylesheet' | 'script' | null;
+    readonly linked: 'image' | 'sound' | 'stylesheet' | 'script' | 'hotspot' | 'pictureLink' | null;
+    readonly display?: 'hidden' | 'squashed' | 'rollover';
     readonly content: FileContent;
 }
 
@@ -47,7 +48,15 @@ export interface LevelPage {
     readonly imageName: string;
     readonly imageTitle: string | null;
     readonly imageNote: string | null;
+    readonly zipped: string | null;
+    readonly hotspot: { readonly x: number; readonly y: number } | null;
     readonly colors: readonly string[];
+    readonly grid: readonly string[];
+    readonly spans: readonly { readonly letter: string; readonly order: number }[];
+    readonly emphasis: readonly (readonly { readonly text: string; readonly bold: boolean }[])[];
+    readonly tags: readonly string[];
+    readonly spacers: readonly number[];
+    readonly attribute: string | null;
     readonly link: string | null;
     readonly lines: readonly string[];
     readonly hiddenText: string | null;
@@ -135,7 +144,15 @@ export function levelPage(level: number): LevelPage {
         imageName,
         imageTitle: clue.imageTitle ?? null,
         imageNote: clue.imageNote ?? null,
+        zipped: clue.zipped ?? null,
+        hotspot: clue.hotspot === undefined ? null : { x: 0.08 + unitHash(level, salts.hotspot) * 0.74, y: 0.1 + unitHash(level + 7919, salts.hotspot) * 0.66 },
         colors: clue.colors ?? [],
+        grid: clue.grid ?? [],
+        spans: clue.spans ?? [],
+        emphasis: clue.emphasis ?? [],
+        tags: clue.tags ?? [],
+        spacers: clue.spacers ?? [],
+        attribute: clue.attribute ?? null,
         link: clue.imageLink === true ? next.url : null,
         lines: [...(clue.lines ?? []), ...(level === 404 ? [handcraftedText.easterEgg404] : level === 418 ? [handcraftedText.easterEgg418] : [])],
         hiddenText: clue.hiddenText ?? null,
@@ -149,7 +166,17 @@ export function levelPage(level: number): LevelPage {
 
 function levelFiles(level: number, clue: Clue, imageName: string, url: string, nextUrl: string): LevelFile[] {
     const files: LevelFile[] = [];
-    if (clue.drawing !== undefined) files.push({ name: `${level}b.gif`, linked: 'image', content: { drawing: clue.drawing } });
+    if (clue.drawing !== undefined) files.push({ name: `${level}b.gif`, linked: 'image', display: clue.drawingDisplay, content: { drawing: clue.drawing } });
+    if (clue.hotspot !== undefined) files.push({ name: `${level}a.htm`, linked: 'hotspot', content: { page: clue.hotspot } });
+    if (clue.zipped !== undefined) {
+        const name = imageName.replace(/\.jpg$/, '.zip');
+        files.push({ name, linked: null, content: { text: fill(alternateFiles.zip, { name, word: clue.zipped }) } });
+    }
+    if (clue.spacers !== undefined) files.push({ name: 'spacer.gif', linked: null, content: { drawing: { kind: 'spacer', text: '' } } });
+    if (clue.renamed !== undefined) {
+        files.push({ name: `${level}.txt`, linked: 'pictureLink', content: { bytesOf: `${level}.gif` } });
+        files.push({ name: `${level}.gif`, linked: null, content: { drawing: { kind: 'plain', text: clue.renamed } } });
+    }
     if (clue.sound !== undefined) files.push({ name: `${level}.wav`, linked: 'sound', content: { sound: clue.sound } });
     if (clue.stylesheet !== undefined) files.push({ name: `${level}.css`, linked: 'stylesheet', content: { text: fill(linkedFiles.stylesheet, { text: clue.stylesheet }) } });
     if (clue.script !== undefined) {

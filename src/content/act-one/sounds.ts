@@ -1,7 +1,8 @@
+import { glyphRows } from './drawings.ts';
 import { morseCode } from './encodings.ts';
 
 export interface Sound {
-    readonly kind: 'morse' | 'tones';
+    readonly kind: 'morse' | 'tones' | 'spectrogram';
     readonly text: string;
 }
 
@@ -11,6 +12,8 @@ const toneRows = [697, 770, 852, 941];
 const toneColumns = [1209, 1336, 1477];
 const keypad = ['123', '456', '789', '*0#'];
 
+const recorders: Readonly<Record<Sound['kind'], (text: string) => number[]>> = { morse, tones, spectrogram };
+
 const recordings = new Map<string, string>();
 
 export function soundData(sound: Sound): string {
@@ -18,7 +21,7 @@ export function soundData(sound: Sound): string {
     let data = recordings.get(key);
     if (data === undefined) {
         if (recordings.size > 16) recordings.clear();
-        data = wave(sound.kind === 'morse' ? morse(sound.text) : tones(sound.text));
+        data = wave(recorders[sound.kind](sound.text));
         recordings.set(key, data);
     }
     return data;
@@ -45,6 +48,19 @@ function tones(digits: string): number[] {
             continue;
         }
         samples.push(...tone([toneRows[row]!, toneColumns[keypad[row]!.indexOf(digit)]!], 0.18), ...silence(0.14));
+    }
+    samples.push(...silence(0.4));
+    return samples;
+}
+
+function spectrogram(text: string): number[] {
+    const samples = silence(0.4);
+    for (const character of text) {
+        const rows = glyphRows(character);
+        for (let x = 0; x < 6; x++) {
+            const frequencies = rows.flatMap((bits, y) => (x < 5 && (bits >> (4 - x)) & 1 ? [3000 - y * 300] : []));
+            samples.push(...(frequencies.length === 0 ? silence(0.12) : tone(frequencies, 0.12)));
+        }
     }
     samples.push(...silence(0.4));
     return samples;

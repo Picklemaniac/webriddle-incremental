@@ -1,4 +1,4 @@
-import type { Drawing, DrawingKind } from './drawings.ts';
+import { glyphRows, type Drawing, type DrawingKind } from './drawings.ts';
 import { atomicNumberSpelling, characterColors, encode, keyboardShift, toRomanNumerals, vigenere, type Encoding } from './encodings.ts';
 import { pickByUnit, ramp, salts, unitHash } from './riddle.ts';
 import type { Sound } from './sounds.ts';
@@ -22,6 +22,16 @@ export interface Clue {
     readonly imageNote?: string;
     readonly colors?: readonly string[];
     readonly drawing?: Drawing;
+    readonly drawingDisplay?: 'hidden' | 'squashed' | 'rollover';
+    readonly grid?: readonly string[];
+    readonly spans?: readonly { readonly letter: string; readonly order: number }[];
+    readonly hotspot?: string;
+    readonly zipped?: string;
+    readonly renamed?: string;
+    readonly emphasis?: readonly (readonly { readonly text: string; readonly bold: boolean }[])[];
+    readonly tags?: readonly string[];
+    readonly spacers?: readonly number[];
+    readonly attribute?: string;
     readonly sound?: Sound;
     readonly stylesheet?: string;
     readonly script?: string;
@@ -69,6 +79,7 @@ const methods: readonly Method[] = [
     cipher('morse', 28),
     cipher('nato', 32),
     { name: 'capitals', fromLevel: 36, clue: ({ word, answer, level }) => ({ lines: lineUp(capitalized(word, answer, level)) }) },
+    { name: 'interleaved', fromLevel: 38, clue: interleaved },
     drawn('semaphore', 40),
     hinted('caesar', 45, () => methodHints.caesar),
     cipher('shift', 50),
@@ -76,6 +87,7 @@ const methods: readonly Method[] = [
     cipher('upsideDown', 58),
     drawn('pigpen', 62),
     cipher('phone', 65),
+    { name: 'boldLetters', fromLevel: 68, clue: ({ word, answer, level }) => ({ emphasis: emphasized(word, answer, level) }) },
     drawn('blink', 70),
     cipher('braille', 75),
     drawn('mirror', 80),
@@ -84,37 +96,53 @@ const methods: readonly Method[] = [
     cipher('polybius', 95),
     drawn('flags', 100),
     cipher('tap', 105),
-    alternative('xmlFile', 120, ['xml']),
     { name: 'script', fromLevel: 110, htmOnly: true, exact: true, clue: ({ word, unit }) => ({ script: passwordCheck(word, unit) }) },
     hinted('keyboard', 115, (unit) => (keyboardShift(unit) > 0 ? methodHints.keyboardRight : methodHints.keyboardLeft)),
+    alternative('xmlFile', 120, ['xml']),
     { name: 'swatches', fromLevel: 125, clue: ({ word }) => ({ colors: characterColors(word) }) },
+    { name: 'scrambled', fromLevel: 128, clue: scrambled },
     drawn('braille', 130),
+    { name: 'clocksPicture', fromLevel: 135, clue: ({ word }) => ({ title: methodHints.clocks, drawing: { kind: 'clocks', text: word } }) },
     cipher('hex', 140),
+    { name: 'letterGrid', fromLevel: 145, clue: ({ word, level }) => ({ grid: letterGrid(word, level) }) },
     { name: 'vigenere', fromLevel: 150, clue: keyed },
-    { name: 'earlierAnswers', fromLevel: 160, clue: earlierAnswers },
     alternative('wavFile', 152, ['wav']),
     cipher('ascii', 155),
+    { name: 'earlierAnswers', fromLevel: 160, clue: earlierAnswers },
     drawn('bits', 165),
+    { name: 'fakeTags', fromLevel: 168, clue: ({ word, answer, level }) => ({ tags: acrostic(word, answer, level).split(' ').filter((tag) => /^[a-z]+$/.test(tag)) }) },
     cipher('bacon', 170),
     { name: 'morseSound', fromLevel: 175, clue: ({ word }) => ({ sound: { kind: 'morse', text: word } }) },
     cipher('dna', 185),
     alternative('zipFile', 188, ['zip']),
     drawn('pixels', 192),
     cipher('url', 200),
+    { name: 'spacers', fromLevel: 205, clue: ({ word }) => ({ spacers: [...word].map((letter) => letter.charCodeAt(0) - 96) }) },
     hinted('railFence', 210, () => methodHints.railFence),
     cipher('entities', 220),
+    drawn('rotated', 225),
+    { name: 'squashedPicture', fromLevel: 230, clue: ({ word }) => ({ drawing: { kind: 'plain', text: word }, drawingDisplay: 'squashed' }) },
+    hinted('keyboardGrid', 235, () => methodHints.keyboardGrid),
     cipher('octal', 240),
     { name: 'elements', fromLevel: 250, clue: elements },
     cipher('roman', 260),
+    drawn('transparent', 268),
     cipher('rot47', 270),
     cipher('base64', 280),
+    { name: 'caselessBase64', fromLevel: 290, clue: caselessBase64 },
     drawn('dark', 295),
+    hinted('base36', 300, () => methodHints.base36),
     cipher('arithmetic', 310),
     cipher('dvorak', 325),
     cipher('codepoints', 340),
+    { name: 'renamed', fromLevel: 345, clue: ({ word }) => ({ renamed: word }) },
     drawn('flash', 355),
     cipher('adfgvx', 370),
+    { name: 'utf16', fromLevel: 380, encoding: 'utf16', clue: (context) => (context.word.length % 2 === 0 ? placed(encode(context.word, 'utf16'), context) : null) },
+    { name: 'spectrogram', fromLevel: 390, clue: ({ word }) => withLine(methodHints.spectrogram, { sound: { kind: 'spectrogram', text: word } }) },
     hinted('pollux', 410, () => methodHints.pollux),
+    { name: 'sharesPicture', fromLevel: 430, clue: ({ word }) => withLine(methodHints.shares, { drawing: { kind: 'shares', text: word } }) },
+    drawn('delayed', 445),
     { name: 'layered', fromLevel: 460, clue: layered },
 ];
 
@@ -127,9 +155,12 @@ const spots: readonly Spot[] = [
     { fromLevel: 60, weight: 1, place: (text) => ({ belowFold: lineUp(text) }) },
     { fromLevel: 100, weight: 1, place: (text) => ({ farComment: text }) },
     { fromLevel: 140, weight: 1, place: (text) => ({ meta: text }) },
+    { fromLevel: 140, weight: 1, place: (text) => ({ hotspot: text }) },
+    { fromLevel: 200, weight: 1, place: (text) => ({ attribute: text }) },
     { fromLevel: 180, weight: 1, place: (text) => ({ stylesheet: text }) },
     { fromLevel: 220, weight: 1, fits: (text, context) => context.withImage && /^[a-z0-9._-]{1,40}$/i.test(text), place: (text) => ({ imageName: `${text}.jpg` }) },
-    { fromLevel: 260, weight: 1, fits: (text) => /^[ -~]+$/.test(text), place: (text) => ({ lines: [methodHints.imageNote], imageNote: text }) },
+    { fromLevel: 260, weight: 1, fits: printable, place: (text) => ({ lines: [methodHints.imageNote], imageNote: text }) },
+    { fromLevel: 320, weight: 1, fits: printable, place: (text) => ({ lines: [methodHints.zipped], zipped: text }) },
 ];
 
 const textEncodings: readonly (readonly [Encoding, number])[] = [
@@ -182,7 +213,15 @@ function hinted(encoding: Encoding, fromLevel: number, hint: (unit: number) => s
 }
 
 function drawn(kind: DrawingKind, fromLevel: number): Method {
-    return { name: `${kind}Picture`, fromLevel, clue: ({ word }) => ({ drawing: { kind, text: word } }) };
+    return {
+        name: `${kind}Picture`, fromLevel, clue: ({ word, level }) => ({ drawing: { kind, text: word }, drawingDisplay: drawingDisplay(level) }),
+    };
+}
+
+function drawingDisplay(level: number): 'hidden' | 'rollover' | undefined {
+    const roll = unitHash(level, salts.display);
+    const hidden = ramp(level, 400, 900, 0.1, 0.25);
+    return roll < hidden ? 'hidden' : roll < hidden + ramp(level, 150, 600, 0.1, 0.2) ? 'rollover' : undefined;
 }
 
 function layer(answer: string, level: number, method: Method): string {
@@ -204,8 +243,12 @@ function short(text: string): boolean {
     return text.length <= lineWidth;
 }
 
+function printable(text: string): boolean {
+    return /^[ -~]+$/.test(text);
+}
+
 function revealsAnswer(clue: Clue, answer: string): boolean {
-    const texts = [clue.title, clue.comment, clue.farComment, clue.hiddenText, clue.meta, clue.imageTitle, clue.imageNote, clue.stylesheet, clue.imageName?.replace(/\.jpg$/, ''),
+    const texts = [clue.title, clue.comment, clue.farComment, clue.hiddenText, clue.hotspot, clue.zipped, clue.attribute, clue.spans?.map((span) => span.letter).join(''), clue.meta, clue.imageTitle, clue.imageNote, clue.stylesheet, clue.imageName?.replace(/\.jpg$/, ''),
         ...(clue.lines ?? []), clue.lines?.join(''), ...(clue.belowFold ?? [])];
     return texts.some((text) => text?.trim().toLowerCase() === answer);
 }
@@ -239,22 +282,77 @@ function keyed(context: ClueContext): Clue {
 }
 
 function earlierAnswers(context: ClueContext): Clue | null {
-    const { word, level, pageName } = context;
+    const { word, level, unit, pageName } = context;
     const span = level - firstNamedLevel;
     if (pageName === undefined || span < 1) return null;
-    const pairs: string[] = [];
-    for (const [index, letter] of [...word].entries()) {
+    const reference = (letter: string, index: number, initial: boolean): string | null => {
         const start = Math.floor(unitHash(level, 2300 + index) * span);
-        let pair: string | null = null;
-        for (let offset = 0; offset < span && pair === null; offset++) {
+        for (let offset = 0; offset < span; offset++) {
             const candidate = firstNamedLevel + ((start + offset) % span);
-            const position = pageName(candidate)?.indexOf(letter) ?? -1;
-            if (position >= 0) pair = `${candidate}:${position + 1}`;
+            const name = pageName(candidate);
+            const position = (initial ? name?.slice(0, 1) : name)?.indexOf(letter) ?? -1;
+            if (position >= 0) return initial ? String(candidate) : `${candidate}:${position + 1}`;
         }
-        if (pair === null) return null;
-        pairs.push(pair);
+        return null;
+    };
+    const references = (initial: boolean): string[] | null => {
+        const found = [...word].map((letter, index) => reference(letter, index, initial));
+        return found.every((item): item is string => item !== null) ? found : null;
+    };
+    const chosen = (fraction(unit * 5) < 0.5 ? references(true) : null) ?? references(false);
+    return chosen === null ? null : withLine(methodHints.earlierAnswers, placed(chosen.join(' '), context));
+}
+
+function scrambled({ word, level }: ClueContext): Clue | null {
+    const letters = [...word].map((letter, index) => ({ letter, order: index + 1 }));
+    for (let attempt = 0; attempt < 8; attempt++) {
+        const shuffled = shuffledIndices(letters.length, level * 31 + attempt).map((index) => letters[index]!);
+        if (shuffled.map((span) => span.letter).join('') !== word) return { spans: shuffled };
     }
-    return withLine(methodHints.earlierAnswers, placed(pairs.join(' '), context));
+    return null;
+}
+
+function interleaved({ word }: ClueContext): Clue {
+    const half = (start: number): string => [...word].map((letter, index) => (index % 2 === start ? letter : '.')).join('');
+    return { lines: [half(0), half(1)] };
+}
+
+function caselessBase64({ word }: ClueContext): Clue | null {
+    const encoded = encode(word, 'base64');
+    const capitals = [...encoded].flatMap((character, index) => (/[A-Z]/.test(character) ? [index + 1] : []));
+    return capitals.length === 0 ? null : { lines: lineUp(encoded.toLowerCase()), comment: capitals.join(' ') };
+}
+
+function emphasized(word: string, answer: string, level: number): { text: string; bold: boolean }[][] {
+    const lines: { text: string; bold: boolean }[][] = [[]];
+    let length = 0;
+    [...word].forEach((letter, index) => {
+        const options = fillerWords('any', letter, answer);
+        const filler = options.length === 0 ? letter : pickByUnit(options, unitHash(level, 2600 + index));
+        const position = filler.indexOf(letter);
+        if (length > 0 && length + filler.length + 1 > lineWidth) {
+            lines.push([]);
+            length = 0;
+        }
+        const line = lines[lines.length - 1]!;
+        line.push({ text: `${length > 0 ? ' ' : ''}${filler.slice(0, position)}`, bold: false }, { text: letter, bold: true }, { text: filler.slice(position + 1), bold: false });
+        length += filler.length + (length > 0 ? 1 : 0);
+    });
+    return lines;
+}
+
+function letterGrid(word: string, level: number): string[] {
+    const special = pickByUnit(['o', 'x', 'z', 'q', 'v', 'k'], unitHash(level, 2400));
+    const filler = [...'abcdefghijklmnopqrstuvwxyz'].filter((letter) => letter !== special);
+    const perBand = 8;
+    const columns = Math.min(word.length, perBand) * 6 + 1;
+    const rows = Math.ceil(word.length / perBand) * 8 + 1;
+    return Array.from({ length: rows }, (_, row) => Array.from({ length: columns }, (_, column) => {
+        const [x, y] = [(column - 1) % 6, (row - 1) % 8];
+        const character = word[Math.floor((row - 1) / 8) * perBand + Math.floor((column - 1) / 6)];
+        const lit = row > 0 && column > 0 && x < 5 && y < 7 && character !== undefined && ((glyphRows(character)[y]! >> (4 - x)) & 1) === 1;
+        return lit ? special : pickByUnit(filler, unitHash(level * 977 + row, 2500 + column));
+    }).join(''));
 }
 
 function withLine(line: string, clue: Clue): Clue {

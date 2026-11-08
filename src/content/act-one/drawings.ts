@@ -1,6 +1,7 @@
 import { brailleDots, characterColors, morseCode } from './encodings.ts';
 
-export type DrawingKind = 'gift' | 'semaphore' | 'pigpen' | 'flags' | 'braille' | 'blink' | 'mirror' | 'dark' | 'flash' | 'pixels' | 'bits';
+export type DrawingKind = 'gift' | 'semaphore' | 'clocks' | 'pigpen' | 'flags' | 'braille' | 'blink' | 'plain' | 'mirror' | 'rotated' | 'dark' | 'transparent' | 'flash' | 'delayed'
+    | 'pixels' | 'bits' | 'shares' | 'spacer';
 
 export interface Drawing {
     readonly kind: DrawingKind;
@@ -8,7 +9,7 @@ export interface Drawing {
 }
 
 export interface Picture {
-    readonly tag: string;
+    readonly src: string;
     readonly width: number;
     readonly height: number;
 }
@@ -36,7 +37,7 @@ const semaphorePositions = '01 02 03 04 05 06 07 12 13 46 14 15 16 17 23 24 25 2
 const flagColors = { red: '#d52b1e', blue: '#1d4f91', yellow: '#f6c700', white: '#f7f7f2', black: '#111111' } as const;
 
 const painters: Readonly<Record<DrawingKind, (text: string) => Picture>> = {
-    gift, semaphore, pigpen, flags, braille, blink, mirror, dark, flash, pixels, bits,
+    gift, semaphore, clocks, pigpen, flags, braille, blink, plain, mirror, rotated, dark, transparent, flash, delayed, pixels, bits, shares, spacer,
 };
 
 const pictures = new Map<string, Picture>();
@@ -84,6 +85,22 @@ function signaller(first: number, second: number): string {
     return '<circle cx="28" cy="16" r="5" fill="#333"/>'
         + '<path d="M28 21V41M28 41L23 55M28 41L33 55M24 25H32" stroke="#333" stroke-width="3" stroke-linecap="round" fill="none"/>'
         + arm(24, left!) + arm(32, right!);
+}
+
+function clocks(text: string): Picture {
+    return symbolRow(text, 34, 34, 10, '#e9e4d8', (character) => {
+        const pair = semaphorePositions[character.charCodeAt(0) - 97];
+        if (pair === undefined) return '';
+        const hand = (position: number, length: number, width: number): string => {
+            const angle = (180 + position * 45) * Math.PI / 180;
+            return `<path d="M17 17L${(17 + length * Math.sin(angle)).toFixed(2)} ${(17 - length * Math.cos(angle)).toFixed(2)}" stroke="#222" stroke-width="${width}" stroke-linecap="round"/>`;
+        };
+        const ticks = Array.from({ length: 12 }, (_, hour) => {
+            const angle = hour * Math.PI / 6;
+            return `<path d="M${(17 + 12 * Math.sin(angle)).toFixed(2)} ${(17 - 12 * Math.cos(angle)).toFixed(2)}L${(17 + 14 * Math.sin(angle)).toFixed(2)} ${(17 - 14 * Math.cos(angle)).toFixed(2)}" stroke="#555" stroke-width="1"/>`;
+        }).join('');
+        return `<circle cx="17" cy="17" r="15" fill="#fdfdf8" stroke="#333" stroke-width="1.5"/>${ticks}${hand(Number(pair[0]), 7, 2.5)}${hand(Number(pair[1]), 11, 1.5)}<circle cx="17" cy="17" r="1.5" fill="#222"/>`;
+    });
 }
 
 function pigpen(text: string): Picture {
@@ -202,6 +219,20 @@ function blink(text: string): Picture {
     return svgPicture(48, 48, content, 2);
 }
 
+function plain(text: string): Picture {
+    const width = text.length * 6 + 7;
+    return svgPicture(width, 15, `${box(0, 0, width, 15, '#101010')}${pixelText(text, 4, 4, '#e8e8e8')}`, 4, true);
+}
+
+function transparent(text: string): Picture {
+    return svgPicture(text.length * 6 + 7, 15, pixelText(text, 4, 4, '#000000'), 4, true);
+}
+
+function rotated(text: string): Picture {
+    const width = text.length * 6 + 7;
+    return svgPicture(width, 15, `${box(0, 0, width, 15, '#e8e8e8')}<g transform="rotate(180 ${width / 2} 7.5)">${pixelText(text, 4, 4, '#1a1a1a')}</g>`, 4, true);
+}
+
 function mirror(text: string): Picture {
     const width = text.length * 6 + 7;
     return svgPicture(width, 15, `${box(0, 0, width, 15, '#e8e8e8')}<g transform="translate(${width} 0) scale(-1 1)">${pixelText(text, 4, 4, '#1a1a1a')}</g>`, 4, true);
@@ -213,8 +244,16 @@ function dark(text: string): Picture {
 }
 
 function flash(text: string): Picture {
+    return flashing(text, 3, 0.9);
+}
+
+function delayed(text: string): Picture {
+    return flashing(text, 24, 0.875);
+}
+
+function flashing(text: string, seconds: number, hiddenShare: number): Picture {
     const width = text.length * 6 + 7;
-    const animate = '<animate attributeName="opacity" calcMode="discrete" dur="3s" repeatCount="indefinite" keyTimes="0;0.9" values="0;1"/>';
+    const animate = `<animate attributeName="opacity" calcMode="discrete" dur="${seconds}s" repeatCount="indefinite" keyTimes="0;${hiddenShare}" values="0;1"/>`;
     return svgPicture(width, 15, `${box(0, 0, width, 15, '#101010')}<g opacity="0">${animate}${pixelText(text, 4, 4, '#e8e8e8')}</g>`, 4, true);
 }
 
@@ -229,6 +268,30 @@ function bits(text: string): Picture {
     return svgPicture(43, codes.length * 5 + 3, box(0, 0, 43, codes.length * 5 + 3, '#000000') + squares.join(''), 2, true);
 }
 
+function shares(text: string): Picture {
+    const width = text.length * 6 + 7;
+    const lit = new Set<string>();
+    [...text].forEach((character, index) => glyphRows(character).forEach((bits, y) => {
+        for (let x = 0; x < 5; x++) if ((bits >> (4 - x)) & 1) lit.add(`${4 + index * 6 + x},${4 + y}`);
+    }));
+    let seed = [...text].reduce((hash, character) => Math.imul(hash ^ character.charCodeAt(0), 16777619), 2166136261) >>> 0;
+    const left: string[] = [];
+    const right: string[] = [];
+    for (let y = 0; y < 15; y++) {
+        for (let x = 0; x < width; x++) {
+            seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
+            const noise = seed >>> 31 === 1;
+            if (noise) left.push(`M${x} ${y}h1v1h-1z`);
+            if (noise !== lit.has(`${x},${y}`)) right.push(`M${width + 2 + x} ${y}h1v1h-1z`);
+        }
+    }
+    return svgPicture(width * 2 + 2, 15, `${box(0, 0, width * 2 + 2, 15, '#000000')}<path d="${left.join('')}${right.join('')}" fill="#ffffff"/>`, 4, true);
+}
+
+function spacer(): Picture {
+    return svgPicture(1, 1, '', 1);
+}
+
 function symbolRow(text: string, cellWidth: number, cellHeight: number, perRow: number, background: string, symbol: (character: string) => string, scale = 1, definitions = ''): Picture {
     const characters = [...text];
     const columns = Math.min(perRow, characters.length);
@@ -239,8 +302,8 @@ function symbolRow(text: string, cellWidth: number, cellHeight: number, perRow: 
 }
 
 function svgPicture(width: number, height: number, content: string, scale: number, crisp = false): Picture {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width * scale}" height="${height * scale}" viewBox="0 0 ${width} ${height}"${crisp ? ' shape-rendering="crispEdges"' : ''}>${content}</svg>`;
-    return { tag: `<img src="data:image/svg+xml,${encodeURIComponent(svg)}" width="${width * scale}" height="${height * scale}" alt="">`, width: width * scale, height: height * scale };
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width * scale}" height="${height * scale}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none"${crisp ? ' shape-rendering="crispEdges"' : ''}>${content}</svg>`;
+    return { src: `data:image/svg+xml,${encodeURIComponent(svg)}`, width: width * scale, height: height * scale };
 }
 
 function box(x: number, y: number, width: number, height: number, color: string): string {
@@ -248,9 +311,13 @@ function box(x: number, y: number, width: number, height: number, color: string)
     return `<rect x="${round(x)}" y="${round(y)}" width="${round(width)}" height="${round(height)}" fill="${color}"/>`;
 }
 
+export function glyphRows(character: string): number[] {
+    return (glyphs[character] ?? '00 00 00 00 00 00 00').split(' ').map((row) => Number.parseInt(row, 16));
+}
+
 function pixelText(text: string, left: number, top: number, color: string): string {
     return [...text.toLowerCase()].flatMap((character, index) => {
-        const rows = (glyphs[character] ?? '00 00 00 00 00 00 00').split(' ').map((row) => Number.parseInt(row, 16));
+        const rows = glyphRows(character);
         return rows.flatMap((row, y) => Array.from({ length: 5 }, (_, x) => x)
             .filter((x) => (row >> (4 - x)) & 1)
             .map((x) => box(left + index * 6 + x, top + y, 1, 1, color)));

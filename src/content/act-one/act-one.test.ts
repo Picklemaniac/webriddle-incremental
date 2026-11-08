@@ -3,6 +3,7 @@ import { Game } from '../../core/game.ts';
 import { createInitialState } from '../../core/state.ts';
 import { parseSave, serializeSave } from '../../persistence/save.ts';
 import { actOneContent } from './index.ts';
+import { glyphRows } from './drawings.ts';
 import { encode } from './encodings.ts';
 import { entrance, levelPage, urlOfLevel } from './levels.ts';
 import { canonicalUrl } from './pages.ts';
@@ -72,7 +73,7 @@ describe('Act I', () => {
             const page = levelPage(level);
             const answer = entrance(level + 1).answer;
             const texts = [page.title, ...page.lines, page.lines.join(''), ...page.comments, page.farComment, page.hiddenText, page.imageTitle, page.imageName.replace(/\.jpg$/, ''),
-                ...page.belowFold, page.meta, page.imageNote];
+                ...page.belowFold, page.meta, page.imageNote, page.zipped, page.spans.map((span) => span.letter).join(''), ...page.files.map((file) => ('page' in file.content ? file.content.page : null))];
             expect(texts.some((text) => text?.trim().toLowerCase() === answer), `level ${level} shows ${answer}`).toBe(false);
             game.state.currentLevel = level;
             for (const file of page.files) expect(game.content.resolvePage(new URL(file.name, page.url).href, game.state).statusCode, `${level}: ${file.name}`).toBe(200);
@@ -100,15 +101,57 @@ describe('Act I', () => {
             const next = entrance(level + 1);
             if (next.clue.method !== 'earlierAnswers') continue;
             const page = levelPage(level);
-            const texts = [page.title, ...page.lines, ...page.comments, page.farComment, page.hiddenText, page.imageTitle, ...page.belowFold, page.meta, page.imageNote,
-                ...page.files.map((file) => ('text' in file.content ? file.content.text : ''))].join(' ');
-            const pairs = texts.match(/\d+:\d+(?: \d+:\d+)*/)![0].split(' ').map((pair) => pair.split(':').map(Number));
-            expect(pairs.every(([earlier]) => earlier! < level), `level ${level}`).toBe(true);
-            const spelled = pairs.map(([earlier, position]) => entrance(earlier!).answer[position! - 1]).join('');
+            const texts = [page.title, ...page.lines, ...page.comments, page.farComment, page.hiddenText, page.imageTitle, ...page.belowFold, page.meta, page.imageNote, page.zipped,
+                ...page.files.map((file) => ('text' in file.content ? file.content.text : 'page' in file.content ? file.content.page : ''))].join(' ');
+            const references = texts.match(/\d+(?::\d+)?(?: \d+(?::\d+)?){2,}/)![0].split(' ').map((reference) => reference.split(':').map(Number));
+            expect(references.every(([earlier]) => earlier! < level), `level ${level}`).toBe(true);
+            const spelled = references.map(([earlier, position]) => entrance(earlier!).answer[(position ?? 1) - 1]).join('');
             expect([next.answer, encode(next.answer, 'reversed'), encode(next.answer, 'atbash'), encode(next.answer, 'rot13')], `level ${level}`).toContain(spelled);
             checked++;
         }
         expect(checked).toBeGreaterThan(5);
+    });
+
+    it('draws letter grids and orders shuffled letters so they can be read back', () => {
+        let grids = 0;
+        let spans = 0;
+        for (let level = 11; level <= 1400; level++) {
+            const next = entrance(level + 1);
+            const page = levelPage(level);
+            const readings = [next.answer, ...(['reversed', 'atbash', 'rot13'] as const).map((layer) => encode(next.answer, layer))];
+            if (page.spans.length > 0) {
+                expect(readings, `level ${level}`).toContain([...page.spans].sort((first, second) => first.order - second.order).map((span) => span.letter).join(''));
+                spans++;
+            }
+            if (page.grid.length > 0) {
+                expect(readings, `level ${level}`).toContain(readGrid(page.grid));
+                grids++;
+            }
+        }
+        expect(grids).toBeGreaterThan(3);
+        expect(spans).toBeGreaterThan(3);
+    });
+
+    it('reads back spacer widths, fake tags, bold letters, interleaved lines and caseless base64', () => {
+        const seen = new Set<string>();
+        for (let level = 11; level <= 1400; level++) {
+            const next = entrance(level + 1);
+            const page = levelPage(level);
+            const method = next.clue.method ?? '';
+            const readings = [next.answer, ...(['reversed', 'atbash', 'rot13'] as const).map((layer) => encode(next.answer, layer))];
+            const capitals = new Set((page.comments[0] ?? '').split(' ').map(Number));
+            const reading = {
+                spacers: () => page.spacers.map((width) => String.fromCharCode(96 + width)).join(''),
+                fakeTags: () => page.tags.map((tag) => tag[0]).join(''),
+                boldLetters: () => page.emphasis.flat().filter((segment) => segment.bold).map((segment) => segment.text).join(''),
+                interleaved: () => [...page.lines[0]!].map((letter, index) => (letter === '.' ? page.lines[1]![index] : letter)).join(''),
+                caselessBase64: () => atob([...page.lines.filter((line) => /^[a-z0-9+/=]+$/.test(line)).join('')].map((character, index) => (capitals.has(index + 1) ? character.toUpperCase() : character)).join('')),
+            }[method];
+            if (reading === undefined) continue;
+            expect(readings, `level ${level} (${method})`).toContain(reading());
+            seen.add(method);
+        }
+        expect([...seen].sort()).toEqual(['boldLetters', 'caselessBase64', 'fakeTags', 'interleaved', 'spacers']);
     });
 
     it('keeps all generated levels solvable by hand, including credentials', () => {
@@ -246,6 +289,22 @@ describe('Act I', () => {
         expect(plan.hitAt).toBeGreaterThan(1e9);
     });
 });
+
+function readGrid(grid: readonly string[]): string {
+    const counts = new Map<string, number>();
+    for (const letter of grid.join('')) counts.set(letter, (counts.get(letter) ?? 0) + 1);
+    const special = [...counts].sort((first, second) => second[1] - first[1])[0]![0];
+    const alphabet = [...'abcdefghijklmnopqrstuvwxyz'];
+    let word = '';
+    for (let band = 0; band * 8 + 1 < grid.length; band++) {
+        for (let cell = 0; cell * 6 + 1 < grid[0]!.length; cell++) {
+            const rows = Array.from({ length: 7 }, (_, y) => [...grid[band * 8 + 1 + y]!.slice(cell * 6 + 1, cell * 6 + 6)].reduce((bits, letter) => bits * 2 + (letter === special ? 1 : 0), 0));
+            if (rows.every((row) => row === 0)) continue;
+            word += alphabet.find((letter) => glyphRows(letter).every((row, y) => row === rows[y])) ?? '?';
+        }
+    }
+    return word;
+}
 
 function gamePage(level: number) {
     const game = newGame();

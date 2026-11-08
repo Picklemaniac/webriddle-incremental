@@ -15,7 +15,7 @@ export class BrowserPanel implements Panel {
     readonly element: HTMLElement;
     private readonly game: Game;
     private readonly address = createElement('input', { className: 'browser-address', attributes: { 'aria-label': menuText.address, spellcheck: 'false', autocomplete: 'off' } });
-    private readonly viewport = createElement('iframe', { className: 'browser-viewport', attributes: { sandbox: 'allow-same-origin', title: uiText.pageTitle } });
+    private readonly viewport = createElement('iframe', { className: 'browser-viewport', attributes: { sandbox: 'allow-same-origin allow-downloads', title: uiText.pageTitle } });
     private readonly title = createElement('strong');
     private readonly status = createElement('span', { className: 'status-cell' });
     private readonly throbber = createElement('img', { className: 'throbber', attributes: { src: 'branding/enigma-web.png', alt: '', 'aria-hidden': 'true' } });
