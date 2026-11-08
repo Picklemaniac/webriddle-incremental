@@ -34,12 +34,12 @@ export function startDevTools(context: DevToolsContext): void {
     const panel = new DevPanel(game.content, createCommands(context, log));
     document.body.append(panel.element);
     addEventListener('keydown', (event) => {
-        if (event.key === '`' && !isTypingIn(event.target)) {
+        if (event.key === '\\' && !isTypingIn(event.target)) {
             event.preventDefault();
             panel.toggle();
         }
     });
-    console.info(`Dev tools ready: press \` to toggle. Session log: logs/${log.sessionId}.jsonl`);
+    console.info(`Dev tools ready: press \\ to toggle. Session log: logs/${log.sessionId}.jsonl`);
 }
 
 function createCommands({ game, loop, saveSlots, screen }: DevToolsContext, log: SessionLog): DevCommands {
