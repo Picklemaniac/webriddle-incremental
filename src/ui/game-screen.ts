@@ -1,14 +1,14 @@
 import type { Game } from '../core/game.ts';
 import type { OfflineSummary } from '../core/offline.ts';
-import { automationText, labels } from '../content/act-one/text.ts';
+import { labels } from '../content/act-one/text.ts';
 import { AwaySummary } from './away-summary.ts';
 import { BrowserPanel } from './browser-panel.ts';
-import { GameDialog } from './dialog.ts';
 import { createButton, createElement } from './dom.ts';
 import { FindingsPanel } from './findings-panel.ts';
 import { NoticeLine } from './notice-line.ts';
 import type { Panel } from './panel.ts';
 import { PurchasesPanel } from './purchases-panel.ts';
+import { SetupWizard } from './setup-wizard.ts';
 import { startSound } from './sound.ts';
 import { StatusPanel } from './status-panel.ts';
 import { TerminalPanel } from './terminal-panel.ts';
@@ -22,7 +22,7 @@ export class GameScreen {
     private readonly awaySummary: AwaySummary;
     private readonly automate: HTMLButtonElement;
     private readonly dashboard: HTMLElement;
-    private readonly dialog = new GameDialog();
+    private readonly wizard = new SetupWizard();
 
     constructor(game: Game) {
         this.game = game;
@@ -34,7 +34,7 @@ export class GameScreen {
         const notice = new NoticeLine(game);
         this.panels = [browser, terminal, status, purchases, findings, notice];
         this.awaySummary = new AwaySummary(game.content);
-        this.automate = createButton(labels.automate, () => this.offerAutomation());
+        this.automate = createButton(labels.automate, () => this.wizard.open(() => game.dispatch({ type: 'automate' })));
         this.automate.className = 'automate-offer';
         const browserColumn = createElement('div', { className: 'browser-column' }, [browser.element, createElement('div', { className: 'prompt-area' }, [this.automate, notice.element])]);
         const terminalSlot = createElement('div', { className: 'terminal-slot' }, [terminal.element]);
@@ -58,12 +58,4 @@ export class GameScreen {
     }
 
     showAwaySummary(summary: OfflineSummary): void { this.awaySummary.show(summary); }
-
-    private offerAutomation(): void {
-        const run = createButton(automationText.run, () => {
-            this.dialog.close();
-            this.game.dispatch({ type: 'automate' });
-        });
-        this.dialog.show(automationText.program, [createElement('p', { text: automationText.description })], [run]);
-    }
 }

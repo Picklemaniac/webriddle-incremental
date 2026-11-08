@@ -40,3 +40,9 @@ export function createTitleBar(children: readonly (Node | string)[]): HTMLElemen
         ['minimize', 'maximize', 'close'].map((kind) => createElement('span', { className: `window-button ${kind}` })));
     return createElement('header', { className: 'title-bar' }, [...children, buttons]);
 }
+
+export function createProgressBar(seconds: number): HTMLElement {
+    const fill = createElement('div', { className: 'win-progress-fill' });
+    fill.style.setProperty('--duration', `${seconds}s`);
+    return createElement('div', { className: 'win-progress' }, [fill]);
+}

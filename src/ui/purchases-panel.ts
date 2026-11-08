@@ -1,10 +1,11 @@
 import type { Game } from '../core/game.ts';
 import { canAfford } from '../core/purchasing.ts';
-import { offeredUpgrades, upgrades } from '../content/act-one/upgrades.ts';
+import { offeredUpgrades, upgrades, type Upgrade } from '../content/act-one/upgrades.ts';
 import { isUpgradeRevealed } from '../content/act-one/progress.ts';
 import { labels, uiText } from '../content/act-one/text.ts';
 import { formatNumber } from '../format.ts';
 import { createButton, createElement } from './dom.ts';
+import { SetupWindows } from './setup-windows.ts';
 import { section } from './status-panel.ts';
 import type { Panel } from './panel.ts';
 
@@ -15,13 +16,15 @@ export class PurchasesPanel implements Panel {
     private readonly game: Game;
     private readonly cards = new Map<string, UpgradeCard>();
     private readonly leaving = new Map<string, number>();
+    private readonly empty = createElement('p', { className: 'panel-help', text: uiText.noUpgrades });
+    private readonly setup = new SetupWindows();
     private purchaseLockUntil = 0;
 
     constructor(game: Game) {
         this.game = game;
         const list = createElement('div', { className: 'upgrade-list' });
         for (const item of upgrades) {
-            const card = createButton('', () => this.purchase(item.id));
+            const card = createButton('', () => this.purchase(item));
             card.className = 'upgrade-card';
             card.dataset.upgrade = item.id;
             const cost = Object.entries(item.price).map(([id, amount]) => id === 'money' ? `$${formatNumber(amount)}` : `${formatNumber(amount)} ${id}`).join(' · ');
@@ -32,7 +35,7 @@ export class PurchasesPanel implements Panel {
             this.cards.set(item.id, { element: card });
             list.append(card);
         }
-        this.element.append(list);
+        this.element.append(this.empty, list);
         game.subscribe((event) => {
             if (event.type !== 'stateReplaced') return;
             this.leaving.clear();
@@ -44,7 +47,8 @@ export class PurchasesPanel implements Panel {
         const now = performance.now();
         for (const [id, until] of this.leaving) if (now >= until) this.leaving.delete(id);
         const offered = new Set(offeredUpgrades(this.game.state).filter((item) => isUpgradeRevealed(this.game.state, item.id)).map((item) => item.id));
-        this.element.hidden = !this.game.state.flags.upgradesRevealed || (offered.size === 0 && this.leaving.size === 0);
+        this.element.hidden = this.game.state.flags.upgradesRevealed !== true;
+        this.empty.hidden = offered.size > 0 || this.leaving.size > 0;
         for (const item of upgrades) {
             const card = this.cards.get(item.id)!;
             const leaving = this.leaving.has(item.id);
@@ -56,11 +60,12 @@ export class PurchasesPanel implements Panel {
         }
     }
 
-    private purchase(id: string): void {
+    private purchase(item: Upgrade): void {
         const now = performance.now();
-        if (now < this.purchaseLockUntil || !this.game.dispatch({ type: 'purchase', purchasableId: id })) return;
+        if (now < this.purchaseLockUntil || !this.game.dispatch({ type: 'purchase', purchasableId: item.id })) return;
+        this.setup.show(item);
         // Keep the bought card's space while it fades so the next card does not slide under the cursor.
-        this.leaving.set(id, now + 450);
+        this.leaving.set(item.id, now + 450);
         this.purchaseLockUntil = now + 600;
         this.render();
     }

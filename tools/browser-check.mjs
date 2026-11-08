@@ -108,8 +108,12 @@ try {
     await assertPageFits();
     const beforeAutomationX = await evaluate(`document.querySelector('.browser-window').getBoundingClientRect().x`);
     await clickText('.prompt-area', 'Automate?');
-    await screenshot('dirbuster-offer');
-    await clickText('dialog[open]', 'Run');
+    await screenshot('dirbuster-setup');
+    await clickText('dialog[open]', 'Next >');
+    await sleep(900);
+    await screenshot('dirbuster-installing');
+    await waitFor(`[...document.querySelectorAll('dialog[open] button')].some((button) => button.textContent === 'Finish')`);
+    await clickText('dialog[open]', 'Finish');
     await waitFor(`document.querySelector('.game-screen').classList.contains('automated')`);
     await sleep(150);
     const duringAutomationX = await evaluate(`document.querySelector('.browser-window').getBoundingClientRect().x`);
@@ -186,6 +190,8 @@ try {
     assert.match(await evaluate(`document.querySelector('.proxy-summary').textContent`), /0 dead/);
     await evaluate(`(()=>{const card=[...document.querySelectorAll('.upgrade-card')].find(card=>!card.hidden&&!card.disabled);if(!card)throw new Error('Expected an affordable upgrade');card.click();card.click();})()`);
     assert.equal(await evaluate(`document.querySelectorAll('.upgrade-card.leaving').length`), 1, 'A double click must purchase only one card');
+    await sleep(700);
+    await screenshot('setup-window', false);
     if (expectsDevelopmentTools) {
         await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', {key:String.fromCharCode(92),bubbles:true}))`);
         assert.equal(await evaluate(`document.querySelector('.dev-panel').hidden`), false);

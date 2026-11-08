@@ -172,7 +172,23 @@ strong { font-weight: 600; }
 .dev-row input, .dev-row select { width: 112px; }
 .dev-row textarea { width: 100%; }
 .dev-status { color: #adc698; }
+.setup-wizard { width: min(500px, calc(100vw - 32px)); }
+.wizard-body { display: flex; min-height: 240px; margin-top: 3px; background: #fff; border-bottom: 1px solid #808080; box-shadow: 0 1px #fff; }
+.wizard-banner { flex: 0 0 130px; display: flex; align-items: flex-end; padding: 14px; background: linear-gradient(180deg, #000080, #1084c8); color: #fff; font: bold italic 19px Georgia, serif; }
+.wizard-page { flex: 1; min-width: 0; padding: 18px 20px; }
+.wizard-page h3 { margin: 0 0 16px; font: bold 13px Tahoma, Arial, sans-serif; }
+.wizard-page p { margin: 0 0 10px; line-height: 1.5; }
+.wizard-actions { display: flex; justify-content: flex-end; gap: 6px; padding: 10px 8px 6px; }
+.wizard-actions button { min-width: 78px; padding: 4px 10px; }
+.wizard-actions button:disabled { color: #808080; text-shadow: 1px 1px #fff; }
+.win-progress { height: 18px; padding: 2px; background: #fff; border: 1px solid #808080; box-shadow: inset 1px 1px #404040; }
+.win-progress-fill { width: 0; height: 100%; background: repeating-linear-gradient(90deg, #000080 0 9px, transparent 9px 11px); animation: progress var(--duration, 2s) steps(18, end) forwards; }
+.setup-windows { position: fixed; right: 20px; bottom: 20px; z-index: 30; display: flex; flex-direction: column; gap: 10px; width: min(320px, calc(100vw - 40px)); pointer-events: none; }
+.setup-window { padding: 3px; background: #c0c0c0; color: #000; border: 2px solid; border-color: #fff #444 #444 #fff; box-shadow: 2px 2px 0 #000; font: 11px Tahoma, Arial, sans-serif; animation: reveal .25s ease; }
+.setup-body { padding: 10px 10px 12px; }
+.setup-body p { margin: 0 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @keyframes reveal { from { opacity: 0; } to { opacity: 1; } }
+@keyframes progress { to { width: 100%; } }
 @keyframes throb { to { opacity: .35; } }
 @media (max-width: 1150px) {
     .game-screen { padding: 30px 22px 60px; }
@@ -199,4 +215,5 @@ strong { font-weight: 600; }
 }
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
+    .win-progress-fill { width: 100%; }
 }

@@ -6,8 +6,32 @@ export function fill(template: string, values: Readonly<Record<string, string | 
 
 export const automationText = {
     program: 'dirbuster',
-    description: 'A program that tries page names from a list of words until one exists.',
-    run: 'Run',
+    description: 'It tries page names from a list of words until one of them exists.',
+} as const;
+
+export const setupText = {
+    wizardTitle: '{name} Setup',
+    welcomeHeading: 'Welcome to the {name} Setup Wizard',
+    welcomeBody: 'This will install {name} on your computer.',
+    welcomeNext: 'Click Next to continue.',
+    installingHeading: 'Installing {name}',
+    copying: 'Copying {file}...',
+    wizardFiles: ['dirbuster.exe', 'words.txt', 'readme.txt'],
+    finishHeading: 'Completing the {name} Setup Wizard',
+    finishBody: '{name} has been installed. Click Finish to run it.',
+    back: '< Back',
+    next: 'Next >',
+    finish: 'Finish',
+    cancel: 'Cancel',
+    installTitle: '{name} Setup',
+    installing: 'Installing {name}...',
+    downloadTitle: 'File Download',
+    downloading: 'Saving {file} from {host}',
+    downloadHost: 'ftp.wordlists.example',
+    hardwareTitle: 'Found New Hardware',
+    hardwareStatus: 'Installing the software for your new hardware...',
+    connectionTitle: 'Connecting to {name}',
+    connectionSteps: ['Dialing...', 'Verifying user name and password...', 'Connected.'],
 } as const;
 
 export const notices = {
@@ -190,6 +214,7 @@ export const uiText = {
     away: 'While you were away',
     levelsSolved: 'levels solved',
     dismiss: 'Dismiss',
+    noUpgrades: 'Nothing new to install right now.',
 } as const;
 
 export const terminalText = {
