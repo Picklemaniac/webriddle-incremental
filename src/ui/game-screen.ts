@@ -48,7 +48,7 @@ export class GameScreen {
         status.machineElement.classList.add('dashboard-machine');
         const support = createElement('div', { className: 'dashboard-support' }, [status.networkElement, findings.element]);
         this.dashboard = createElement('div', { className: 'dashboard' }, [status.element, purchases.element, support, status.machineElement]);
-        this.element.append(createElement('div', { className: 'workspace' }, [browserColumn, terminalSlot]), this.dashboard, this.awaySummary.element);
+        this.element.append(createElement('div', { className: 'workspace' }, [browserColumn, terminalSlot]), this.dashboard);
         startSound(game);
         this.render();
     }

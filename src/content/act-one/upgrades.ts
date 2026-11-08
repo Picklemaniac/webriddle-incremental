@@ -15,6 +15,8 @@ export interface Upgrade extends PurchasableDefinition {
 
 const multiply = (statId: string, value: number): Modifier => ({ statId, operation: 'multiply', value });
 const add = (statId: string, value: number): Modifier => ({ statId, operation: 'add', value });
+const kilobytes = 1024;
+const megabytes = 1024 ** 2;
 
 function upgrade(id: UpgradeId, price: ResourceAmounts, level: number,
     requires: readonly UpgradeId[] = [], modifiers: readonly Modifier[] = [], fixes?: BlockReason): Upgrade {
@@ -37,29 +39,29 @@ export const upgrades: readonly Upgrade[] = [
     upgrade('autoReplyMacros', { insight: 15 }, 10),
     upgrade('otherRiddles', { insight: 15 }, 8),
     upgrade('isdn', { money: 100 }, 15, [], [multiply('requestsPerThread', 2)]),
-    upgrade('english10k', { words: 500 }, 10),
+    upgrade('english10k', { data: 75 * kilobytes }, 10),
     upgrade('newPc', { money: 240 }, 25, ['ram'], [add('scriptSlots', 2)]),
-    upgrade('certification', { money: 150 }, 20, [], [multiply('ticketValue', 3), multiply('ticketBotRate', 3)]),
-    upgrade('rssFeeds', { money: 120 }, 20, ['wgetMirror'], [multiply('scourValue', 3), multiply('scraperRate', 3)]),
+    upgrade('certification', { money: 150 }, 20, [], [multiply('workRate', 3), multiply('ticketBotRate', 3)]),
+    upgrade('rssFeeds', { money: 120 }, 20, ['wgetMirror'], [multiply('scourRate', 3), multiply('scraperRate', 3)]),
     upgrade('dirb', { insight: 35 }, 60, [], [multiply('searchEfficiency', 2)], 'folder'),
     upgrade('freeProxies', { money: 180 }, 30, ['throttle'], [add('proxySlots', 3)]),
     upgrade('threads8', { insight: 30 }, 35, ['curlBatch'], [multiply('threadsPerScript', 2)]),
     upgrade('adsl', { money: 450 }, 60, ['isdn'], [multiply('requestsPerThread', 3)]),
     upgrade('secondPc', { money: 700 }, 80, ['newPc'], [add('scriptSlots', 3)]),
     upgrade('extensionList', { insight: 25 }, 120, [], [], 'extension'),
-    upgrade('dictWords', { words: 3500 }, 90, ['english10k']),
+    upgrade('dictWords', { data: 512 * kilobytes }, 90, ['english10k']),
     upgrade('proxyChecker', { insight: 45, money: 250 }, 75, ['freeProxies']),
     upgrade('sizeFilter', { insight: 25 }, 170, [], [], 'wildcard'),
     upgrade('dorking', { insight: 40 }, 90, [], [add('dorkChance', 0.08)]),
     upgrade('gobuster', { insight: 60, money: 400 }, 150, ['dirb'], [multiply('searchEfficiency', 2.5)]),
-    upgrade('seniorCertification', { money: 800 }, 140, ['certification'], [multiply('ticketValue', 3), multiply('ticketBotRate', 3)]),
-    upgrade('archives', { money: 600 }, 140, ['rssFeeds'], [multiply('scourValue', 3), multiply('scraperRate', 3)]),
+    upgrade('seniorCertification', { money: 800 }, 140, ['certification'], [multiply('workRate', 3), multiply('ticketBotRate', 3)]),
+    upgrade('archives', { money: 600 }, 140, ['rssFeeds'], [multiply('scourRate', 3), multiply('scraperRate', 3)]),
     upgrade('proxyPool', { money: 700 }, 140, ['freeProxies'], [add('proxySlots', 6)]),
     upgrade('cable', { money: 1400 }, 220, ['adsl'], [multiply('requestsPerThread', 3)]),
     upgrade('mutationRules', { insight: 50 }, 260),
-    upgrade('rockyou', { words: 9000 }, 260),
+    upgrade('rockyou', { data: 1.25 * megabytes }, 260),
     upgrade('server', { money: 2200 }, 260, ['secondPc'], [add('scriptSlots', 4)]),
-    upgrade('scrabble', { words: 14000 }, 220, ['dictWords']),
+    upgrade('scrabble', { data: 2 * megabytes }, 220, ['dictWords']),
     upgrade('threads32', { insight: 80 }, 250, ['threads8'], [multiply('threadsPerScript', 4)]),
     upgrade('numberRanges', { insight: 30 }, 350),
     upgrade('rentedAddresses', { money: 2000 }, 300, ['proxyPool'], [add('extraAddresses', 16)]),
@@ -69,7 +71,7 @@ export const upgrades: readonly Upgrade[] = [
     upgrade('fiber', { money: 4500 }, 500, ['cable'], [multiply('requestsPerThread', 3)]),
     upgrade('addressBlock', { money: 6000 }, 500, ['rentedAddresses'], [add('extraAddresses', 64)]),
     upgrade('combinator', { insight: 80 }, 650),
-    upgrade('indexCache', { insight: 100, words: 20000 }, 600, ['dorking'], [add('dorkChance', 0.08)]),
+    upgrade('indexCache', { insight: 100, data: 3 * megabytes }, 600, ['dorking'], [add('dorkChance', 0.08)]),
     upgrade('leavePcOn', { money: 500 }, 100),
 ];
 

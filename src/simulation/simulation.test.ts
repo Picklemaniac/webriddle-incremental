@@ -51,10 +51,10 @@ describe('simulatePlayer', () => {
         expect(report.realSeconds).toBe(3600);
     });
 
-    it('does not count repetitive resource clicks as meaningful progress', () => {
+    it('does not count activity switches as meaningful progress', () => {
         const profile: PlayerProfile = {
             name: 'clicking', dailySessions: [{ startHour: 0, durationMinutes: 1 }],
-            strategy: { decisionIntervalSeconds: 1, act: (game) => game.dispatch({ type: 'work' }) },
+            strategy: { decisionIntervalSeconds: 1, act: (game) => game.dispatch({ type: 'setActivity', activity: 'work' }) },
         };
         const content = { ...testContent, systems: [], milestones: [], purchasables: [], handleAction: () => true };
         const report = simulatePlayer(profile, content, { ...options, days: 1 });

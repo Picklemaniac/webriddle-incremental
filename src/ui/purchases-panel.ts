@@ -1,25 +1,30 @@
 import type { Game } from '../core/game.ts';
+import type { Modifier } from '../core/stats.ts';
 import { canAfford } from '../core/purchasing.ts';
 import { offeredUpgrades, upgrades, type Upgrade } from '../content/act-one/upgrades.ts';
 import { isUpgradeRevealed } from '../content/act-one/progress.ts';
 import { fill, labels, statText, uiText } from '../content/act-one/text.ts';
-import { formatNumber } from '../format.ts';
-import { createButton, createElement, setText } from './dom.ts';
+import { formatBytes, formatNumber } from '../format.ts';
+import { formatAmount } from './amounts.ts';
+import { createButton, createElement } from './dom.ts';
 import { section } from './status-panel.ts';
 import type { Panel } from './panel.ts';
 
-interface UpgradeCard { element: HTMLButtonElement; effect: HTMLElement }
-
 const statLabels: Readonly<Record<string, { readonly label: string; readonly value: string }>> = statText;
-const moneyStats: ReadonlySet<string> = new Set(['ticketValue', 'ticketBotRate']);
+const requestStats: ReadonlySet<string> = new Set(['threadsPerScript', 'requestsPerThread']);
+const moneyStats: ReadonlySet<string> = new Set(['workRate', 'ticketBotRate']);
+const byteStats: ReadonlySet<string> = new Set(['scourRate', 'scraperRate']);
 const percentStats: ReadonlySet<string> = new Set(['dorkChance']);
+const tooltipDelayMilliseconds = 350;
 
 export class PurchasesPanel implements Panel {
     readonly element = section(labels.upgradesPanel);
     private readonly game: Game;
-    private readonly cards = new Map<string, UpgradeCard>();
+    private readonly cards = new Map<string, HTMLButtonElement>();
     private readonly leaving = new Map<string, number>();
     private readonly empty = createElement('p', { className: 'panel-help', text: uiText.noUpgrades });
+    private readonly tooltip = createElement('div', { className: 'win-tooltip', attributes: { role: 'tooltip' } });
+    private tooltipTimer: ReturnType<typeof setTimeout> | undefined;
     private purchaseLockUntil = 0;
 
     constructor(game: Game) {
@@ -29,14 +34,17 @@ export class PurchasesPanel implements Panel {
             const card = createButton('', () => this.purchase(item));
             card.className = 'upgrade-card';
             card.dataset.upgrade = item.id;
-            const cost = Object.entries(item.price).map(([id, amount]) => id === 'money' ? `$${formatNumber(amount)}` : `${formatNumber(amount)} ${id}`).join(', ');
-            const effect = createElement('div', { className: 'upgrade-effect' });
+            const cost = Object.entries(item.price).map(([id, amount]) => formatAmount(id, amount)).join(', ');
             card.append(createElement('div', { className: 'upgrade-heading' }, [createElement('strong', { text: item.name }), createElement('span', { className: 'upgrade-cost', text: cost })]),
-                createElement('div', { className: 'upgrade-description', text: item.description }), effect);
-            this.cards.set(item.id, { element: card, effect });
+                createElement('div', { className: 'upgrade-description', text: item.description }));
+            for (const show of ['mouseenter', 'focus']) card.addEventListener(show, () => this.scheduleTooltip(item, card));
+            for (const hide of ['mouseleave', 'blur']) card.addEventListener(hide, () => this.hideTooltip());
+            this.cards.set(item.id, card);
             list.append(card);
         }
+        this.tooltip.hidden = true;
         this.element.append(this.empty, list);
+        document.body.append(this.tooltip);
         game.subscribe((event) => {
             if (event.type !== 'stateReplaced') return;
             this.leaving.clear();
@@ -54,21 +62,42 @@ export class PurchasesPanel implements Panel {
             const card = this.cards.get(item.id)!;
             const leaving = this.leaving.has(item.id);
             const affordable = canAfford(this.game.state, item.price);
-            card.element.hidden = !offered.has(item.id) && !leaving;
-            card.element.disabled = leaving || !affordable || now < this.purchaseLockUntil;
-            card.element.classList.toggle('unaffordable', !affordable && !leaving);
-            card.element.classList.toggle('leaving', leaving);
-            if (!card.element.hidden && !leaving) setText(card.effect, this.effectText(item));
+            const waitingForLeavingCard = card.hidden && this.leaving.size > 0;
+            card.hidden = leaving ? false : !offered.has(item.id) || waitingForLeavingCard;
+            card.disabled = leaving || !affordable || now < this.purchaseLockUntil;
+            card.classList.toggle('unaffordable', !affordable && !leaving);
+            card.classList.toggle('leaving', leaving);
         }
+    }
+
+    private scheduleTooltip(item: Upgrade, card: HTMLButtonElement): void {
+        this.hideTooltip();
+        const text = this.effectText(item);
+        if (text === '') return;
+        this.tooltipTimer = setTimeout(() => {
+            if (card.hidden) return;
+            this.tooltip.textContent = text;
+            this.tooltip.hidden = false;
+            const bounds = card.getBoundingClientRect();
+            const width = this.tooltip.offsetWidth;
+            this.tooltip.style.left = `${Math.max(4, Math.min(bounds.left + 12, window.innerWidth - width - 4))}px`;
+            this.tooltip.style.top = `${bounds.bottom + 2}px`;
+        }, tooltipDelayMilliseconds);
+    }
+
+    private hideTooltip(): void {
+        clearTimeout(this.tooltipTimer);
+        this.tooltip.hidden = true;
     }
 
     private effectText(item: Upgrade): string {
         const modifiers = item.modifiers?.(1) ?? [];
-        const lines = modifiers.flatMap(({ statId }) => {
+        const shownStats = new Set(modifiers.map(({ statId }) => requestStats.has(statId) ? 'requestRate' : statId));
+        const lines = [...shownStats].flatMap((statId) => {
             const text = statLabels[statId];
             if (text === undefined) return [];
-            const value = (amount: number): string => fill(text.value, { value: statNumber(statId, amount) });
-            return [fill(uiText.effectLine, { label: text.label, before: value(this.game.stat(statId)), after: value(this.game.statWith(statId, modifiers)) })];
+            const value = (extra: readonly Modifier[]): string => fill(text.value, { value: statNumber(statId, this.statValue(statId, extra)) });
+            return [fill(uiText.effectLine, { label: text.label, before: value([]), after: value(modifiers) })];
         });
         if (item.effect !== undefined) {
             const statIds = [...item.effect.matchAll(/\{(\w+)\}/g)].map((match) => match[1]!);
@@ -77,9 +106,15 @@ export class PurchasesPanel implements Panel {
         return lines.join('\n');
     }
 
+    private statValue(statId: string, extra: readonly Modifier[]): number {
+        const stat = (id: string): number => this.game.statWith(id, extra);
+        return statId === 'requestRate' ? stat('threadsPerScript') * stat('requestsPerThread') : stat(statId);
+    }
+
     private purchase(item: Upgrade): void {
         const now = performance.now();
         if (now < this.purchaseLockUntil || !this.game.dispatch({ type: 'purchase', purchasableId: item.id })) return;
+        this.hideTooltip();
         // Keep the bought card's space while it fades so the next card does not slide under the cursor.
         this.leaving.set(item.id, now + 450);
         this.purchaseLockUntil = now + 600;
@@ -88,6 +123,7 @@ export class PurchasesPanel implements Panel {
 }
 
 function statNumber(statId: string, value: number): string {
+    if (byteStats.has(statId)) return formatBytes(value);
     if (percentStats.has(statId)) return formatNumber(Math.round(value * 100));
     if (Number.isInteger(value)) return formatNumber(value);
     return moneyStats.has(statId) ? value.toFixed(2) : String(Number(value.toFixed(2)));

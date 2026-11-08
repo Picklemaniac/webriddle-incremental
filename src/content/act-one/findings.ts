@@ -49,7 +49,7 @@ function discoverFinding(game: Game, finding: Finding): void {
     state.statistics[`foundAtLevel:${finding.id}`] = state.currentLevel;
     state.flags.findingsRevealed = true;
     game.gainResource('insight', finding.insight ?? 0);
-    if (finding.id === 'dictionary') game.gainResource('words', 1000);
+    if (finding.id === 'dictionary') game.gainResource('data', 150 * 1024);
     for (let index = 0; index < (finding.levels ?? 0); index++) solveLevel(game, 'windfall');
     game.invalidateStats();
     game.announce({ type: 'findingDiscovered', findingId: finding.id, count: state.findings[finding.id]! });

@@ -3,9 +3,7 @@ export type Action =
     | { readonly type: 'navigate'; readonly url: string }
     | { readonly type: 'submitCredentials'; readonly url: string; readonly username: string; readonly password: string }
     | { readonly type: 'automate' }
-    | { readonly type: 'work' }
-    | { readonly type: 'scour' }
-    | { readonly type: 'solveRiddle' }
+    | { readonly type: 'setActivity'; readonly activity: string }
     | { readonly type: 'assignJob'; readonly jobId: string; readonly change: number }
     | { readonly type: 'replaceProxy'; readonly proxyIndex: number }
     | { readonly type: 'answerCaptcha'; readonly answer: string }

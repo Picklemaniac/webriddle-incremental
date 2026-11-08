@@ -30,7 +30,7 @@ describe('Act I onboarding', () => {
         const game = startAutomation();
         game.state.resources.insight = 100000;
         game.state.resources.money = 100000;
-        game.state.resources.words = 100000;
+        game.state.resources.data = 100000;
         expect(game.dispatch({ type: 'purchase', purchasableId: 'curlBatch' })).toBe(false);
         game.advance(74);
         expect(game.state.flags.upgradesRevealed).not.toBe(true);
@@ -43,14 +43,14 @@ describe('Act I onboarding', () => {
         expect(game.dispatch({ type: 'purchase', purchasableId: 'throttle' })).toBe(false);
         game.advance(43);
         expect(game.state.flags.moneyRevealed).not.toBe(true);
-        expect(game.state.flags.wordsRevealed).not.toBe(true);
+        expect(game.state.flags.dataRevealed).not.toBe(true);
         expect(game.state.flags.scriptsRevealed).not.toBe(true);
     });
 
     it('spaces new systems and upgrades instead of revealing a backlog together', () => {
         const game = startAutomation();
         const robot = new AutoPlayer(actOneStrategy(4));
-        const systems = new Set(['insightRevealed', 'moneyRevealed', 'wordsRevealed', 'scriptsRevealed', 'networkRevealed', 'findingsRevealed']);
+        const systems = new Set(['insightRevealed', 'moneyRevealed', 'dataRevealed', 'scriptsRevealed', 'networkRevealed', 'findingsRevealed']);
         const observed = new Set<string>();
         const introductions: { seconds: number; id: string }[] = [];
         for (let second = 0; second < 600; second++) {
@@ -71,12 +71,12 @@ describe('Act I onboarding', () => {
         expect(introductions.some(({ id }) => id === 'networkRevealed')).toBe(true);
         for (let index = 1; index < introductions.length; index++) {
             const { seconds, id } = introductions[index]!;
-            const followsItsFirstPrice = id === 'insightRevealed' || id === 'moneyRevealed' || id === 'wordsRevealed';
+            const followsItsFirstPrice = id === 'insightRevealed' || id === 'moneyRevealed' || id === 'dataRevealed';
             expect(seconds - introductions[index - 1]!.seconds).toBeGreaterThanOrEqual(followsItsFirstPrice ? 6 : 30);
         }
     });
 
-    it('introduces words only once DirBuster runs out of words.txt', () => {
+    it('introduces data only once DirBuster runs out of words.txt', () => {
         const game = startAutomation();
         Object.assign(game.state.flags, { 'seen:curlBatch': true, insightRevealed: true, moneyRevealed: true });
         game.state.purchases.fakeUserAgent = 1;
@@ -85,12 +85,12 @@ describe('Act I onboarding', () => {
         game.state.currentLevel = 80;
         let cardSecond: number | undefined;
         let second = 0;
-        for (; second < 60 && game.state.flags.wordsRevealed !== true; second++) {
+        for (; second < 60 && game.state.flags.dataRevealed !== true; second++) {
             game.advance(1);
             if (cardSecond === undefined && isUpgradeRevealed(game.state, 'english10k')) cardSecond = second;
         }
         expect(wasNoticed(game.state, 'wordlistExhausted')).toBe(true);
-        expect(game.state.flags.wordsRevealed).toBe(true);
+        expect(game.state.flags.dataRevealed).toBe(true);
         expect(second - cardSecond!).toBeGreaterThanOrEqual(6);
     });
 });

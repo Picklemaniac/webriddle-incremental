@@ -11,7 +11,7 @@
 .dashboard .dashboard-support { grid-area: support; min-width: 0; }
 .dashboard .dashboard-machine { grid-area: machine; }
 .dashboard .status-panels > .panel:last-child { margin-bottom: 0; }
-.dashboard .resource-row { grid-template-columns: minmax(48px, 1fr) auto 52px 118px; height: 46px; min-height: 0; margin-bottom: 8px; }
+.dashboard .resource-row { grid-template-columns: minmax(48px, 1fr) auto 66px 118px; height: 46px; min-height: 0; margin-bottom: 8px; }
 .dashboard .resource-action { display: flex; flex-direction: column; justify-content: center; gap: 2px; height: 46px; line-height: 1.25; }
 .dashboard .resource-action > span { white-space: nowrap; }
 .dashboard .action-yield { font-size: 10px; }
@@ -30,7 +30,7 @@
 .dashboard .proxy-row { grid-template-columns: minmax(0, 1fr) 44px 65px; gap: 6px; font-size: 11px; }
 
 .dashboard .upgrade-card { --pad-y: 6px; --pad-x: 10px; min-height: 46px; white-space: normal; }
-.dashboard .upgrade-heading strong, .dashboard .upgrade-description, .dashboard .upgrade-effect { line-height: 15px; }
+.dashboard .upgrade-heading strong, .dashboard .upgrade-description { line-height: 15px; }
 .dashboard .upgrade-heading { margin-bottom: 3px; }
 .dashboard .upgrade-card.unaffordable { color: #505050; text-shadow: none; }
 .dashboard .upgrade-heading { flex-wrap: wrap; column-gap: 10px; row-gap: 4px; }
@@ -61,5 +61,5 @@
 }
 
 @media (max-width: 500px) {
-    .dashboard .resource-row { grid-template-columns: minmax(43px, 1fr) auto 45px 118px; column-gap: 5px; }
+    .dashboard .resource-row { grid-template-columns: minmax(43px, 1fr) auto 62px 118px; column-gap: 5px; }
 }

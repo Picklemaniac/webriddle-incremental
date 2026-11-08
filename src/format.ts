@@ -8,6 +8,19 @@ export function formatNumber(value: number): string {
     return value.toExponential(2).replace('e+', 'e');
 }
 
+const byteUnits = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'] as const;
+
+export function formatBytes(bytes: number): string {
+    let value = Math.max(0, bytes);
+    let unit = 0;
+    while (value >= 1024 && unit < byteUnits.length - 1) {
+        value /= 1024;
+        unit += 1;
+    }
+    const scale = unit === 0 || value >= 100 ? 1 : value >= 10 ? 10 : 100;
+    return `${Math.floor(value * scale) / scale} ${byteUnits[unit]}`;
+}
+
 export function formatDuration(totalSeconds: number): string {
     const seconds = Math.floor(totalSeconds);
     const days = Math.floor(seconds / 86_400);

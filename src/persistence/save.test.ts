@@ -57,6 +57,18 @@ describe('save format', () => {
         });
     });
 
+    it('turns words into bytes of data and drops the old click cooldowns', () => {
+        const save = { version: 3, savedAt: 0, state: {
+            resources: { insight: 4, words: 1000 },
+            flags: { insightRevealed: true, wordsRevealed: true },
+            cooldowns: { work: 12 },
+        } };
+        expect(migrateSave(save, saveMigrations, 4).state).toEqual({
+            resources: { insight: 4, data: 150_000 },
+            flags: { insightRevealed: true, dataRevealed: true },
+        });
+    });
+
     it('rejects saves from a newer version', () => {
         const futureSave = JSON.stringify({ version: currentSaveVersion + 1, savedAt: 0, state: defaults });
         expect(() => parseSave(futureSave, defaults)).toThrow(SaveError);
@@ -116,7 +128,7 @@ describe('save format', () => {
         ['zero current level', { currentLevel: 0 }],
         ['zero visited level', { visitedLevels: { 'http://riddle.example/': 0 } }],
         ['negative search progress', { search: { requestsSpent: -1 } }],
-        ['null cooldown', { cooldowns: { work: null } }],
+        ['numeric activity', { activity: 3 }],
         ['string statistic', { statistics: { requestsSent: 'a lot' } }],
         ['negative milestone time', { reachedMilestones: { automated: -1 } }],
         ['negative pending tick', { pendingTickSeconds: -0.1 }],

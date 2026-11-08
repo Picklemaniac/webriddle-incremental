@@ -2,7 +2,7 @@ import type { Page } from '../../core/content.ts';
 import type { CaptchaChallenge, GameState } from '../../core/state.ts';
 import { findingFile, findings } from './findings.ts';
 import { imagePath } from './images.ts';
-import { entrance, inWildcardFolder, levelPage, presentImageId, urlOfLevel, type LevelPage } from './levels.ts';
+import { entrance, inWildcardFolder, levelPage, urlOfLevel, type LevelPage } from './levels.ts';
 import { riddleOrigin } from './riddle.ts';
 import { startPage } from './start-pages.ts';
 import { alternateFiles, captchaText, errorPages, fill, pageText } from './text.ts';
@@ -33,9 +33,28 @@ function escapeHtml(text: string): string {
     return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 }
 
-function documentPage(title: string, body: string, statusCode: number, style: string): Page {
+function documentPage(title: string, body: string, statusCode: number, style: string, source?: string): Page {
     const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${scrollbarStyle}${style}</style></head><body>${body}</body></html>`;
-    return { title, html, source: html, statusCode };
+    return { title, html, source: source ?? html, statusCode };
+}
+
+function textFilePage(name: string, text: string): Page {
+    return documentPage(name, `<pre>${escapeHtml(text)}</pre>`, 200, textFileStyle, text);
+}
+
+function imageFilePage(name: string, body: string, style: string): Page {
+    return documentPage(name, body, 200, style, binaryText(name));
+}
+
+function binaryText(name: string): string {
+    let seed = [...name].reduce((hash, character) => Math.imul(hash ^ character.charCodeAt(0), 16777619), 2166136261);
+    let text = name.endsWith('.gif') ? 'GIF89a' : 'ÿØÿà JFIF  H H  ÿÛ C ';
+    for (let index = 0; index < 2400; index++) {
+        seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
+        const byte = seed >>> 24;
+        text += byte === 10 ? '\n' : byte < 32 || (byte > 126 && byte < 161) || byte === 60 || byte === 62 ? ' ' : String.fromCharCode(byte);
+    }
+    return text;
 }
 
 function picture(page: LevelPage): string {
@@ -94,7 +113,7 @@ export function resolvePage(url: string, state: GameState): Page {
     if (start !== null) return start;
     if (state.captcha !== null && state.network.bannedUntil > state.elapsedSeconds) return captchaPage(state.captcha, state.flags.captchaRejected === true);
     if (!address.startsWith(`${riddleOrigin}/`)) return errorPage('unavailable');
-    if (address === `${riddleOrigin}/present.gif`) return documentPage('present.gif', `<img src="${imagePath(presentImageId())}" alt="">`, 200, imageStyle);
+    if (address === `${riddleOrigin}/present.gif`) return imageFilePage('present.gif', `<div class="drawn">${entrance(7).answer}</div>`, drawnTextStyle);
     const known = state.visitedLevels[address];
     if (known !== undefined) return renderLevel(known);
     if (address === urlOfLevel(state.currentLevel)) return renderLevel(state.currentLevel);
@@ -103,13 +122,13 @@ export function resolvePage(url: string, state: GameState): Page {
     if (address.endsWith('.jpg')) {
         for (const level of [state.currentLevel, ...Object.values(state.visitedLevels)]) {
             const page = levelPage(level);
-            if (address === canonicalUrl(new URL(page.imageName, page.url).href)) return documentPage(page.imageName, picture(page), 200, imageStyle);
+            if (address === canonicalUrl(new URL(page.imageName, page.url).href)) return imageFilePage(page.imageName, picture(page), imageStyle);
         }
     }
     const next = entrance(state.currentLevel + 1);
     if (address === next.url && next.credentials !== null) return { ...errorPage('unauthorized'), loginRealm: next.folder ?? 'riddle' };
     const finding = findings.find((candidate) => address === `${riddleOrigin}/${candidate.path}` && state.findings[candidate.id]);
-    if (finding) return documentPage(finding.path, `<pre>${escapeHtml(findingFile(finding, state))}</pre>`, 200, textFileStyle);
+    if (finding) return textFilePage(finding.path, findingFile(finding, state));
     if (inWildcardFolder(address)) return documentPage('', `<p>${pageText.wildcardPage}</p>`, 200, levelStyle);
     return errorPage('notFound');
 }
@@ -121,8 +140,8 @@ function alternatePage(address: string, state: GameState): Page | null {
         const name = imageName.replace(/\.jpg$/, `.${alternate.extension}`);
         if (address !== canonicalUrl(new URL(name, url).href)) continue;
         return alternate.extension === 'gif'
-            ? documentPage(name, `<div class="drawn">${escapeHtml(alternate.text)}</div>`, 200, drawnTextStyle)
-            : documentPage(name, `<pre>${escapeHtml(fill(alternateFiles[alternate.extension], { word: alternate.text }))}</pre>`, 200, textFileStyle);
+            ? imageFilePage(name, `<div class="drawn">${escapeHtml(alternate.text)}</div>`, drawnTextStyle)
+            : textFilePage(name, fill(alternateFiles[alternate.extension], { word: alternate.text }));
     }
     return null;
 }

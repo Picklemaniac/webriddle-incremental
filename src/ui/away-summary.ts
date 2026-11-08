@@ -1,25 +1,30 @@
 import type { GameContent } from '../core/content.ts';
 import type { OfflineSummary } from '../core/offline.ts';
-import { fill, labels, uiText } from '../content/act-one/text.ts';
+import { dialogText, fill, uiText } from '../content/act-one/text.ts';
 import { formatDuration, formatNumber } from '../format.ts';
-import { createButton, createElement } from './dom.ts';
+import { formatAmount } from './amounts.ts';
+import { GameDialog } from './dialog.ts';
+import { createElement } from './dom.ts';
+
+const listFormat = new Intl.ListFormat('en', { style: 'long', type: 'conjunction' });
 
 export class AwaySummary {
-    readonly element = createElement('aside', { className: 'away-summary', attributes: { role: 'status' } });
-    private readonly message = createElement('div');
+    private readonly dialog = new GameDialog();
     private readonly content: GameContent;
 
     constructor(content: GameContent) {
         this.content = content;
-        this.element.append(this.message, createButton(uiText.dismiss, () => { this.element.hidden = true; }));
-        this.element.hidden = true;
     }
 
     show(summary: OfflineSummary): void {
         const capped = summary.awaySeconds > summary.simulatedSeconds + 1;
-        this.message.replaceChildren(createElement('strong', { text: fill(uiText.away, { time: formatDuration(summary.awaySeconds) }) }),
-            createElement('p', { text: `${formatNumber(summary.levelsGained)} ${uiText.levelsSolved}${capped ? ` (${labels.awayCapped} ${formatDuration(summary.simulatedSeconds)})` : ''}` }),
-            createElement('p', { className: 'muted', text: this.content.resources.filter((item) => (summary.resourceGains[item.id] ?? 0) > 0).map((item) => `+${formatNumber(summary.resourceGains[item.id]!)} ${item.name.toLowerCase()}`).join(', ') }));
-        this.element.hidden = false;
+        const gains = this.content.resources.filter((item) => (summary.resourceGains[item.id] ?? 0) > 0).map((item) => formatAmount(item.id, summary.resourceGains[item.id]!));
+        const lines = [
+            fill(uiText.away, { time: formatDuration(summary.awaySeconds) }),
+            ...(capped ? [fill(uiText.awayCapped, { time: formatDuration(summary.simulatedSeconds) })] : []),
+            ...(summary.levelsGained > 0 ? [fill(summary.levelsGained === 1 ? uiText.awayLevel : uiText.awayLevels, { levels: formatNumber(summary.levelsGained) })] : []),
+            ...(gains.length > 0 ? [fill(uiText.awayEarned, { amounts: listFormat.format(gains) })] : []),
+        ];
+        this.dialog.show(uiText.awayTitle, lines.map((text) => createElement('p', { text })), [], false, dialogText.ok);
     }
 }

@@ -1,13 +1,14 @@
 import type { Game } from '../core/game.ts';
-import { assignedScripts, cooldownRemaining, dirbustingScripts, insightPerSecond, isJobUnlocked, moneyPerSecond, scriptSlots, wordsPerSecond, type JobId } from '../content/act-one/economy.ts';
+import { activities, activityRate, assignedScripts, dirbustingScripts, incomePerSecond, isJobUnlocked, isResourceRevealed, scriptSlots, type ActivityId, type JobId } from '../content/act-one/economy.ts';
 import { effectiveRate, isBanned, liveProxies, networkCapacity, requestedRate } from '../content/act-one/network.ts';
 import { owns } from '../content/act-one/progress.ts';
-import { connectionNames, fill, labels, toolNames, uiText } from '../content/act-one/text.ts';
+import { activityText, connectionNames, fill, labels, toolNames, uiText } from '../content/act-one/text.ts';
 import { formatDuration, formatNumber } from '../format.ts';
+import { formatRate, formatValue } from './amounts.ts';
 import { createButton, createElement, setText } from './dom.ts';
 import type { Panel } from './panel.ts';
 
-interface ResourceRow { element: HTMLElement; value: HTMLElement; rate: HTMLElement; button: HTMLButtonElement; yield: HTMLElement }
+interface ResourceRow { element: HTMLElement; value: HTMLElement; rate: HTMLElement; button: HTMLButtonElement; yield: HTMLElement; activity: ActivityId }
 interface WorkerRow { element: HTMLElement; count: HTMLElement; minus: HTMLButtonElement; plus: HTMLButtonElement }
 
 export class StatusPanel implements Panel {
@@ -31,16 +32,17 @@ export class StatusPanel implements Panel {
 
     constructor(game: Game) {
         this.game = game;
-        for (const [id, name, action] of [['insight', labels.insight, 'solveRiddle'], ['money', labels.money, 'work'], ['words', labels.words, 'scour']] as const) {
+        for (const activity of activities) {
             const value = createElement('strong');
             const rate = createElement('span', { className: 'income-rate' });
             const yieldLabel = createElement('span', { className: 'action-yield' });
-            const button = createButton('', () => game.dispatch({ type: action }));
+            const button = createButton('', () => game.dispatch({ type: 'setActivity', activity: activity.id }));
             button.className = 'resource-action';
-            button.replaceChildren(createElement('span', { text: labels[action] }), yieldLabel);
+            button.replaceChildren(createElement('span', { text: activityText[activity.id] }), yieldLabel);
+            const name = labels[activity.resource as 'insight' | 'money' | 'data'];
             const row = createElement('div', { className: 'resource-row' }, [createElement('span', { text: name }), value, rate, button]);
             this.you.append(row);
-            this.resources.set(id, { element: row, value, rate, button, yield: yieldLabel });
+            this.resources.set(activity.resource, { element: row, value, rate, button, yield: yieldLabel, activity: activity.id });
         }
         this.scripts.append(createElement('p', { className: 'panel-help', text: uiText.workersHelp }), createElement('div', { className: 'stat-row' }, [createElement('span', { text: labels.dirbusting }), this.bustingCount]));
         for (const [id, label] of [['riddles', labels.otherRiddles], ['ticketing', labels.ticketBot], ['scraping', labels.scraping]] as const) {
@@ -76,17 +78,14 @@ export class StatusPanel implements Panel {
 
     render(): void {
         const game = this.game;
-        this.you.hidden = !game.state.flags.insightRevealed && !game.state.flags.moneyRevealed && !game.state.flags.wordsRevealed;
+        this.you.hidden = ![...this.resources.keys()].some((id) => isResourceRevealed(game, id));
         for (const [id, row] of this.resources) {
-            row.element.hidden = !game.state.flags[`${id}Revealed`];
-            setText(row.value, `${id === 'money' ? '$' : ''}${formatNumber(game.state.resources[id] ?? 0)}`);
-            const rate = { insight: insightPerSecond, money: moneyPerSecond, words: wordsPerSecond }[id as 'insight' | 'money' | 'words'](game);
-            setText(row.rate, rate > 0 ? `+${rate.toFixed(1).replace('.0', '')}/s` : '');
-            const remaining = cooldownRemaining(game, id === 'insight' ? 'riddle' : id === 'money' ? 'work' : 'scour');
-            row.button.disabled = remaining > 0;
-            row.button.style.setProperty('--cooldown', `${remaining / 2 * 100}%`);
-            const gain = formatNumber(game.stat(id === 'insight' ? 'riddleValue' : id === 'money' ? 'ticketValue' : 'scourValue'));
-            setText(row.yield, id === 'money' ? `+$${gain}` : `+${gain} ${(id === 'insight' ? labels.insight : labels.words).toLowerCase()}`);
+            row.element.hidden = !isResourceRevealed(game, id);
+            setText(row.value, formatValue(id, game.state.resources[id] ?? 0));
+            const income = incomePerSecond(game, id);
+            setText(row.rate, income > 0 ? `+${formatRate(id, income)}` : '');
+            row.button.setAttribute('aria-pressed', String(game.state.activity === row.activity));
+            setText(row.yield, formatRate(id, activityRate(game, row.activity)));
         }
         this.scripts.hidden = !game.state.flags.scriptsRevealed;
         setText(this.bustingCount, String(dirbustingScripts(game)));

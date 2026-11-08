@@ -1,5 +1,4 @@
 import { levelImages } from './generated/level-images.ts';
-import { pickByUnit } from './riddle.ts';
 import { subjects, type Subject } from './word-lists.ts';
 
 export const levelImageCount = levelImages.length;
@@ -15,10 +14,6 @@ export const pictureSubjects: readonly Subject[] = subjects.filter((subject) => 
 
 export function imagePath(imageId: number): string {
     return `/levels/${imageId}.jpg`;
-}
-
-export function imageForSubject(subject: string, unit: number): number {
-    return pickByUnit(imageIdsBySubject.get(subject) ?? [0], unit);
 }
 
 export function imageWithWord(word: string): number {

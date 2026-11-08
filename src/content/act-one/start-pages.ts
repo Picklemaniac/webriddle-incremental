@@ -1,6 +1,6 @@
 import type { Page } from '../../core/content.ts';
 import { imagePath, imageWithWord } from './images.ts';
-import { enigmaticsUrl, hallOfFameUrl, homeUrl, nordinhoUrl, riddleHomeUrl, rulesUrl, startUrl, toolUrls } from './riddle.ts';
+import { enigmaticsUrl, hallOfFameUrl, hintsUrl, homeUrl, nordinhoUrl, riddleHomeUrl, rulesUrl, startUrl, toolUrls } from './riddle.ts';
 import { browserName, fill, riddleHomeText, riddleName, startPageText } from './text.ts';
 
 interface Site {
@@ -11,6 +11,9 @@ interface Site {
 }
 
 const visitorCount = '004211';
+const riddleMenu: readonly (readonly [string, string])[] = [
+    [rulesUrl, riddleHomeText.rulesHeading], [hintsUrl, riddleHomeText.hintsHeading], [hallOfFameUrl, riddleHomeText.hallOfFameHeading],
+];
 
 const enigmaWebColors = 'bgcolor="#FFFFFF" text="#000000" link="#0033CC" vlink="#663399"';
 const enigmaWebStyle = 'body{margin:0}.masthead{padding:12px 14px;background:linear-gradient(90deg,#000080,#1084c8)}.masthead img{display:block}.brand{padding-left:10px}'
@@ -31,11 +34,12 @@ const riddleStyle = '.banner{display:inline-block;width:444px;max-width:96%}.ban
 const sites: Readonly<Record<string, Site>> = {
     [homeUrl]: { title: startPageText.title, body: enigmaWebHome, colors: enigmaWebColors, style: enigmaWebStyle },
     [riddleHomeUrl]: { title: riddleName, body: riddleHome, colors: riddleColors, style: riddleStyle },
-    [rulesUrl]: riddleSubpage(riddleHomeText.rulesHeading, [
-        '<table class="text" cellpadding="0" cellspacing="0" border="0"><tr><td align="center"><font face="Verdana" size="2">',
-        riddleHomeText.rules.map((rule, index) => `${index + 1}. ${rule}`).join('<br>'),
-        '</font></td></tr></table>',
-    ]),
+    [rulesUrl]: riddleSubpage(riddleHomeText.rulesHeading, textBlock(riddleHomeText.rules.map((rule, index) => `${index + 1}. ${rule}`))),
+    [hintsUrl]: riddleSubpage(riddleHomeText.hintsHeading, textBlock([
+        ...riddleHomeText.hints.map((hint, index) => fill(riddleHomeText.hintLine, { level: index + 1, hint })),
+        '',
+        riddleHomeText.moreHints,
+    ])),
     [hallOfFameUrl]: riddleSubpage(riddleHomeText.hallOfFameHeading, [
         '<table class="fame" cellpadding="5" cellspacing="0" border="1">',
         `<tr>${riddleHomeText.hallOfFameColumns.map((column) => `<th><font face="Verdana" size="1">${column}</font></th>`).join('')}</tr>`,
@@ -93,11 +97,8 @@ function riddleHome(rendered: boolean): string {
         '<center>',
         '<br>',
         riddleBanner(rendered),
-        '<table class="text" cellpadding="0" cellspacing="0" border="0"><tr><td align="center">',
-        `<font face="Verdana" size="2">${fill(riddleHomeText.description, { name: riddleName })}</font>`,
-        '</td></tr></table>',
         `<p class="start"><font face="Times New Roman" size="5"><a href="${pageName(startUrl)}">${riddleHomeText.start}</a></font></p>`,
-        `<p class="menu"><font face="Verdana" size="2"><a href="${pageName(rulesUrl)}">${riddleHomeText.rulesHeading}</a> | <a href="${pageName(hallOfFameUrl)}">${riddleHomeText.hallOfFameHeading}</a></font></p>`,
+        `<p class="menu"><font face="Verdana" size="2">${riddleMenu.map(([url, label]) => `<a href="${pageName(url)}">${label}</a>`).join(' | ')}</font></p>`,
         '<hr>',
         `<p><span class="counter">${visitorCount}</span><br><font face="Verdana" size="1" color="#999999">${riddleHomeText.visitors}</font></p>`,
         `<p><font face="Verdana" size="1" color="#666666">${riddleHomeText.updated}</font></p>`,
@@ -121,6 +122,10 @@ function riddleSubpage(heading: string, content: readonly string[]): Site {
         colors: riddleColors,
         style: riddleStyle,
     };
+}
+
+function textBlock(lines: readonly string[]): readonly string[] {
+    return ['<table class="text" cellpadding="0" cellspacing="0" border="0"><tr><td align="center"><font face="Verdana" size="2">', lines.join('<br>'), '</font></td></tr></table>'];
 }
 
 function riddleBanner(rendered: boolean): string {

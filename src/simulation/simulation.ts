@@ -115,7 +115,7 @@ class PlayerSimulation {
         } else if (event.type === 'levelSolved' || event.type === 'findingDiscovered' || event.type === 'notice') {
             this.meaningfulActivity = true;
         } else if (event.type === 'actionApplied') {
-            if (event.action.type === 'work' || event.action.type === 'scour') this.routineActions++;
+            if (event.action.type === 'setActivity') this.routineActions++;
             else this.meaningfulActivity = true;
         }
     }

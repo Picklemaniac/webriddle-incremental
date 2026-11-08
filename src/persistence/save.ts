@@ -1,7 +1,7 @@
 import type { GameState } from '../core/state.ts';
 import { saveMigrations } from './migrations.ts';
 
-export const currentSaveVersion = 3;
+export const currentSaveVersion = 4;
 
 const exportPrefix = 'WEBRIDDLE-';
 const exportSuffix = '-END';
@@ -191,7 +191,7 @@ function validateState(value: unknown): void {
         statistics: recordOf(nonnegativeNumber),
         jobs: recordOf(nonnegativeInteger),
         findings: recordOf(nonnegativeInteger),
-        cooldowns: recordOf(nonnegativeNumber),
+        activity: string,
         search: (candidate) => fieldsMatch(candidate, {
             level: positiveInteger,
             requestsSpent: nonnegativeNumber,

@@ -1,21 +1,34 @@
 import type { GameSystem } from '../../core/content.ts';
 import type { Game } from '../../core/game.ts';
-import { increment, owns } from './progress.ts';
+import { owns } from './progress.ts';
 
 export type JobId = 'scraping' | 'ticketing' | 'riddles';
+export type ActivityId = 'riddles' | 'work' | 'scouring';
 
 interface JobDefinition {
     readonly id: JobId;
     readonly unlockedBy: string;
+    readonly resource: string;
+    readonly rateStat: string;
+}
+
+interface ActivityDefinition {
+    readonly id: ActivityId;
+    readonly resource: string;
+    readonly rateStat: string;
 }
 
 const jobs: readonly JobDefinition[] = [
-    { id: 'scraping', unlockedBy: 'wgetMirror' },
-    { id: 'ticketing', unlockedBy: 'autoReplyMacros' },
-    { id: 'riddles', unlockedBy: 'otherRiddles' },
+    { id: 'scraping', unlockedBy: 'wgetMirror', resource: 'data', rateStat: 'scraperRate' },
+    { id: 'ticketing', unlockedBy: 'autoReplyMacros', resource: 'money', rateStat: 'ticketBotRate' },
+    { id: 'riddles', unlockedBy: 'otherRiddles', resource: 'insight', rateStat: 'riddleBotRate' },
 ];
 
-const manualActionCooldownSeconds = 2;
+export const activities: readonly ActivityDefinition[] = [
+    { id: 'riddles', resource: 'insight', rateStat: 'riddleRate' },
+    { id: 'work', resource: 'money', rateStat: 'workRate' },
+    { id: 'scouring', resource: 'data', rateStat: 'scourRate' },
+];
 
 export function scriptSlots(game: Game): number {
     return game.state.flags.automated === true ? Math.floor(game.stat('scriptSlots')) : 0;
@@ -49,56 +62,32 @@ export function assignJob(game: Game, jobId: string, change: number): boolean {
     return true;
 }
 
-export function cooldownRemaining(game: Game, actionId: 'work' | 'scour' | 'riddle'): number {
-    return Math.max(0, (game.state.cooldowns[actionId] ?? 0) - game.state.elapsedSeconds);
+export function isResourceRevealed(game: Game, resource: string): boolean {
+    return game.state.flags[`${resource}Revealed`] === true;
 }
 
-export function work(game: Game): boolean {
-    if (game.state.flags.moneyRevealed !== true || cooldownRemaining(game, 'work') > 0) {
+export function setActivity(game: Game, activityId: string): boolean {
+    const activity = activities.find((candidate) => candidate.id === activityId);
+    if (activity === undefined || !isResourceRevealed(game, activity.resource) || game.state.activity === activity.id) {
         return false;
     }
-    game.gainResource('money', game.stat('ticketValue'));
-    game.state.cooldowns.work = game.state.elapsedSeconds + manualActionCooldownSeconds;
-    increment(game.state, 'tickets');
+    game.state.activity = activity.id;
     return true;
 }
 
-export function scour(game: Game): boolean {
-    if (game.state.flags.wordsRevealed !== true || cooldownRemaining(game, 'scour') > 0) {
-        return false;
-    }
-    game.gainResource('words', game.stat('scourValue'));
-    game.state.cooldowns.scour = game.state.elapsedSeconds + manualActionCooldownSeconds;
-    increment(game.state, 'scours');
-    return true;
+export function activityRate(game: Game, activityId: ActivityId): number {
+    const activity = activities.find((candidate) => candidate.id === activityId)!;
+    return game.stat(activity.rateStat);
 }
 
-export function solveRiddle(game: Game): boolean {
-    if (game.state.flags.insightRevealed !== true || cooldownRemaining(game, 'riddle') > 0) {
-        return false;
-    }
-    game.gainResource('insight', game.stat('riddleValue'));
-    game.state.cooldowns.riddle = game.state.elapsedSeconds + manualActionCooldownSeconds;
-    increment(game.state, 'otherRiddles');
-    return true;
-}
-
-export function insightPerSecond(game: Game): number {
-    return assignedScripts(game, 'riddles') * game.stat('riddleBotRate');
-}
-
-export function moneyPerSecond(game: Game): number {
-    return assignedScripts(game, 'ticketing') * game.stat('ticketBotRate');
-}
-
-export function wordsPerSecond(game: Game): number {
-    return assignedScripts(game, 'scraping') * game.stat('scraperRate');
+export function incomePerSecond(game: Game, resource: string): number {
+    const activity = activities.find((candidate) => candidate.resource === resource && candidate.id === game.state.activity);
+    const job = jobs.find((candidate) => candidate.resource === resource)!;
+    return (activity === undefined ? 0 : game.stat(activity.rateStat)) + assignedScripts(game, job.id) * game.stat(job.rateStat);
 }
 
 export const passiveIncome: GameSystem = {
     update(game, deltaSeconds) {
-        game.gainResource('money', moneyPerSecond(game) * deltaSeconds);
-        game.gainResource('words', wordsPerSecond(game) * deltaSeconds);
-        game.gainResource('insight', insightPerSecond(game) * deltaSeconds);
+        for (const { resource } of activities) game.gainResource(resource, incomePerSecond(game, resource) * deltaSeconds);
     },
 };

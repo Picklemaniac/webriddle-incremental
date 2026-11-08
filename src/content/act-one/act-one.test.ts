@@ -4,7 +4,7 @@ import { createInitialState } from '../../core/state.ts';
 import { parseSave, serializeSave } from '../../persistence/save.ts';
 import { actOneContent } from './index.ts';
 import { entrance, levelPage, urlOfLevel } from './levels.ts';
-import { hallOfFameUrl, riddleHomeUrl, rulesUrl } from './riddle.ts';
+import { hallOfFameUrl, hintsUrl, riddleHomeUrl, rulesUrl } from './riddle.ts';
 import { createCaptcha } from './captchas.ts';
 import { effectiveRate, networkCapacity } from './network.ts';
 import { planSearch, searchCapabilities } from './search.ts';
@@ -50,7 +50,7 @@ describe('Act I', () => {
 
     it('generates unique stable URLs and a usable clue on every page through the wall', () => {
         const game = newGame();
-        const urls = new Set<string>([`${riddleHomeUrl}index.htm`, rulesUrl, hallOfFameUrl]);
+        const urls = new Set<string>([`${riddleHomeUrl}index.htm`, rulesUrl, hintsUrl, hallOfFameUrl]);
         for (const url of urls) expect(game.content.resolvePage(url, game.state).statusCode).toBe(200);
         for (let level = 1; level <= 1400; level++) {
             const url = urlOfLevel(level);

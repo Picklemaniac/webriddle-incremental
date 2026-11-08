@@ -117,11 +117,12 @@ strong { font-weight: 600; }
 .panel { min-width: 0; margin-bottom: 28px; animation: reveal .4s ease; }
 .panel h2 { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 10px; padding: 0 0 6px; border-bottom: 1px solid var(--rule); color: #fff; font: bold 13px Tahoma, Verdana, sans-serif; white-space: nowrap; }
 .panel-help { font-size: 11px; margin: 0 0 10px; line-height: 1.6; }
-.resource-row { display: grid; grid-template-columns: minmax(50px, 1fr) minmax(45px, auto) 52px 118px; align-items: center; gap: 8px; min-height: 33px; white-space: nowrap; animation: reveal .4s ease; }
+.resource-row { display: grid; grid-template-columns: minmax(50px, 1fr) minmax(45px, auto) 66px 118px; align-items: center; gap: 8px; min-height: 33px; white-space: nowrap; animation: reveal .4s ease; }
 .resource-row strong, .income-rate { text-align: right; font-weight: normal; }
 .resource-row strong { color: #fff; }
 .income-rate { font-size: 11px; }
-.dashboard .resource-action { --cooldown: 0%; --pad-y: 3px; --pad-x: 5px; width: 118px; height: 26px; background: linear-gradient(to right, #9c9c9c var(--cooldown, 0%), #c0c0c0 var(--cooldown, 0%)); }
+.dashboard .resource-action { --pad-y: 3px; --pad-x: 5px; width: 118px; height: 26px; }
+.dashboard .resource-action[aria-pressed="true"] { box-shadow: var(--pressed); background: repeating-conic-gradient(#c0c0c0 0% 25%, #dcdcdc 0% 50%) 0 0 / 2px 2px; padding: calc(var(--pad-y) + 1px) max(0px, calc(var(--pad-x) - 1px)) max(0px, calc(var(--pad-y) - 1px)) calc(var(--pad-x) + 1px); }
 .stat-row { display: flex; gap: 12px; justify-content: space-between; align-items: center; min-height: 27px; white-space: nowrap; }
 .stat-row strong { font-weight: normal; }
 .worker-row { display: grid; grid-template-columns: 1fr 26px 30px 26px; align-items: center; gap: 7px; min-height: 32px; white-space: nowrap; animation: reveal .4s ease; }
@@ -133,8 +134,7 @@ strong { font-weight: 600; }
 .upgrade-heading strong { font: bold 12px Tahoma, Arial, sans-serif; }
 .upgrade-cost { font-size: 11px; }
 .upgrade-description { font-size: 11px; line-height: 1.45; }
-.upgrade-effect { margin-top: 4px; font-size: 11px; line-height: 1.45; white-space: pre-line; }
-.upgrade-effect:empty { display: none; }
+.win-tooltip { position: fixed; z-index: 40; max-width: 300px; padding: 2px 5px; background: #ffffe1; color: #000; border: 1px solid #000; font: 11px Tahoma, Arial, sans-serif; line-height: 1.45; white-space: pre-line; pointer-events: none; }
 .heat-track { height: 12px; margin: 8px 0 12px; padding: 1px; background: #000; border: 1px solid; border-color: var(--sunken); }
 .heat-fill { height: 100%; background: var(--problem); }
 .proxy-row { display: grid; grid-template-columns: minmax(0, 1fr) 45px 65px; gap: 8px; align-items: center; margin: 5px 0; white-space: nowrap; font-size: 10px; }
@@ -169,10 +169,6 @@ strong { font-weight: 600; }
 .login-field { display: grid; grid-template-columns: 100px 1fr; gap: 8px; align-items: center; margin: 10px 0; }
 .login-field input { background: white; color: black; border: 2px inset white; width: 100%; }
 .dialog-message { margin-top: 10px !important; }
-.away-summary { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 20px; padding: 14px 18px; background: #c0c0c0; color: #000; border: 2px solid; border-color: #fff #444 #444 #fff; box-shadow: 2px 2px 0 #000; font: 12px Tahoma, Arial, sans-serif; z-index: 20; max-width: calc(100vw - 32px); }
-.away-summary .muted { color: #404040; }
-.away-summary strong { font-size: 12px; }
-.away-summary p { margin: 8px 0 0; font-size: 11px; }
 .dev-panel { position: fixed; right: 14px; bottom: 14px; width: 410px; max-width: calc(100vw - 28px); max-height: 85vh; overflow-y: auto; padding: 15px; background: #111; border: 1px solid #c6a762; color: #ccc; z-index: 50; font: 11px/1.5 'IBM Plex Mono', monospace; box-shadow: 0 4px 30px #000; }
 .dev-panel h2 { margin: 0 0 12px; color: #c6a762; font-size: 13px; }
 .dev-row { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; }
@@ -219,7 +215,7 @@ strong { font-weight: 600; }
     .browser-viewport { height: 360px; }
     .tool-button { --pad-y: 3px; --pad-x: 5px; gap: 2px; }
     .toolbar-divider { margin: 0 2px; }
-    .resource-row { grid-template-columns: 1fr 55px 44px 118px; gap: 5px; }
+    .resource-row { grid-template-columns: 1fr 55px 62px 118px; gap: 5px; }
     .upgrade-heading { gap: 7px; }
     .upgrade-heading strong { font-size: 11px; }
     .menu-bar summary { padding: 4px 7px; }

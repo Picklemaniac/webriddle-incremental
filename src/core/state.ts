@@ -41,7 +41,7 @@ export interface GameState {
     statistics: Record<string, number>;
     jobs: Record<string, number>;
     findings: Record<string, number>;
-    cooldowns: Record<string, number>;
+    activity: string;
     search: SearchState;
     network: NetworkState;
     captcha: CaptchaChallenge | null;
@@ -65,7 +65,7 @@ export function createInitialState(content: GameContent, seed: number): GameStat
         statistics: {},
         jobs: {},
         findings: {},
-        cooldowns: {},
+        activity: '',
         search: { level: 1, requestsSpent: 0, configuration: '' },
         network: { heat: 0, bannedUntil: 0, proxies: [] },
         captcha: null,

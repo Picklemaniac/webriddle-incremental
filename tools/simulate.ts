@@ -45,7 +45,7 @@ if (continuousRuns.length > 0) {
     throw new Error('--check requires the continuous active profile (use --profile continuous or omit --profile).');
 }
 
-console.log('\nIdle stretch = no robot input. Progress gap = no solve, unlock, finding or meaningful intervention; Work/Scour clicks do not reset it.');
+console.log('\nIdle stretch = no robot input. Progress gap = no solve, unlock, finding or meaningful intervention; activity switches do not reset it.');
 console.log('Unlocks are distinct upgrade cards observed in the first real hour. Offline milestone times are when they occur, not when the player returns.');
 console.log('Robot play is a balancing model, not a human playtest. Manual solving uses estimated delays; the robot knows the solution after that delay.');
 console.log(`Simulated up to ${days} days for ${profiles.length} profiles × ${seeds.length} seeds in ${Math.round(performance.now() - startedAt)} ms.`);

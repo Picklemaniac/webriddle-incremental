@@ -1,9 +1,9 @@
 import { currentSearch } from '../content/act-one/automation.ts';
-import { assignedScripts, dirbustingScripts, isJobUnlocked, scriptSlots } from '../content/act-one/economy.ts';
+import { activities, activityRate, assignedScripts, dirbustingScripts, isJobUnlocked, isResourceRevealed, scriptSlots, type ActivityId } from '../content/act-one/economy.ts';
 import { entrance } from '../content/act-one/levels.ts';
 import { effectiveRate } from '../content/act-one/network.ts';
 import { isUpgradeRevealed } from '../content/act-one/progress.ts';
-import { offeredUpgrades, upgrades } from '../content/act-one/upgrades.ts';
+import { offeredUpgrades, upgrades, type Upgrade } from '../content/act-one/upgrades.ts';
 import type { Game } from '../core/game.ts';
 import { canAfford } from '../core/purchasing.ts';
 import type { Strategy } from './strategies.ts';
@@ -41,16 +41,16 @@ export function actOneStrategy(decisionIntervalSeconds: number, purist = false):
                 for (const item of offered) {
                     if (canAfford(state, item.price)) acted = game.dispatch({ type: 'purchase', purchasableId: item.id }) || acted;
                 }
-                const neededMoney = upgrades.filter((item) => !state.purchases[item.id]).reduce((sum, item) => sum + (item.price.money ?? 0), 0);
-                const neededWords = upgrades.filter((item) => !state.purchases[item.id]).reduce((sum, item) => sum + (item.price.words ?? 0), 0);
-                const neededInsight = upgrades.filter((item) => !state.purchases[item.id]).reduce((sum, item) => sum + (item.price.insight ?? 0), 0);
-                if ((state.resources.money ?? 0) < neededMoney) acted = game.dispatch({ type: 'work' }) || acted;
-                if ((state.resources.words ?? 0) < neededWords) acted = game.dispatch({ type: 'scour' }) || acted;
-                if ((state.resources.insight ?? 0) < neededInsight) acted = game.dispatch({ type: 'solveRiddle' }) || acted;
+                const needed = (resource: string): number => upgrades.filter((item) => !state.purchases[item.id]).reduce((sum, item) => sum + (item.price[resource] ?? 0), 0);
+                const neededMoney = needed('money');
+                const neededData = needed('data');
+                const neededInsight = needed('insight');
+                const activity = chooseActivity(game, offered.find((item) => !canAfford(state, item.price)));
+                if (activity !== undefined) acted = game.dispatch({ type: 'setActivity', activity }) || acted;
                 const slots = scriptSlots(game);
                 const targets = {
                     ticketing: (state.resources.money ?? 0) >= neededMoney ? 0 : Math.max(1, Math.floor(slots * 0.4)),
-                    scraping: (state.resources.words ?? 0) >= neededWords || slots < 4 ? 0 : Math.max(1, Math.floor(slots * 0.2)),
+                    scraping: (state.resources.data ?? 0) >= neededData || slots < 4 ? 0 : Math.max(1, Math.floor(slots * 0.2)),
                     riddles: (state.resources.insight ?? 0) >= neededInsight || slots < 3 ? 0 : Math.max(1, Math.floor(slots * 0.2)),
                 };
                 for (const job of ['ticketing', 'scraping', 'riddles'] as const) {
@@ -87,4 +87,14 @@ export function actOneStrategy(decisionIntervalSeconds: number, purist = false):
             return acted;
         },
     };
+}
+
+function chooseActivity(game: Game, goal: Upgrade | undefined): ActivityId | undefined {
+    if (goal === undefined) return undefined;
+    const waits = activities.filter((activity) => isResourceRevealed(game, activity.resource)).map((activity) => ({
+        id: activity.id,
+        seconds: Math.max(0, (goal.price[activity.resource] ?? 0) - (game.state.resources[activity.resource] ?? 0)) / activityRate(game, activity.id),
+    }));
+    const longest = waits.reduce<{ id: ActivityId; seconds: number } | undefined>((best, wait) => best === undefined || wait.seconds > best.seconds ? wait : best, undefined);
+    return longest !== undefined && longest.seconds > 0 ? longest.id : undefined;
 }
