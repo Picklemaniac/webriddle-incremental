@@ -43,7 +43,7 @@ export class StatusPanel implements Panel {
             this.you.append(row);
             this.resources.set(activity.resource, { element: row, value, rate, button, yield: yieldLabel, activity: activity.id });
         }
-        this.scripts.append(createElement('p', { className: 'panel-help', text: uiText.workersHelp }), createElement('div', { className: 'stat-row' }, [createElement('span', { text: labels.dirbusting }), this.bustingCount]));
+        this.scripts.append(createElement('div', { className: 'stat-row' }, [createElement('span', { text: labels.dirbusting }), this.bustingCount]));
         for (const [id, label] of [['riddles', labels.otherRiddles], ['ticketing', labels.ticketBot], ['scraping', labels.scraping]] as const) {
             const count = createElement('strong');
             const minus = createButton('−', () => game.dispatch({ type: 'assignJob', jobId: id, change: -1 }));

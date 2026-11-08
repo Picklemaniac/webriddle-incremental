@@ -286,7 +286,7 @@ export const labels = {
     insight: 'Insight',
     money: 'Money',
     data: 'Data',
-    dirbusting: 'Running DirBuster',
+    dirbusting: 'Running DirBuster (default)',
     scraping: 'Scraping',
     ticketBot: 'Closing tickets',
     otherRiddles: 'Other riddles',
@@ -303,7 +303,6 @@ export const labels = {
 
 export const uiText = {
     follow: 'Return to current level',
-    workersHelp: 'Scripts without another job run DirBuster.',
     findingsOdds: 'Drop rates',
     findingsHelp: 'A find about every three minutes of running. Guaranteed within six minutes.',
     findingsOddsTitle: 'Findings: drop rates',

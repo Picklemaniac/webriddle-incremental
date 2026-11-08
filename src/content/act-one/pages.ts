@@ -3,6 +3,7 @@ import type { CaptchaChallenge, GameState } from '../../core/state.ts';
 import { findingFile, findings } from './findings.ts';
 import { imagePath } from './images.ts';
 import { entrance, inWildcardFolder, levelPage, urlOfLevel, type LevelPage } from './levels.ts';
+import { giftImage } from './pixel-images.ts';
 import { riddleOrigin } from './riddle.ts';
 import { startPage } from './start-pages.ts';
 import { alternateFiles, captchaText, errorPages, fill, pageText } from './text.ts';
@@ -25,7 +26,7 @@ const imageStyle = `*{box-sizing:border-box}body{margin:8px;background:#000}img{
 
 const textFileStyle = 'body{margin:8px;background:#000;color:#ddd}pre{margin:0;font:13px "Courier New",monospace}';
 
-const drawnTextStyle = 'body{margin:8px;background:#000}.drawn{display:inline-block;padding:28px 36px;background:#101010;color:#f0f0f0;border:2px solid #f2f2f2;font:bold 44px "Courier New",monospace;letter-spacing:4px}';
+const gifStyle = 'body{margin:8px;background:#000}img{display:block;max-width:100%;height:auto}';
 
 const captchaStyle = 'body{margin:16px 20px;background:#fff;color:#000;font:16px "Times New Roman",Times,serif}h1{margin:0 0 12px;font-size:28px}p{margin:10px 0}.captcha{display:block;max-width:100%;height:auto;border:1px solid #808080}.error{color:#c00000}input{font:15px "Courier New",monospace}button{font:13px Tahoma,Arial,sans-serif}.link{padding:0;border:0;background:none;color:#0000ee;text-decoration:underline;cursor:pointer;font:16px "Times New Roman",Times,serif}hr{border:0;border-top:1px solid #808080;margin:18px 0 8px}address{font-style:italic;font-size:14px}';
 
@@ -116,7 +117,7 @@ export function resolvePage(url: string, state: GameState): Page {
     const start = startPage(address, scrollbarStyle, pictureStyle);
     if (start !== null) return start;
     if (!address.startsWith(`${riddleOrigin}/`)) return errorPage('unavailable');
-    if (address === `${riddleOrigin}/present.gif`) return imageFilePage('present.gif', `<div class="drawn">${entrance(7).answer}</div>`, drawnTextStyle);
+    if (address === `${riddleOrigin}/present.gif`) return imageFilePage('present.gif', giftImage(entrance(7).answer), gifStyle);
     const known = state.visitedLevels[address];
     if (known !== undefined) return renderLevel(known);
     if (address === urlOfLevel(state.currentLevel)) return renderLevel(state.currentLevel);
@@ -143,7 +144,7 @@ function alternatePage(address: string, state: GameState): Page | null {
         const name = imageName.replace(/\.jpg$/, `.${alternate.extension}`);
         if (address !== canonicalUrl(new URL(name, url).href)) continue;
         return alternate.extension === 'gif'
-            ? imageFilePage(name, `<div class="drawn">${escapeHtml(alternate.text)}</div>`, drawnTextStyle)
+            ? imageFilePage(name, giftImage(alternate.text), gifStyle)
             : textFilePage(name, fill(alternateFiles[alternate.extension], { word: alternate.text }));
     }
     return null;
