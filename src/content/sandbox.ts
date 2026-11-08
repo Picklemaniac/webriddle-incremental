@@ -50,10 +50,8 @@ function levelColor(level: number): string {
 }
 
 function levelPage(level: number): Page {
-    return {
-        statusCode: 200,
-        html: `<!doctype html>
-<html>
+    const html = `<!doctype html>
+<html lang="en">
 <head>
 <title>Level ${level}</title>
 <style>
@@ -67,22 +65,21 @@ body { margin: 0; height: 100vh; display: grid; place-content: center; gap: 16px
 <!-- sandbox placeholder -->
 </body>
 </html>
-`,
-    };
+`;
+    return { statusCode: 200, title: `Level ${level}`, html, source: html };
 }
 
-const notFoundPage: Page = {
-    statusCode: 404,
-    html: `<!doctype html>
-<html>
+const notFoundHtml = `<!doctype html>
+<html lang="en">
 <head><title>404 Not Found</title></head>
 <body>
 <h1>Not Found</h1>
 <p>The requested URL was not found on this server.</p>
 </body>
 </html>
-`,
-};
+`;
+
+const notFoundPage: Page = { statusCode: 404, title: '404 Not Found', html: notFoundHtml, source: notFoundHtml };
 
 function levelMilestone(level: number): MilestoneDefinition {
     return {
@@ -100,6 +97,7 @@ export const sandboxContent: GameContent = {
         {
             id: 'script',
             name: 'Script',
+            description: 'One more script.',
             cost: (ownedCount) => ({ [points]: Math.ceil(10 * 1.15 ** ownedCount) }),
             isAvailable: () => true,
             modifiers: (ownedCount) => [{ statId: solvingPower, operation: 'add', value: ownedCount }],
@@ -107,6 +105,7 @@ export const sandboxContent: GameContent = {
         {
             id: 'fasterScripts',
             name: 'Faster scripts',
+            description: 'Doubles solving power.',
             maximumCount: 1,
             cost: () => ({ [points]: 250 }),
             isAvailable: (state) => state.currentLevel >= 10,
@@ -115,6 +114,7 @@ export const sandboxContent: GameContent = {
         {
             id: 'parallelScripts',
             name: 'Parallel scripts',
+            description: 'Triples solving power.',
             maximumCount: 1,
             cost: () => ({ [points]: 5_000 }),
             isAvailable: (state) => state.currentLevel >= 30,
@@ -133,5 +133,6 @@ export const sandboxContent: GameContent = {
             game.state.levelProgress = 0;
         }
     },
+    handleAction: () => false,
     offlineCapSeconds: () => 12 * 3_600,
 };

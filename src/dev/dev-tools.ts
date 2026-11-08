@@ -5,7 +5,8 @@ import { formatDuration } from '../format.ts';
 import { autosaveSlotName, type SaveSlots } from '../persistence/save-slots.ts';
 import { decodeExport, encodeExport, parseSave, serializeSave } from '../persistence/save.ts';
 import { AutoPlayer } from '../simulation/auto-player.ts';
-import { buyBestValue } from '../simulation/strategies.ts';
+import { actOneStrategy } from '../simulation/act-one-strategy.ts';
+import { urlOfLevel } from '../content/act-one/levels.ts';
 import type { GameScreen } from '../ui/game-screen.ts';
 import { DevPanel, type DevCommands } from './dev-panel.ts';
 import { SessionLog } from './session-log.ts';
@@ -58,7 +59,7 @@ function createCommands({ game, loop, saveSlots, screen }: DevToolsContext, log:
         },
         skipToMilestone(milestoneId) {
             const isReached = (): boolean => game.state.reachedMilestones[milestoneId] !== undefined;
-            const autoPlayer = new AutoPlayer(buyBestValue(10));
+            const autoPlayer = new AutoPlayer(actOneStrategy(4));
             const playedSeconds = log.withoutRecording(() => autoPlayer.playUntil(game, isReached, maximumSkipSeconds));
             record('devSkip', { milestoneId, playedSeconds, reached: isReached(), purchases: game.state.purchases });
             return isReached()
@@ -66,8 +67,20 @@ function createCommands({ game, loop, saveSlots, screen }: DevToolsContext, log:
                 : `Not reached within ${formatDuration(maximumSkipSeconds)} of simulated play.`;
         },
         setResource(resourceId, amount) {
+            if (!Number.isFinite(amount) || amount < 0) throw new Error('Enter a finite, non-negative amount.');
             game.state.resources[resourceId] = amount;
             record('devSetResource', { resourceId, amount });
+        },
+        setLevel(level) {
+            if (!Number.isSafeInteger(level) || level < 1 || level > 100000) throw new Error('Choose a level from 1 to 100000.');
+            game.state.currentLevel = level;
+            game.state.browserUrl = urlOfLevel(level);
+            game.state.visitedLevels[game.state.browserUrl] = level;
+            game.state.search = { level, requestsSpent: 0, configuration: '' };
+            game.state.captcha = null;
+            game.state.network.bannedUntil = 0;
+            game.state.network.heat = 0;
+            record('devSetLevel', { level });
         },
         saveSlot(slotName) {
             saveSlots.write(slotName, game.state, Date.now());
@@ -96,8 +109,8 @@ function createCommands({ game, loop, saveSlots, screen }: DevToolsContext, log:
 }
 
 function recordSnapshot(game: Game, log: SessionLog): void {
-    const { currentLevel, levelProgress, resources, purchases } = game.state;
-    log.record('snapshot', game.state.elapsedSeconds, { currentLevel, levelProgress, resources, purchases });
+    const { currentLevel, levelProgress, resources, purchases, jobs, network, findings, statistics } = game.state;
+    log.record('snapshot', game.state.elapsedSeconds, { currentLevel, levelProgress, resources, purchases, jobs, network, findings, statistics });
 }
 
 function isTypingIn(target: EventTarget | null): boolean {

@@ -3,6 +3,9 @@ import { devLogEndpoint } from './tools/dev-log-endpoint.ts';
 
 export default defineConfig({
     plugins: [devLogEndpoint('logs')],
+    server: {
+        watch: { ignored: ['**/logs/**'] },
+    },
     build: {
         target: 'es2023',
     },

@@ -1,4 +1,4 @@
-export type ModifierOperation = 'add' | 'multiply' | 'power';
+type ModifierOperation = 'add' | 'multiply' | 'power';
 
 export interface Modifier {
     readonly statId: string;

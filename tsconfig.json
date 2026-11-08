@@ -16,5 +16,5 @@
         "isolatedModules": true,
         "skipLibCheck": true
     },
-    "include": ["src", "tools", "vite.config.ts"]
+    "include": ["src", "tools", "vite.config.ts", "knip.ts"]
 }

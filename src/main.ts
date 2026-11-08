@@ -1,4 +1,7 @@
 import './ui/styles.css';
+import './ui/browser.css';
+import './ui/dashboard.css';
+import './ui/onboarding.css';
 import { GameLoop } from './app/game-loop.ts';
 import { gameContent } from './content/index.ts';
 import { Game } from './core/game.ts';

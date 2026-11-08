@@ -6,6 +6,7 @@ export interface DevCommands {
     advance(seconds: number): void;
     skipToMilestone(milestoneId: string): string;
     setResource(resourceId: string, amount: number): void;
+    setLevel(level: number): void;
     saveSlot(slotName: string): void;
     loadSlot(slotName: string): void;
     slotNames(): string[];
@@ -42,12 +43,21 @@ export class DevPanel {
             this.createTimeAwayRow(),
             this.createSkipRow(),
             this.createResourceRow(),
+            this.createLevelRow(),
             this.createSlotRows(),
             this.createSaveStringRow(),
             createRow('', [createButton('Reset game', () => this.confirmReset())]),
             this.status,
         ]);
         this.element.hidden = true;
+    }
+
+    private createLevelRow(): HTMLElement {
+        const input = createElement('input', { attributes: { type: 'number', min: '1', max: '100000', value: '100', 'aria-label': 'Level' } });
+        return createRow('Level', [input, createButton('Set', () => this.run(() => {
+            this.commands.setLevel(Number(input.value));
+            return `Moved to level ${input.value}.`;
+        }))]);
     }
 
     toggle(): void {

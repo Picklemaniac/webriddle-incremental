@@ -11,6 +11,7 @@ export class Game {
     readonly content: GameContent;
     private currentState: GameState;
     private cachedStats: Record<string, number> | undefined;
+    private catchingUp = false;
     private readonly listeners = new Set<GameEventListener>();
 
     constructor(content: GameContent, state: GameState) {
@@ -20,6 +21,10 @@ export class Game {
 
     get state(): GameState {
         return this.currentState;
+    }
+
+    get isCatchingUp(): boolean {
+        return this.catchingUp;
     }
 
     stat(statId: string): number {
@@ -38,13 +43,21 @@ export class Game {
     dispatch(action: Action): boolean {
         const applied = this.apply(action);
         if (applied) {
-            this.emit({ type: 'actionApplied', action });
+            this.announce({ type: 'actionApplied', action });
         }
         return applied;
     }
 
     advance(seconds: number, maximumStepSeconds = 1): void {
-        if (seconds <= 0) {
+        if (!Number.isFinite(seconds) || seconds <= 0 || !Number.isFinite(maximumStepSeconds) || maximumStepSeconds <= 0) {
+            return;
+        }
+        const fixedStep = this.content.tickSeconds;
+        if (fixedStep !== undefined) {
+            const availableSeconds = this.currentState.pendingTickSeconds + seconds;
+            const steps = Math.floor((availableSeconds + 1e-9) / fixedStep);
+            this.currentState.pendingTickSeconds = Math.round(Math.max(0, availableSeconds - steps * fixedStep) * 1e9) / 1e9;
+            for (let step = 0; step < steps; step++) this.tick(fixedStep);
             return;
         }
         const stepCount = Math.ceil(seconds / maximumStepSeconds);
@@ -55,15 +68,20 @@ export class Game {
     }
 
     catchUp(awaySeconds: number): OfflineSummary {
-        const summary = simulateOfflineProgress(this, awaySeconds);
-        this.emit({ type: 'offlineProgressApplied', summary });
-        return summary;
+        this.catchingUp = true;
+        try {
+            const summary = simulateOfflineProgress(this, awaySeconds);
+            this.announce({ type: 'offlineProgressApplied', summary });
+            return summary;
+        } finally {
+            this.catchingUp = false;
+        }
     }
 
     replaceState(state: GameState): void {
         this.currentState = state;
         this.invalidateStats();
-        this.emit({ type: 'stateReplaced' });
+        this.announce({ type: 'stateReplaced' });
     }
 
     clone(): Game {
@@ -79,6 +97,12 @@ export class Game {
         this.cachedStats = undefined;
     }
 
+    announce(event: GameEvent): void {
+        for (const listener of this.listeners) {
+            listener(event);
+        }
+    }
+
     private apply(action: Action): boolean {
         switch (action.type) {
             case 'purchase':
@@ -87,6 +111,8 @@ export class Game {
                 this.currentState.browserUrl = action.url;
                 this.content.handleNavigation(this, action.url);
                 return true;
+            default:
+                return this.content.handleAction(this, action);
         }
     }
 
@@ -118,21 +144,16 @@ export class Game {
             const alreadyReached = this.currentState.reachedMilestones[milestone.id] !== undefined;
             if (!alreadyReached && milestone.isReached(this.currentState)) {
                 this.currentState.reachedMilestones[milestone.id] = this.currentState.elapsedSeconds;
-                this.emit({ type: 'milestoneReached', milestoneId: milestone.id });
+                this.announce({ type: 'milestoneReached', milestoneId: milestone.id });
             }
         }
     }
 
     private collectModifiers(): Modifier[] {
-        return this.content.purchasables.flatMap((definition) => {
+        const purchaseModifiers = this.content.purchasables.flatMap((definition) => {
             const count = ownedCount(this.currentState, definition.id);
             return count > 0 && definition.modifiers !== undefined ? definition.modifiers(count) : [];
         });
-    }
-
-    private emit(event: GameEvent): void {
-        for (const listener of this.listeners) {
-            listener(event);
-        }
+        return [...purchaseModifiers, ...(this.content.extraModifiers?.(this.currentState) ?? [])];
     }
 }

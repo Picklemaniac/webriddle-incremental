@@ -1,7 +1,7 @@
 import type { GameState } from '../core/state.ts';
 import { saveMigrations } from './migrations.ts';
 
-export const currentSaveVersion = 1;
+export const currentSaveVersion = 2;
 
 const exportPrefix = 'WEBRIDDLE-';
 const exportSuffix = '-END';
@@ -38,6 +38,7 @@ export function parseSave(serialized: string, defaults: GameState): SaveEnvelope
         throw new SaveError(`This save comes from a newer version of the game (save version ${rawSave.version}).`);
     }
     const migratedSave = migrateSave(rawSave, saveMigrations, currentSaveVersion);
+    validateState(migratedSave.state);
     return {
         version: currentSaveVersion,
         savedAt: migratedSave.savedAt,
@@ -59,14 +60,24 @@ export function migrateSave(save: RawSave, migrations: readonly SaveMigration[],
 }
 
 export function mergeWithDefaults<Value>(saved: unknown, defaults: Value): Value {
-    if (isPlainObject(saved) && isPlainObject(defaults)) {
-        const merged: Record<string, unknown> = structuredClone(defaults);
-        for (const [key, savedValue] of Object.entries(saved)) {
-            merged[key] = key in defaults ? mergeWithDefaults(savedValue, defaults[key]) : savedValue;
-        }
-        return merged as Value;
+    if (defaults === null) {
+        return (saved === null || isPlainObject(saved) ? structuredClone(saved) : null) as Value;
     }
-    return typeof saved === typeof defaults ? (saved as Value) : structuredClone(defaults);
+    if (Array.isArray(defaults)) {
+        return structuredClone(Array.isArray(saved) ? saved : defaults) as Value;
+    }
+    if (isPlainObject(defaults)) {
+        if (!isPlainObject(saved)) {
+            return structuredClone(defaults);
+        }
+        const entries = Object.entries(defaults).map(([key, value]) => [
+            key,
+            Object.hasOwn(saved, key) ? mergeWithDefaults(saved[key], value) : structuredClone(value),
+        ]);
+        const additions = Object.entries(saved).filter(([key]) => !Object.hasOwn(defaults, key));
+        return Object.fromEntries([...entries, ...structuredClone(additions)]) as Value;
+    }
+    return structuredClone(typeof saved === typeof defaults ? saved : defaults) as Value;
 }
 
 export function encodeExport(serialized: string): string {
@@ -95,8 +106,8 @@ function parseRawSave(serialized: string): RawSave {
     }
     if (
         !isPlainObject(parsed) ||
-        typeof parsed.version !== 'number' ||
-        typeof parsed.savedAt !== 'number' ||
+        !positiveInteger(parsed.version) ||
+        !nonnegativeNumber(parsed.savedAt) ||
         !isPlainObject(parsed.state)
     ) {
         throw new SaveError('The save data is missing required fields.');
@@ -105,7 +116,109 @@ function parseRawSave(serialized: string): RawSave {
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
+    if (typeof value !== 'object' || value === null) {
+        return false;
+    }
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+}
+
+type ValueCheck = (value: unknown) => boolean;
+
+function nonnegativeNumber(value: unknown): value is number {
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
+function nonnegativeInteger(value: unknown): value is number {
+    return nonnegativeNumber(value) && Number.isSafeInteger(value);
+}
+
+function positiveInteger(value: unknown): value is number {
+    return nonnegativeInteger(value) && value > 0;
+}
+
+function recordOf(check: ValueCheck): ValueCheck {
+    return (value) => isPlainObject(value) && Object.values(value).every(check);
+}
+
+function arrayOf(check: ValueCheck): ValueCheck {
+    return (value) => Array.isArray(value) && value.every(check);
+}
+
+function fieldsMatch(value: unknown, checks: Readonly<Record<string, ValueCheck>>, required = false): boolean {
+    return isPlainObject(value) && Object.entries(checks).every(([key, check]) =>
+        Object.hasOwn(value, key) ? check(value[key]) : !required,
+    );
+}
+
+function validCaptcha(value: unknown): boolean {
+    if (value === null) {
+        return true;
+    }
+    if (!fieldsMatch(value, {
+        kind: (kind) => kind === 'images' || kind === 'text',
+        stage: (stage) => stage === 'checkbox' || stage === 'challenge',
+        subject: (subject) => typeof subject === 'string',
+        imageIds: arrayOf(nonnegativeInteger),
+        correctTiles: arrayOf(nonnegativeInteger),
+        word: (word) => typeof word === 'string',
+    }, true)) {
+        return false;
+    }
+    const captcha = value as NonNullable<GameState['captcha']>;
+    const orderedTiles = captcha.correctTiles.every((tile, index) =>
+        tile < captcha.imageIds.length && (index === 0 || tile > captcha.correctTiles[index - 1]!),
+    );
+    return orderedTiles && (captcha.kind === 'images'
+        ? captcha.imageIds.length === 9 && captcha.correctTiles.length > 0 && captcha.subject.trim().length > 0
+        : captcha.word.trim().length > 0);
+}
+
+function validateState(value: unknown): void {
+    const string: ValueCheck = (candidate) => typeof candidate === 'string';
+    const boolean: ValueCheck = (candidate) => typeof candidate === 'boolean';
+    const checks: Readonly<Record<keyof GameState, ValueCheck>> = {
+        elapsedSeconds: nonnegativeNumber,
+        pendingTickSeconds: nonnegativeNumber,
+        randomState: (candidate) => typeof candidate === 'number' && Number.isInteger(candidate) && candidate >= -(2 ** 31) && candidate < 2 ** 32,
+        currentLevel: positiveInteger,
+        levelProgress: nonnegativeNumber,
+        browserUrl: string,
+        resources: recordOf(nonnegativeNumber),
+        purchases: recordOf(nonnegativeInteger),
+        reachedMilestones: recordOf(nonnegativeNumber),
+        flags: recordOf(boolean),
+        statistics: recordOf(nonnegativeNumber),
+        jobs: recordOf(nonnegativeInteger),
+        findings: recordOf(nonnegativeInteger),
+        cooldowns: recordOf(nonnegativeNumber),
+        search: (candidate) => fieldsMatch(candidate, {
+            level: positiveInteger,
+            requestsSpent: nonnegativeNumber,
+            configuration: string,
+        }),
+        network: (candidate) => fieldsMatch(candidate, {
+            heat: nonnegativeNumber,
+            bannedUntil: nonnegativeNumber,
+            proxies: arrayOf((proxy) => fieldsMatch(proxy, {
+                address: string,
+                latencyMilliseconds: nonnegativeNumber,
+                diesAtSeconds: nonnegativeNumber,
+            }, true)),
+        }),
+        captcha: validCaptcha,
+        favorites: arrayOf(string),
+        visitedLevels: recordOf(positiveInteger),
+        settings: (candidate) => fieldsMatch(candidate, { sound: boolean }),
+    };
+    if (!isPlainObject(value)) {
+        throw new SaveError('The save data has an invalid game state.');
+    }
+    for (const [key, check] of Object.entries(checks)) {
+        if (Object.hasOwn(value, key) && !check(value[key])) {
+            throw new SaveError(`The save data has an invalid ${key} field.`);
+        }
+    }
 }
 
 function bytesToBase64(bytes: Uint8Array): string {

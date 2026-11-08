@@ -11,6 +11,7 @@ export const testContent: GameContent = {
         {
             id: 'booster',
             name: 'Booster',
+            description: 'Doubles income.',
             maximumCount: 1,
             cost: () => ({ points: 5 }),
             isAvailable: () => true,
@@ -26,7 +27,8 @@ export const testContent: GameContent = {
             },
         },
     ],
-    resolvePage: () => ({ statusCode: 404, html: '' }),
+    resolvePage: () => ({ statusCode: 404, title: 'Not Found', html: '', source: '' }),
     handleNavigation: () => undefined,
+    handleAction: () => false,
     offlineCapSeconds: () => 3_600,
 };

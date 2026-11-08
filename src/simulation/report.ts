@@ -11,6 +11,11 @@ export function formatReports(reports: readonly SimulationReport[], milestones: 
         ['Real time', ...perReport((report) => formatDuration(report.realSeconds))],
         ['Active time', ...perReport((report) => formatDuration(report.activeSeconds))],
         ['Longest idle stretch', ...perReport((report) => formatDuration(report.longestIdleStretchSeconds))],
+        ['Longest progress gap', ...perReport((report) => formatDuration(report.longestProgressGapSeconds))],
+        ['Unlocks in first hour', ...perReport((report) => String(report.firstHourUnlocks))],
+        ['Upgrades purchased', ...perReport((report) => String(report.upgradesPurchased))],
+        ['Work / Scour clicks', ...perReport((report) => formatNumber(report.routineActions))],
+        ['Manual solves', ...perReport((report) => formatNumber(report.handSolves))],
         ['Progress made offline', ...perReport((report) => `${Math.round(report.offlineProgressShare * 100)}%`)],
     ]);
 }

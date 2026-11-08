@@ -1,35 +1,25 @@
 import type { GameContent } from '../core/content.ts';
 import type { OfflineSummary } from '../core/offline.ts';
+import { labels, uiText } from '../content/act-one/text.ts';
 import { formatDuration, formatNumber } from '../format.ts';
-import { createButton, createElement, setText } from './dom.ts';
+import { createButton, createElement } from './dom.ts';
 
 export class AwaySummary {
-    readonly element: HTMLElement;
+    readonly element = createElement('aside', { className: 'away-summary', attributes: { role: 'status' } });
+    private readonly message = createElement('div');
     private readonly content: GameContent;
-    private readonly message: HTMLElement;
 
     constructor(content: GameContent) {
         this.content = content;
-        this.message = createElement('p');
-        this.element = createElement('div', { className: 'away-summary' }, [
-            this.message,
-            createButton('OK', () => {
-                this.element.hidden = true;
-            }),
-        ]);
+        this.element.append(this.message, createButton(uiText.dismiss, () => { this.element.hidden = true; }));
         this.element.hidden = true;
     }
 
     show(summary: OfflineSummary): void {
-        const gains = [
-            `${formatNumber(summary.levelsGained)} levels`,
-            ...this.content.resources.map(
-                (resource) => `${formatNumber(summary.resourceGains[resource.id] ?? 0)} ${resource.name.toLowerCase()}`,
-            ),
-        ];
-        const cappedNote =
-            summary.simulatedSeconds < summary.awaySeconds ? ` (capped at ${formatDuration(summary.simulatedSeconds)})` : '';
-        setText(this.message, `Away for ${formatDuration(summary.awaySeconds)}${cappedNote}: +${gains.join(', +')}`);
+        const capped = summary.awaySeconds > summary.simulatedSeconds + 1;
+        this.message.replaceChildren(createElement('strong', { text: `${uiText.away} · ${formatDuration(summary.awaySeconds)}` }),
+            createElement('p', { text: `${formatNumber(summary.levelsGained)} ${uiText.levelsSolved}${capped ? ` (${labels.awayCapped} ${formatDuration(summary.simulatedSeconds)})` : ''}` }),
+            createElement('p', { className: 'muted', text: this.content.resources.filter((item) => (summary.resourceGains[item.id] ?? 0) > 0).map((item) => `+${formatNumber(summary.resourceGains[item.id]!)} ${item.name.toLowerCase()}`).join(' · ') }));
         this.element.hidden = false;
     }
 }

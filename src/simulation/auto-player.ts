@@ -15,6 +15,9 @@ export class AutoPlayer {
     }
 
     playStep(game: Game, stepSeconds: number): void {
+        if (!Number.isFinite(stepSeconds) || stepSeconds <= 0) {
+            throw new Error('A robot step must be a positive number of seconds.');
+        }
         if (this.secondsUntilDecision <= 0) {
             this.lastDecisionActed = this.strategy.act(game);
             this.secondsUntilDecision = this.strategy.decisionIntervalSeconds;
@@ -26,8 +29,9 @@ export class AutoPlayer {
     playUntil(game: Game, isDone: () => boolean, maximumSeconds: number, stepSeconds = 1): number {
         let playedSeconds = 0;
         while (!isDone() && playedSeconds < maximumSeconds) {
-            this.playStep(game, stepSeconds);
-            playedSeconds += stepSeconds;
+            const remainingStep = Math.min(stepSeconds, maximumSeconds - playedSeconds);
+            this.playStep(game, remainingStep);
+            playedSeconds += remainingStep;
         }
         return playedSeconds;
     }

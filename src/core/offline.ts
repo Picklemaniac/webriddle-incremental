@@ -7,13 +7,11 @@ export interface OfflineSummary {
     readonly resourceGains: Readonly<Record<string, number>>;
 }
 
-const maximumOfflineSteps = 10_000;
-
 export function simulateOfflineProgress(game: Game, awaySeconds: number): OfflineSummary {
-    const simulatedSeconds = Math.min(awaySeconds, game.content.offlineCapSeconds(game.state));
+    const simulatedSeconds = Number.isFinite(awaySeconds) ? Math.max(0, Math.min(awaySeconds, game.content.offlineCapSeconds(game.state))) : 0;
     const levelBefore = game.state.currentLevel;
     const resourcesBefore = { ...game.state.resources };
-    game.advance(simulatedSeconds, Math.max(1, simulatedSeconds / maximumOfflineSteps));
+    game.advance(simulatedSeconds, 1);
     return {
         awaySeconds,
         simulatedSeconds,
