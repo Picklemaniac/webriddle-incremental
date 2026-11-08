@@ -143,7 +143,7 @@ export const findingText = {
 export type FindingId = keyof typeof findingText;
 
 export const labels = {
-    automate: 'Automate?',
+    automate: 'Install dirbuster',
     youPanel: 'You',
     scriptsPanel: 'Scripts',
     networkPanel: 'Network',

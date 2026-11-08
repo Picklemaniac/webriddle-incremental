@@ -82,7 +82,7 @@ try {
     assert.match(await evaluate(`document.querySelector('.browser-viewport').contentWindow.getSelection().toString()`), /lighthouse/, 'Select All reveals the hidden text');
     await evaluate(`document.querySelector('.browser-viewport').contentWindow.getSelection().removeAllRanges()`);
     await navigate('lighthouse.htm');
-    assert.equal(await evaluate(`document.querySelector('.automate-offer').hidden`), true, 'Automate? waits a few seconds on level 5');
+    assert.equal(await evaluate(`document.querySelector('.automate-offer').hidden`), true, 'Install dirbuster waits a few seconds on level 5');
     await waitFor(`document.querySelector('.automate-offer').hidden === false`);
     await screenshot('automate');
     await toolbar('Back');
@@ -107,7 +107,7 @@ try {
     await evaluate(`document.querySelector('.browser-viewport').contentWindow.getSelection().removeAllRanges()`);
     await assertPageFits();
     const beforeAutomationX = await evaluate(`document.querySelector('.browser-window').getBoundingClientRect().x`);
-    await clickText('.prompt-area', 'Automate?');
+    await clickText('.prompt-area', 'Install dirbuster');
     await screenshot('dirbuster-setup');
     await clickText('dialog[open]', 'Next >');
     await sleep(900);
