@@ -78,29 +78,32 @@ try {
     await navigate('beneath.htm');
     assert.equal(await evaluate(`document.querySelector('.source-pane').hidden`), false, 'Source should stay open across navigation');
     await toolbar('View Source');
+    await menu('Edit', 'Select All');
+    assert.match(await evaluate(`document.querySelector('.browser-viewport').contentWindow.getSelection().toString()`), /lighthouse/, 'Select All reveals the hidden text');
+    await evaluate(`document.querySelector('.browser-viewport').contentWindow.getSelection().removeAllRanges()`);
     await navigate('lighthouse.htm');
     assert.equal(await evaluate(`document.querySelector('.automate-offer').hidden`), true, 'Automate? waits a few seconds on level 5');
     await waitFor(`document.querySelector('.automate-offer').hidden === false`);
     await screenshot('automate');
     await toolbar('Back');
-    await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === 'Level 4: rot13'`);
+    await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === 'Level 4'`);
     await toolbar('Forward');
-    await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === 'Level 5'`);
+    await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === 'Level 5: it blinks.'`);
     await toolbar('Back');
     await toolbar('Stop');
     await sleep(650);
-    assert.equal(await evaluate(`document.querySelector('.browser-viewport').contentDocument.title`), 'Level 5');
+    assert.equal(await evaluate(`document.querySelector('.browser-viewport').contentDocument.title`), 'Level 5: it blinks.');
     assert.equal(await evaluate(`document.querySelector('.tool-button[aria-label="Forward"]').disabled`), true);
     await toolbar('Home');
     await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === 'Level 1'`);
     await evaluate(`document.querySelector('.follow-current').click()`);
-    await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === 'Level 5'`);
+    await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === 'Level 5: it blinks.'`);
     await evaluate(`document.querySelector('.browser-viewport').contentDocument.body.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 60, clientY: 60 }))`);
     assert.equal(await evaluate(`document.querySelector('.context-menu').hidden`), false, 'Right-click opens the page menu');
     await screenshot('context-menu');
     await clickText('.context-menu', 'Select All');
     assert.equal(await evaluate(`document.querySelector('.context-menu').hidden`), true);
-    assert.match(await evaluate(`document.querySelector('.browser-viewport').contentWindow.getSelection().toString()`), /midnight/);
+    assert.match(await evaluate(`document.querySelector('.browser-viewport').contentWindow.getSelection().toString()`), /01101101/);
     await evaluate(`document.querySelector('.browser-viewport').contentWindow.getSelection().removeAllRanges()`);
     await assertPageFits();
     const beforeAutomationX = await evaluate(`document.querySelector('.browser-window').getBoundingClientRect().x`);
@@ -133,7 +136,7 @@ try {
     await toolbar('View Source');
     await navigate('bridge.htm');
     await navigate('moon.htm');
-    assert.match(await evaluate(`document.querySelector('.browser-viewport').contentDocument.body.textContent`), /13 9 18 18 15 18/);
+    assert.match(await evaluate(`document.querySelector('.browser-viewport').contentDocument.body.textContent`), /zveebe/);
     await navigate('mirror.htm');
     assert.match(await evaluate(`document.querySelector('.browser-viewport').contentDocument.body.textContent`), /ksud/);
 
@@ -310,7 +313,7 @@ async function importGame(game) {
 }
 
 async function assertLayout(width) {
-    const dimensions = await evaluate(`({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,body:document.body.scrollWidth,outside:[...document.querySelectorAll('.browser-window,.terminal,.panel,.resource-action')].filter(element=>element.checkVisibility()).map(element=>({className:element.className,left:element.getBoundingClientRect().left,right:element.getBoundingClientRect().right})).filter(rect=>rect.left < 0 || rect.right > document.documentElement.clientWidth + 1)})`);
+    const dimensions = await evaluate(`({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,body:document.body.scrollWidth,outside:[...document.querySelectorAll('.browser-window,.terminal-window,.panel,.resource-action')].filter(element=>element.checkVisibility()).map(element=>({className:element.className,left:element.getBoundingClientRect().left,right:element.getBoundingClientRect().right})).filter(rect=>rect.left < 0 || rect.right > document.documentElement.clientWidth + 1)})`);
     assert.ok(dimensions.scroll <= width + 1 && dimensions.body <= width + 1, `Horizontal page overflow at ${width}: ${JSON.stringify(dimensions)}`);
     assert.deepEqual(dimensions.outside, [], `Clipped panels at ${width}`);
 }

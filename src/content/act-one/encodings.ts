@@ -1,4 +1,4 @@
-export type Encoding = 'plain' | 'reversed' | 'a1z26' | 'rot13' | 'morse';
+export type Encoding = 'plain' | 'reversed' | 'a1z26' | 'rot13' | 'morse' | 'binary';
 
 const morseAlphabet: Readonly<Record<string, string>> = {
     a: '.-', b: '-...', c: '-.-.', d: '-..', e: '.', f: '..-.', g: '--.', h: '....', i: '..', j: '.---',
@@ -26,6 +26,8 @@ export function encode(text: string, encoding: Encoding): string {
             return text.replace(/[a-z]/g, (letter) => String.fromCharCode(((letter.charCodeAt(0) - 97 + 13) % 26) + 97));
         case 'morse':
             return text.split(' ').map((word) => [...word].map((character) => morseAlphabet[character] ?? character).join(' ')).join(' / ');
+        case 'binary':
+            return [...text].map((character) => character.charCodeAt(0).toString(2).padStart(8, '0')).join(' ');
     }
 }
 

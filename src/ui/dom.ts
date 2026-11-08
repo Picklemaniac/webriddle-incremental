@@ -34,3 +34,9 @@ export function setText(element: Element, text: string): void {
         element.textContent = text;
     }
 }
+
+export function createTitleBar(children: readonly (Node | string)[]): HTMLElement {
+    const buttons = createElement('span', { className: 'window-buttons', attributes: { 'aria-hidden': 'true' } },
+        ['minimize', 'maximize', 'close'].map((kind) => createElement('span', { className: `window-button ${kind}` })));
+    return createElement('header', { className: 'title-bar' }, [...children, buttons]);
+}

@@ -1,7 +1,7 @@
 import { encode, toLeet, toRomanNumerals, type Encoding } from './encodings.ts';
 import { imageForSubject, imageIdsWithSubject, imageWithWord, levelImageCount, pictureSubjects } from './images.ts';
 import { pickByUnit, ramp, riddleOrigin, salts, startUrl, unitHash } from './riddle.ts';
-import { clueLines, fill, handcraftedText, pageText, picturePrompts } from './text.ts';
+import { clueLines, fill, handcraftedText, pageText } from './text.ts';
 import { vocabularySize, wordAtRank } from './vocabulary.ts';
 import { folderNames } from './word-lists.ts';
 
@@ -69,16 +69,16 @@ const handcraftedEntrances: Readonly<Record<number, HandcraftedEntrance>> = {
     2: { kind: 'fixed', answer: 'level2', clue: { imageLink: true, lines: [handcraftedText.level1] } },
     3: { kind: 'fixed', answer: 'level3', clue: { lines: [handcraftedText.level2] } },
     4: { kind: 'word', answer: 'beneath', clue: { lines: [handcraftedText.level3], comment: handcraftedText.level3Comment } },
-    5: { kind: 'word', answer: 'lighthouse', clue: { title: 'rot13', lines: [handcraftedText.level4] } },
-    6: { kind: 'word', answer: 'midnight', positionUnit: 0.08, clue: { lines: [handcraftedText.level5], hiddenText: 'midnight' } },
+    5: { kind: 'word', answer: 'lighthouse', clue: { lines: [handcraftedText.level4], hiddenText: 'lighthouse' } },
+    6: { kind: 'word', answer: 'midnight', positionUnit: 0.08, clue: { title: handcraftedText.level5Title, lines: binaryLines('midnight') } },
     7: { kind: 'word', answer: 'bridge', clue: { lines: [handcraftedText.level6], imageName: 'present.jpg' } },
-    8: { kind: 'word', answer: 'moon', clue: { lines: [] } },
-    9: { kind: 'word', answer: 'mirror', clue: { lines: [handcraftedText.level8] } },
-    10: { kind: 'word', answer: 'dusk', clue: { lines: [handcraftedText.level9] } },
+    8: { kind: 'word', answer: 'moon', clue: {} },
+    9: { kind: 'word', answer: 'mirror', clue: { title: handcraftedText.level8Title, lines: [encode('mirror', 'rot13')] } },
+    10: { kind: 'word', answer: 'dusk', clue: { lines: [encode('dusk', 'reversed')] } },
 };
 
 const handcraftedPageImageWords: Readonly<Record<number, string>> = {
-    1: 'path', 2: 'foggy', 3: 'cave', 4: 'ruins', 5: 'night', 6: 'bouquet', 7: 'moon', 8: 'mirror', 9: 'reflection',
+    1: 'path', 2: 'staircase', 3: 'foggy', 4: 'cave', 5: 'lighthouse', 6: 'bouquet', 7: 'moon', 8: 'crescent', 9: 'mirror',
 };
 
 const handcraftedPageImages = new Set(Object.values(handcraftedPageImageWords).map(imageWithWord));
@@ -124,7 +124,7 @@ export function levelPage(level: number): LevelPage {
         link: clue.imageLink === true ? next.url : null,
         lines: [...(clue.lines ?? []), ...(level === 404 ? [handcraftedText.easterEgg404] : level === 418 ? [handcraftedText.easterEgg418] : [])],
         hiddenText: clue.hiddenText ?? null,
-        comments: [clue.comment, next.folder !== folderFor(level) ? `folder: /${next.folder}/` : undefined].filter((comment) => comment !== undefined),
+        comments: [clue.comment, next.folder !== null && next.folder !== folderFor(level) ? fill(pageText.folderComment, { folder: next.folder }) : undefined].filter((comment) => comment !== undefined),
     };
 }
 
@@ -163,7 +163,7 @@ function generatedEntrance(level: number, attempt = 0): Entrance {
         case 'word': {
             if (unit(salts.picture) < 0.25) {
                 const subject = pickByUnit(pictureSubjects, unit(salts.clue));
-                const clue: Clue = { pictureSubject: subject.word, lines: [picturePrompts[subject.category]] };
+                const clue: Clue = { pictureSubject: subject.word };
                 return buildEntrance(level, kind, subject.word, 'htm', [subject.word], null, clue, folder);
             }
             const word = sampleWord(level, unit(salts.rank));
@@ -172,21 +172,23 @@ function generatedEntrance(level: number, attempt = 0): Entrance {
         case 'extension': {
             const word = sampleWord(level, unit(salts.rank));
             const extension = pickByUnit(otherExtensions, unit(salts.extension));
-            const encoded = `${encode(word, encodingFor(level, unit(salts.encoding)))}.${extension}`;
-            const clue: Clue = unit(salts.clue) < 0.5
-                ? { title: `${word}.${extension}`, lines: [clueLines.extension] }
-                : { comment: encoded, lines: [clueLines.extension] };
+            const wordHint = wordClue(level, word);
+            const clue: Clue = {
+                ...wordHint,
+                imageName: `${wordHint.imageName?.replace(/\.jpg$/, '') ?? level}.${extension}.jpg`,
+                lines: [...(wordHint.lines ?? []), pickByUnit(clueLines.extension, unit(salts.ending))],
+            };
             return buildEntrance(level, kind, word, extension, [word], null, clue, folder);
         }
         case 'leet': {
             const word = sampleWord(level, unit(salts.rank));
             const answer = toLeet(word, unit(salts.leet));
-            const clue: Clue = unit(salts.clue) < 0.5 ? { title: answer, lines: [clueLines.leet] } : { comment: answer, lines: [clueLines.leet] };
+            const clue: Clue = unit(salts.clue) < 0.5 ? { title: answer } : { comment: answer };
             return buildEntrance(level, kind, answer, 'htm', [word], null, clue, folder);
         }
         case 'number': {
             const year = 1000 + Math.floor(unit(salts.year) * 1100);
-            const clue: Clue = { title: clueLines.number, lines: [toRomanNumerals(year)] };
+            const clue: Clue = { lines: [toRomanNumerals(year)] };
             return buildEntrance(level, kind, String(year), 'htm', [], null, clue, folder);
         }
         case 'credentials': {
@@ -200,7 +202,7 @@ function generatedEntrance(level: number, attempt = 0): Entrance {
         case 'twoWords': {
             const first = sampleCommonWord(unit(salts.rank), 300, 7);
             const second = sampleCommonWord(unit(salts.secondWord), 300, 7, first);
-            const clue: Clue = { comment: encode(`${first} ${second}`, encodingFor(level, unit(salts.encoding))), lines: [clueLines.twoWords] };
+            const clue: Clue = { comment: encode(`${first} ${second}`, encodingFor(level, unit(salts.encoding))) };
             return buildEntrance(level, kind, `${first}${second}`, 'htm', [first, second], null, clue, folder);
         }
         case 'phrase': {
@@ -208,7 +210,7 @@ function generatedEntrance(level: number, attempt = 0): Entrance {
             const phraseSalts = [salts.rank, salts.secondWord, salts.thirdWord, salts.fourthWord];
             const words = phraseSalts.slice(0, wordCount).map((salt) => sampleCommonWord(unit(salt), 600, 7));
             const encoding = pickByUnit<Encoding>(['plain', 'rot13', 'reversed'], unit(salts.encoding));
-            const clue: Clue = { comment: encode(words.join(' '), encoding), lines: [clueLines.phrase] };
+            const clue: Clue = { comment: encode(words.join(' '), encoding) };
             return buildEntrance(level, kind, words.join(''), 'htm', words, null, clue, folder);
         }
         case 'fixed':
@@ -312,6 +314,16 @@ function wordClue(level: number, word: string): Clue {
         case 'visible':
             return { lines: [encode(word, encoding)] };
     }
+}
+
+function binaryLines(word: string): string[] {
+    const bytes = encode(word, 'binary').split(' ');
+    const half = Math.ceil(bytes.length / 2);
+    return [bytes.slice(0, half).join(' '), bytes.slice(half).join(' ')];
+}
+
+export function inWildcardFolder(address: string): boolean {
+    return wildcardFolders.has(new URL(address).pathname.split('/')[1] ?? '');
 }
 
 function subjectImage(subject: string, level: number): number {

@@ -2,9 +2,9 @@ import type { Page } from '../../core/content.ts';
 import type { CaptchaChallenge, GameState } from '../../core/state.ts';
 import { findings } from './findings.ts';
 import { imagePath } from './images.ts';
-import { entrance, levelPage, presentImageId, urlOfLevel, type LevelPage } from './levels.ts';
+import { entrance, inWildcardFolder, levelPage, presentImageId, urlOfLevel, type LevelPage } from './levels.ts';
 import { riddleOrigin } from './riddle.ts';
-import { captchaText, errorPages } from './text.ts';
+import { captchaText, errorPages, pageText } from './text.ts';
 
 const pictureWidth = 440;
 const pictureHeight = 294;
@@ -97,6 +97,7 @@ export function resolvePage(url: string, state: GameState): Page {
     if (address === next.url && next.credentials !== null) return { ...errorPage('unauthorized'), loginRealm: next.folder ?? 'riddle' };
     const finding = findings.find((candidate) => address === `${riddleOrigin}/${candidate.path}` && state.findings[candidate.id]);
     if (finding) return documentPage(finding.path, `<pre>${escapeHtml(finding.file)}</pre>`, 200, textFileStyle);
+    if (inWildcardFolder(address)) return documentPage('', `<p>${pageText.wildcardPage}</p>`, 200, levelStyle);
     return errorPage('notFound');
 }
 

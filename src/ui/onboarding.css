@@ -17,11 +17,11 @@
     transition: flex-basis 1.1s ease, opacity .8s ease .3s, visibility 1.1s;
 }
 
-.game-screen .terminal { min-width: 0; }
+.game-screen .terminal-window { min-width: 0; }
 .game-screen.automated .workspace { gap: 24px; }
 .game-screen.automated .workspace > .browser-column { flex-basis: calc(64% - 12px); }
 .game-screen.automated .terminal-slot { flex-basis: calc(36% - 12px); }
-.terminal.booting .terminal-footer { color: #777; }
+.terminal-window.booting .terminal-footer { color: #808080; }
 
 @media (max-width: 900px) {
     .game-screen .workspace { flex-direction: column; }

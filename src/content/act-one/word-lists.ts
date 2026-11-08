@@ -1,4 +1,4 @@
-export type SubjectCategory = 'flower' | 'building' | 'animal' | 'scene';
+type SubjectCategory = 'flower' | 'building' | 'animal' | 'scene';
 
 export interface Subject {
     readonly word: string;

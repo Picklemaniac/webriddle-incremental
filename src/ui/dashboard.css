@@ -2,7 +2,7 @@
     grid-template-columns: minmax(310px, 1.05fr) minmax(330px, 1.3fr) minmax(270px, .85fr);
     grid-template-areas: "status upgrades support" "machine upgrades support";
     grid-template-rows: auto 1fr;
-    column-gap: 24px;
+    column-gap: 28px;
     row-gap: 16px;
 }
 
@@ -12,37 +12,28 @@
 .dashboard .dashboard-machine { grid-area: machine; }
 .dashboard .status-panels > .panel:last-child { margin-bottom: 0; }
 .dashboard .resource-row { grid-template-columns: minmax(48px, 1fr) auto 52px 118px; min-height: 48px; }
-.dashboard .resource-action { display: flex; flex-direction: column; justify-content: center; gap: 2px; width: 118px; height: 41px; padding: 4px 5px; line-height: 1.25; }
+.dashboard .resource-action { display: flex; flex-direction: column; justify-content: center; gap: 2px; height: 41px; line-height: 1.25; }
 .dashboard .resource-action > span { white-space: nowrap; }
-.dashboard .action-yield { font-size: 10px; color: #aaa; }
-.dashboard .resource-action:disabled .action-yield { color: #999; }
-.dashboard .income-rate { color: #9a9a9a; }
+.dashboard .action-yield { font-size: 10px; }
 .dashboard .worker-row { grid-template-columns: minmax(0, 1fr) 26px 30px 26px; }
 
 .dashboard .machine-details > summary,
-.dashboard .proxy-details > summary { cursor: pointer; color: #aaa; width: fit-content; white-space: nowrap; }
-.dashboard .machine-details > summary { font-size: 11px; margin-bottom: 10px; }
+.dashboard .proxy-details > summary { cursor: pointer; width: fit-content; white-space: nowrap; }
+.dashboard .machine-details > summary { margin-bottom: 10px; }
 .dashboard .machine-details[open] > summary { margin-bottom: 12px; }
-.dashboard .machine-details .stat-row { font-size: 11px; }
-.dashboard .proxy-summary { font-size: 11px; color: #aaa; }
-.dashboard .proxy-summary.has-dead-proxies { color: #d6a175; }
-.dashboard .replace-dead-proxies { display: block; width: 100%; margin: 9px 0; border-color: #946e4e; color: #dfbd93; }
+.dashboard .proxy-summary { color: var(--text-dim); }
+.dashboard .proxy-summary.has-dead-proxies { color: var(--problem); }
+.dashboard .replace-dead-proxies { display: block; width: 100%; margin: 9px 0; }
 .dashboard .proxy-details { margin-top: 12px; }
-.dashboard .proxy-details > summary { font-size: 10px; }
+.dashboard .proxy-details > summary { font-size: 11px; }
 .dashboard .proxy-list { margin-top: 10px; }
-.dashboard .proxy-row { grid-template-columns: minmax(0, 1fr) 44px 65px; gap: 6px; }
-.dashboard .proxy-address { font-size: 10px; }
+.dashboard .proxy-row { grid-template-columns: minmax(0, 1fr) 44px 65px; gap: 6px; font-size: 11px; }
 
-.dashboard .upgrade-card { white-space: normal; padding: 10px; }
-.dashboard .upgrade-card:disabled { color: #c1c1c1; border-color: #484848; }
-.dashboard .upgrade-card.unaffordable { background: #101010; }
+.dashboard .upgrade-card { white-space: normal; }
+.dashboard .upgrade-card.unaffordable { color: #505050; text-shadow: none; }
 .dashboard .upgrade-heading { flex-wrap: wrap; column-gap: 10px; row-gap: 4px; }
 .dashboard .upgrade-heading strong,
 .dashboard .upgrade-cost { white-space: nowrap; }
-.dashboard .upgrade-cost { font-size: 11px; }
-.dashboard .upgrade-description { overflow: visible; white-space: normal; text-overflow: clip; font-size: 11px; line-height: 1.5; color: #ababab; }
-.dashboard .upgrade-card:disabled .upgrade-description,
-.dashboard .upgrade-card:disabled .upgrade-cost { color: #a0a0a0; }
 .dashboard .upgrade-card.leaving { opacity: 0; transition: opacity .4s ease; }
 
 @media (max-width: 1150px) {

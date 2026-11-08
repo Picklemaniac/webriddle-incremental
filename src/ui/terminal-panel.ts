@@ -7,18 +7,18 @@ import { entrance, urlOfLevel } from '../content/act-one/levels.ts';
 import { effectiveRate, isBanned, requestedRate } from '../content/act-one/network.ts';
 import { automationBootSeconds, automationElapsed, owns } from '../content/act-one/progress.ts';
 import { riddleOrigin } from '../content/act-one/riddle.ts';
-import { fill, terminalText, uiText } from '../content/act-one/text.ts';
+import { automationText, fill, terminalText, uiText } from '../content/act-one/text.ts';
 import { wordAtRank } from '../content/act-one/vocabulary.ts';
 import { formatDuration, formatNumber } from '../format.ts';
-import { createElement, setText } from './dom.ts';
+import { createElement, createTitleBar, setText } from './dom.ts';
 import type { Panel } from './panel.ts';
 
 export class TerminalPanel implements Panel {
-    readonly element = createElement('section', { className: 'terminal', attributes: { 'aria-label': terminalText.title } });
+    readonly element = createElement('section', { className: 'terminal-window', attributes: { 'aria-label': automationText.program } });
     private readonly command = createElement('div', { className: 'terminal-command' });
     private readonly lines = createElement('div', { className: 'terminal-lines', attributes: { role: 'log', 'aria-live': 'off' } });
     private readonly live = createElement('div', { className: 'terminal-line live', attributes: { 'aria-hidden': 'true' } });
-    private readonly rate = createElement('span');
+    private readonly rate = createElement('span', { className: 'terminal-rate' });
     private readonly footer = createElement('div', { className: 'terminal-footer' });
     private readonly progress = createElement('div', { className: 'terminal-progress-fill' });
     private readonly game: Game;
@@ -29,8 +29,10 @@ export class TerminalPanel implements Panel {
 
     constructor(game: Game) {
         this.game = game;
-        this.element.append(createElement('div', { className: 'terminal-heading' }, [createElement('span', { text: terminalText.title }), this.rate]), this.command, this.lines, this.live,
-            createElement('div', { className: 'terminal-progress' }, [this.progress]), this.footer);
+        this.element.append(createTitleBar([createElement('strong', { text: automationText.program })]),
+            createElement('div', { className: 'terminal' }, [this.command, this.lines, this.live]),
+            createElement('div', { className: 'terminal-progress' }, [this.progress]),
+            createElement('footer', { className: 'terminal-status' }, [this.footer, this.rate]));
         game.subscribe((event) => this.onEvent(event));
     }
 

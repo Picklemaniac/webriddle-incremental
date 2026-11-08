@@ -5,7 +5,7 @@ import { canonicalUrl } from '../content/act-one/pages.ts';
 import { urlOfLevel } from '../content/act-one/levels.ts';
 import { browserName, dialogText, menuText, uiText } from '../content/act-one/text.ts';
 import { decodeExport, encodeExport, parseSave, serializeSave } from '../persistence/save.ts';
-import { createButton, createElement, setText } from './dom.ts';
+import { createButton, createElement, createTitleBar, setText } from './dom.ts';
 import { GameDialog } from './dialog.ts';
 import type { Panel } from './panel.ts';
 
@@ -61,9 +61,7 @@ export class BrowserPanel implements Panel {
         this.sourcePane.append(createElement('div', { className: 'source-heading' }, [createElement('strong', { text: uiText.pageSource }), createElement('span', { text: uiText.sourceShortcut }), sourceClose]), this.sourceDocument);
         this.content.append(this.viewport, this.sourcePane);
         this.updateSourceVisibility();
-        const windowButtons = createElement('span', { className: 'window-buttons', attributes: { 'aria-hidden': 'true' } },
-            ['minimize', 'maximize', 'close'].map((kind) => createElement('span', { className: `window-button ${kind}` })));
-        const titleBar = createElement('header', { className: 'title-bar' }, [createElement('img', { className: 'browser-icon', attributes: { src: '/branding/enigma-web.png', alt: '' } }), this.title, windowButtons]);
+        const titleBar = createTitleBar([createElement('img', { className: 'browser-icon', attributes: { src: '/branding/enigma-web.png', alt: '' } }), this.title]);
         const toolbar = createElement('div', { className: 'browser-toolbar' }, [this.back, this.forward, this.stop,
             this.tool('↻', menuText.refresh, () => this.navigate(this.viewedUrl, false)),
             this.tool('⌂', menuText.home, () => this.navigate(game.content.startUrl)),

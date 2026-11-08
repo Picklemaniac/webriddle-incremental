@@ -1,5 +1,5 @@
 export const riddleOrigin = 'http://riddle.example';
-export const startUrl = `${riddleOrigin}/level1.htm`;
+export const startUrl = `${riddleOrigin}/beginning.htm`;
 
 const riddleSeed = 0x2026_1108;
 
@@ -9,7 +9,7 @@ export const salts = {
     clue: 3,
     extension: 5,
     encoding: 6,
-    flavor: 7,
+    ending: 7,
     secondWord: 8,
     thirdWord: 9,
     fourthWord: 10,

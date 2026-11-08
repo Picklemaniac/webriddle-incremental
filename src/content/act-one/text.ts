@@ -1,5 +1,3 @@
-import type { SubjectCategory } from './word-lists.ts';
-
 export const browserName = 'Enigma Web';
 
 export function fill(template: string, values: Readonly<Record<string, string | number>>): string {
@@ -39,38 +37,28 @@ export const notices = {
 export type NoticeId = keyof typeof notices;
 
 export const handcraftedText = {
-    level1: 'Enter the forest',
-    level2: 'Look at the URL.',
-    level3: 'Look at the source.',
+    level1: 'step inside.',
+    level2: 'look at the address bar.',
+    level3: 'get to the source of the problem.',
     level3Comment: 'beneath.htm',
-    level4: 'yvtugubhfr',
-    level5: 'Lights out.',
-    level6: '.gif',
-    level8: '13 9 18 18 15 18',
-    level9: 'ksud',
+    level4: 'it\'s dark down here.',
+    level5Title: 'it blinks.',
+    level6: 'i have a GIFT for you.',
+    level8Title: 'half moon',
     easterEgg404: 'this level could not be found. (it is right here.)',
     easterEgg418: 'i am a teapot.',
 } as const;
 
 export const clueLines = {
-    leet: 'exactly as written.',
-    number: 'a year.',
     credentials: 'members only.',
-    twoWords: 'together.',
-    phrase: 'all of it, without spaces.',
-    extension: 'mind the extension.',
+    extension: ['it\'s all in the ending.', 'same name, different ending.'],
 } as const;
-
-export const picturePrompts: Readonly<Record<SubjectCategory, string>> = {
-    flower: 'name the flower.',
-    building: 'name the building.',
-    animal: 'name the animal.',
-    scene: 'say what you see.',
-};
 
 export const pageText = {
     levelTitle: 'Level {level}',
     levelTitleWithClue: 'Level {level}: {clue}',
+    folderComment: 'new levels go in /{folder}/',
+    wildcardPage: 'nothing here.',
 } as const;
 
 export const upgradeText = {
@@ -205,7 +193,6 @@ export const uiText = {
 } as const;
 
 export const terminalText = {
-    title: 'Request log',
     booting: 'Starting script…',
     curlCommand: '$ while read name; do curl -I "{folder}$name.htm"; done < {list}',
     toolCommand: '$ {tool} -u {folder} -w {list} -t {threads}',

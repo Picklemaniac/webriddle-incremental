@@ -22,12 +22,13 @@
 .browser-status .follow-current { position: static; box-shadow: none; padding: 1px 7px; font-size: 10px; height: 22px; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
 .finding-entry { margin-bottom: 10px; }
 .finding-entry .finding-row { min-height: 25px; }
-.finding-effect { color: #999; margin: 0; font: 10px/1.6 Verdana, sans-serif; }
+.finding-effect { color: var(--text-dim); margin: 0; font: 11px/1.5 Verdana, sans-serif; }
 @media (max-width: 500px) {
     .browser-toolbar { gap: 1px; }
     .browser-toolbar .tool-button { padding: 3px 5px; font-size: 11px; }
     .browser-toolbar .tool-icon { font-size: 14px; }
     .browser-toolbar .throbber { display: none; }
+    .browser-toolbar .tool-button.secondary span:last-child { display: none; }
     .browser-toolbar .toolbar-divider { display: none; }
     .browser-status .status-zone { width: 70px; }
     .browser-content { height: 360px; }
