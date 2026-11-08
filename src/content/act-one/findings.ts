@@ -13,24 +13,24 @@ export interface Finding {
     readonly weight: number;
     readonly description: string;
     readonly file: string;
-    readonly insight?: number;
+    readonly money?: number;
     readonly levels?: number;
     readonly speed?: number;
 }
 
 export const findings: readonly Finding[] = [
-    { id: 'robots', path: 'robots.txt', rarity: 'common', weight: 22, insight: 3, ...findingText.robots },
-    { id: 'readme', path: 'readme.txt', rarity: 'common', weight: 20, insight: 5, ...findingText.readme },
+    { id: 'robots', path: 'robots.txt', rarity: 'common', weight: 22, money: 15, ...findingText.robots },
+    { id: 'readme', path: 'readme.txt', rarity: 'common', weight: 20, money: 25, ...findingText.readme },
     { id: 'sitemap', path: 'sitemap.xml', rarity: 'common', weight: 18, levels: 3, ...findingText.sitemap },
     { id: 'dictionary', path: 'words.bak', rarity: 'uncommon', weight: 11, ...findingText.dictionary },
-    { id: 'notes', path: 'notes.old', rarity: 'uncommon', weight: 9, insight: 12, ...findingText.notes },
+    { id: 'notes', path: 'notes.old', rarity: 'uncommon', weight: 9, money: 60, ...findingText.notes },
     { id: 'cache', path: 'cache/', rarity: 'uncommon', weight: 7, levels: 5, ...findingText.cache },
     { id: 'git', path: '.git/', rarity: 'rare', weight: 4, speed: 0.1, ...findingText.git },
-    { id: 'htpasswd', path: '.htpasswd', rarity: 'rare', weight: 3, insight: 15, ...findingText.htpasswd },
+    { id: 'htpasswd', path: '.htpasswd', rarity: 'rare', weight: 3, money: 75, ...findingText.htpasswd },
     { id: 'backup', path: 'backup.zip', rarity: 'rare', weight: 3, levels: 12, ...findingText.backup },
     { id: 'env', path: '.env', rarity: 'legendary', weight: 1, speed: 0.25, ...findingText.env },
     { id: 'walkthrough', path: 'walkthrough.txt', rarity: 'legendary', weight: 1, levels: 25, ...findingText.walkthrough },
-    { id: 'source', path: 'source.tar', rarity: 'legendary', weight: 1, insight: 50, ...findingText.source },
+    { id: 'source', path: 'source.tar', rarity: 'legendary', weight: 1, money: 250, ...findingText.source },
 ];
 
 export function findingModifiers(state: GameState): readonly Modifier[] {
@@ -42,7 +42,7 @@ function discoverFinding(game: Game, finding: Finding): void {
     const { state } = game;
     state.findings[finding.id] = (state.findings[finding.id] ?? 0) + 1;
     state.flags.findingsRevealed = true;
-    game.gainResource('insight', finding.insight ?? 0);
+    game.gainResource('money', finding.money ?? 0);
     if (finding.id === 'dictionary') game.gainResource('words', 1000);
     for (let index = 0; index < (finding.levels ?? 0); index++) solveLevel(game, 'windfall');
     game.invalidateStats();

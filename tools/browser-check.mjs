@@ -79,7 +79,8 @@ try {
     assert.equal(await evaluate(`document.querySelector('.source-pane').hidden`), false, 'Source should stay open across navigation');
     await toolbar('View Source');
     await navigate('lighthouse.htm');
-    assert.equal(await evaluate(`document.querySelector('.automate-prompt').hidden`), false);
+    assert.equal(await evaluate(`document.querySelector('.automate-offer').hidden`), true, 'Automate? waits a few seconds on level 5');
+    await waitFor(`document.querySelector('.automate-offer').hidden === false`);
     await screenshot('automate');
     await toolbar('Back');
     await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === 'Level 4: rot13'`);
@@ -94,12 +95,18 @@ try {
     await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === 'Level 1'`);
     await evaluate(`document.querySelector('.follow-current').click()`);
     await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === 'Level 5'`);
-    await toolbar('Select All');
+    await evaluate(`document.querySelector('.browser-viewport').contentDocument.body.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 60, clientY: 60 }))`);
+    assert.equal(await evaluate(`document.querySelector('.context-menu').hidden`), false, 'Right-click opens the page menu');
+    await screenshot('context-menu');
+    await clickText('.context-menu', 'Select All');
+    assert.equal(await evaluate(`document.querySelector('.context-menu').hidden`), true);
     assert.match(await evaluate(`document.querySelector('.browser-viewport').contentWindow.getSelection().toString()`), /midnight/);
     await evaluate(`document.querySelector('.browser-viewport').contentWindow.getSelection().removeAllRanges()`);
     await assertPageFits();
     const beforeAutomationX = await evaluate(`document.querySelector('.browser-window').getBoundingClientRect().x`);
-    await clickText('.automate-prompt', 'Automate');
+    await clickText('.prompt-area', 'Automate?');
+    await screenshot('dirbuster-offer');
+    await clickText('dialog[open]', 'Run');
     await waitFor(`document.querySelector('.game-screen').classList.contains('automated')`);
     await sleep(150);
     const duringAutomationX = await evaluate(`document.querySelector('.browser-window').getBoundingClientRect().x`);
@@ -133,19 +140,19 @@ try {
     const opening = new Game(actOneContent, createInitialState(actOneContent, 1));
     for (let level = 2; level <= 5; level++) opening.dispatch({ type: 'navigate', url: urlOfLevel(level) });
     opening.dispatch({ type: 'automate' });
-    opening.advance(30);
+    opening.advance(60);
     await importGame(opening);
     assert.equal(await evaluate(`document.querySelector('.dashboard').hidden`), true);
-    opening.advance(16);
+    opening.advance(17);
     await importGame(opening);
     assert.equal(await evaluate(`document.querySelector('.dashboard').hidden`), false);
-    assert.equal(await evaluate(`document.querySelector('.dashboard-upgrades').hidden`), true);
-    await screenshot('first-insight');
-    opening.advance(45);
-    await importGame(opening);
     assert.equal(await evaluate(`[...document.querySelectorAll('.upgrade-card')].filter(card=>!card.hidden).length`), 1);
-    assert.equal(await evaluate(`document.querySelector('.resource-action').closest('.resource-row').hidden`), true);
+    assert.equal(await evaluate(`document.querySelector('.resource-action').closest('.resource-row').hidden`), true, 'The price comes before the money');
     await screenshot('first-upgrade');
+    opening.advance(6);
+    await importGame(opening);
+    assert.equal(await evaluate(`document.querySelector('.resource-action').closest('.resource-row').hidden`), false);
+    await screenshot('first-money');
 
     const game = new Game(actOneContent, createInitialState(actOneContent, 7));
     const player = new AutoPlayer(actOneStrategy(4));
@@ -175,8 +182,7 @@ try {
     await waitFor(`document.querySelector('.replace-dead-proxies').hidden`);
     assert.match(await evaluate(`document.querySelector('.proxy-summary').textContent`), /0 dead/);
     await evaluate(`(()=>{const card=[...document.querySelectorAll('.upgrade-card')].find(card=>!card.hidden&&!card.disabled);if(!card)throw new Error('Expected an affordable upgrade');card.click();card.click();})()`);
-    assert.equal(await evaluate(`document.querySelectorAll('.upgrade-card.installed').length`), 1, 'A double click must purchase only one card');
-    assert.match(await evaluate(`document.querySelector('.purchase-feedback').textContent`), /Installed:/);
+    assert.equal(await evaluate(`document.querySelectorAll('.upgrade-card.leaving').length`), 1, 'A double click must purchase only one card');
     if (expectsDevelopmentTools) {
         await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', {key:String.fromCharCode(92),bubbles:true}))`);
         assert.equal(await evaluate(`document.querySelector('.dev-panel').hidden`), false);

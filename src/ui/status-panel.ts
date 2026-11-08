@@ -7,7 +7,7 @@ import { formatDuration, formatNumber } from '../format.ts';
 import { createButton, createElement, setText } from './dom.ts';
 import type { Panel } from './panel.ts';
 
-interface ResourceRow { element: HTMLElement; value: HTMLElement; rate: HTMLElement; button?: HTMLButtonElement; yield?: HTMLElement }
+interface ResourceRow { element: HTMLElement; value: HTMLElement; rate: HTMLElement; button: HTMLButtonElement; yield: HTMLElement }
 interface WorkerRow { element: HTMLElement; count: HTMLElement; minus: HTMLButtonElement; plus: HTMLButtonElement }
 
 export class StatusPanel implements Panel {
@@ -15,6 +15,7 @@ export class StatusPanel implements Panel {
     readonly networkElement = section(labels.networkPanel);
     readonly machineElement = createElement('details', { className: 'panel machine-details' }, [createElement('summary', { text: uiText.machineDetails })]);
     private readonly game: Game;
+    private readonly you = section(labels.youPanel);
     private readonly resources = new Map<string, ResourceRow>();
     private readonly scripts = section(labels.scriptsPanel);
     private readonly workerRows = new Map<string, WorkerRow>();
@@ -30,18 +31,15 @@ export class StatusPanel implements Panel {
 
     constructor(game: Game) {
         this.game = game;
-        const you = section(labels.youPanel);
-        for (const [id, name, action] of [['money', labels.money, 'work'], ['words', labels.words, 'scour'], ['insight', labels.insight, '']] as const) {
+        for (const [id, name, action] of [['money', labels.money, 'work'], ['words', labels.words, 'scour']] as const) {
             const value = createElement('strong');
             const rate = createElement('span', { className: 'income-rate' });
-            const button = action ? createButton(labels[action], () => game.dispatch({ type: action })) : undefined;
-            const yieldLabel = button ? createElement('span', { className: 'action-yield' }) : undefined;
-            if (button && yieldLabel) {
-                button.className = 'resource-action';
-                button.replaceChildren(createElement('span', { text: labels[action as 'work' | 'scour'] }), yieldLabel);
-            }
-            const row = createElement('div', { className: 'resource-row' }, [createElement('span', { text: name }), value, rate, ...(button ? [button] : [])]);
-            you.append(row);
+            const yieldLabel = createElement('span', { className: 'action-yield' });
+            const button = createButton('', () => game.dispatch({ type: action }));
+            button.className = 'resource-action';
+            button.replaceChildren(createElement('span', { text: labels[action] }), yieldLabel);
+            const row = createElement('div', { className: 'resource-row' }, [createElement('span', { text: name }), value, rate, button]);
+            this.you.append(row);
             this.resources.set(id, { element: row, value, rate, button, yield: yieldLabel });
         }
         this.scripts.append(createElement('p', { className: 'panel-help', text: uiText.workersHelp }), createElement('div', { className: 'stat-row' }, [createElement('span', { text: labels.dirbusting }), this.bustingCount]));
@@ -73,23 +71,21 @@ export class StatusPanel implements Panel {
         );
         this.networkElement.classList.add('network-panel');
         this.networkElement.append(createElement('div', { className: 'heat-track' }, [this.heat]), this.proxies);
-        this.element.append(you, this.scripts);
+        this.element.append(this.you, this.scripts);
     }
 
     render(): void {
         const game = this.game;
+        this.you.hidden = !game.state.flags.moneyRevealed && !game.state.flags.wordsRevealed;
         for (const [id, row] of this.resources) {
             row.element.hidden = !game.state.flags[`${id}Revealed`];
             setText(row.value, `${id === 'money' ? '$' : ''}${formatNumber(game.state.resources[id] ?? 0)}`);
-            const rate = id === 'money' ? moneyPerSecond(game) : id === 'words' ? wordsPerSecond(game) : 0;
+            const rate = id === 'money' ? moneyPerSecond(game) : wordsPerSecond(game);
             setText(row.rate, rate > 0 ? `+${rate.toFixed(1).replace('.0', '')}/s` : '');
-            if (row.button) {
-                const action = id === 'money' ? 'work' : 'scour';
-                const remaining = cooldownRemaining(game, action);
-                row.button.disabled = remaining > 0;
-                row.button.style.setProperty('--cooldown', `${remaining / 2 * 100}%`);
-                setText(row.yield!, `+${id === 'money' ? '$' : ''}${formatNumber(game.stat(id === 'money' ? 'ticketValue' : 'scourValue'))}${id === 'words' ? ` ${labels.words.toLowerCase()}` : ''}`);
-            }
+            const remaining = cooldownRemaining(game, id === 'money' ? 'work' : 'scour');
+            row.button.disabled = remaining > 0;
+            row.button.style.setProperty('--cooldown', `${remaining / 2 * 100}%`);
+            setText(row.yield, `+${id === 'money' ? '$' : ''}${formatNumber(game.stat(id === 'money' ? 'ticketValue' : 'scourValue'))}${id === 'words' ? ` ${labels.words.toLowerCase()}` : ''}`);
         }
         this.scripts.hidden = !game.state.flags.scriptsRevealed;
         setText(this.bustingCount, String(dirbustingScripts(game)));

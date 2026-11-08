@@ -33,8 +33,6 @@
 .dashboard .proxy-row { grid-template-columns: minmax(0, 1fr) 44px 65px; gap: 6px; }
 .dashboard .proxy-address { font-size: 10px; }
 
-.dashboard .purchase-feedback { min-height: 1.6em; margin: -3px 0 9px; color: #b6d0a9; font-size: 11px; line-height: 1.6; }
-.dashboard .purchase-feedback:empty { display: none; }
 .dashboard .upgrade-card { white-space: normal; padding: 10px; }
 .dashboard .upgrade-card:disabled { color: #c1c1c1; border-color: #484848; }
 .dashboard .upgrade-card.unaffordable { background: #101010; }
@@ -45,8 +43,7 @@
 .dashboard .upgrade-description { overflow: visible; white-space: normal; text-overflow: clip; font-size: 11px; line-height: 1.5; color: #ababab; }
 .dashboard .upgrade-card:disabled .upgrade-description,
 .dashboard .upgrade-card:disabled .upgrade-cost { color: #a0a0a0; }
-.dashboard .upgrade-card.installed { border-color: #637b58; background: #141b12; }
-.dashboard .upgrade-card.installed .upgrade-cost { color: #b6d0a9; }
+.dashboard .upgrade-card.leaving { opacity: 0; transition: opacity .4s ease; }
 
 @media (max-width: 1150px) {
     .game-screen .dashboard {

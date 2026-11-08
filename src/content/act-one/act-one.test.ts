@@ -17,16 +17,15 @@ function handSolve(game: Game): boolean {
 }
 
 describe('Act I', () => {
-    it('starts by hand, unlocks automation at five, and rewards each solve once', () => {
+    it('starts by hand, unlocks automation at five, and counts each solve once', () => {
         const game = newGame();
         expect(game.dispatch({ type: 'automate' })).toBe(false);
         game.advance(3600);
         expect(game.state.currentLevel).toBe(1);
         for (let level = 1; level < 5; level++) handSolve(game);
-        expect(game.state.resources.insight).toBe(20);
         game.dispatch({ type: 'navigate', url: urlOfLevel(4) });
         expect(game.state.currentLevel).toBe(5);
-        expect(game.state.resources.insight).toBe(20);
+        expect(game.state.statistics.handSolves).toBe(4);
         expect(game.dispatch({ type: 'automate' })).toBe(true);
         game.advance(4);
         expect(game.state.currentLevel).toBe(5);
@@ -67,7 +66,8 @@ describe('Act I', () => {
             expect(game.state.currentLevel).toBe(level + 1);
             expect(game.content.resolvePage(game.state.browserUrl, game.state).statusCode).toBe(200);
         }
-        expect(game.state.resources.insight).toBe(1249 * 5);
+        expect(game.state.statistics.handSolves).toBe(1249);
+        expect(Object.keys(game.state.flags).filter((flag) => flag.startsWith('learned:'))).toEqual(['learned:userAgent']);
         expect(game.state.flags.automated).not.toBe(true);
     });
 

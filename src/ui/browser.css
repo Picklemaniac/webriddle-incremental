@@ -20,8 +20,6 @@
 .source-document a { color: #164d9b; text-decoration: underline; }
 .source-document a:hover { background: #dce9fb; }
 .browser-status .follow-current { position: static; box-shadow: none; padding: 1px 7px; font-size: 10px; height: 22px; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
-.terminal-explanation { flex-shrink: 0; color: #c1c7b8; background: #11140f; border-left: 2px solid #66755a; padding: 9px 11px; margin: 0 0 12px; font: 11px/1.7 Verdana, sans-serif; }
-.terminal-explanation:empty { display: none; }
 .finding-entry { margin-bottom: 10px; }
 .finding-entry .finding-row { min-height: 25px; }
 .finding-effect { color: #999; margin: 0; font: 10px/1.6 Verdana, sans-serif; }

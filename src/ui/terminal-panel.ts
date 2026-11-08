@@ -7,7 +7,7 @@ import { entrance, urlOfLevel } from '../content/act-one/levels.ts';
 import { effectiveRate, isBanned, requestedRate } from '../content/act-one/network.ts';
 import { automationBootSeconds, automationElapsed, owns } from '../content/act-one/progress.ts';
 import { riddleOrigin } from '../content/act-one/riddle.ts';
-import { fill, notices, terminalText, uiText } from '../content/act-one/text.ts';
+import { fill, terminalText, uiText } from '../content/act-one/text.ts';
 import { wordAtRank } from '../content/act-one/vocabulary.ts';
 import { formatDuration, formatNumber } from '../format.ts';
 import { createElement, setText } from './dom.ts';
@@ -21,8 +21,6 @@ export class TerminalPanel implements Panel {
     private readonly rate = createElement('span');
     private readonly footer = createElement('div', { className: 'terminal-footer' });
     private readonly progress = createElement('div', { className: 'terminal-progress-fill' });
-    private readonly explanation = createElement('p', { className: 'terminal-explanation', attributes: { role: 'status' } });
-    private latestNotice = '';
     private readonly game: Game;
     private readonly pendingLines: { text: string; style: string }[] = [];
     private lastLineAt = performance.now();
@@ -31,10 +29,9 @@ export class TerminalPanel implements Panel {
 
     constructor(game: Game) {
         this.game = game;
-        this.element.append(createElement('div', { className: 'terminal-heading' }, [createElement('span', { text: terminalText.title }), this.rate]), this.explanation, this.command, this.lines, this.live,
+        this.element.append(createElement('div', { className: 'terminal-heading' }, [createElement('span', { text: terminalText.title }), this.rate]), this.command, this.lines, this.live,
             createElement('div', { className: 'terminal-progress' }, [this.progress]), this.footer);
         game.subscribe((event) => this.onEvent(event));
-        if (game.state.flags.automated) this.queueLine(`# ${terminalText.session}`, 'notice');
     }
 
     render(): void {
@@ -46,7 +43,6 @@ export class TerminalPanel implements Panel {
         this.element.classList.toggle('booting', booting);
         this.command.hidden = booting;
         if (booting) {
-            setText(this.explanation, '');
             setText(this.rate, '');
             setText(this.footer, terminalText.booting);
             setText(this.live, '');
@@ -56,8 +52,6 @@ export class TerminalPanel implements Panel {
             return;
         }
         const plan = currentSearch(game);
-        const blockNotices = { unguessable: terminalText.readPage, userAgent: notices.userAgentBlock, folder: notices.folderBlock, extension: notices.extensionBlock, wildcard: notices.wildcardBlock, credentials: notices.credentialsBlock };
-        setText(this.explanation, isBanned(game) ? notices.firstBan : plan.blockedBy ? blockNotices[plan.blockedBy] : this.latestNotice);
         let spent = game.state.search.requestsSpent;
         let phase = plan.phases[0];
         for (const candidate of plan.phases) {
@@ -110,20 +104,14 @@ export class TerminalPanel implements Panel {
         if (event.type === 'stateReplaced') {
             this.lines.replaceChildren();
             this.pendingLines.length = 0;
-            this.latestNotice = '';
             this.sampleIndex = 0;
             this.lastSampledRequests = 0;
             this.lastLineAt = performance.now();
-            if (this.game.state.flags.automated) this.queueLine(`# ${terminalText.session}`, 'notice');
             return;
         }
         if (!this.game.state.flags.automated) return;
         if (this.game.isCatchingUp) return;
         switch (event.type) {
-            case 'notice':
-                this.latestNotice = notices[event.noticeId as keyof typeof notices] ?? event.noticeId;
-                this.queueLine(`# ${this.latestNotice}`, 'notice');
-                break;
             case 'levelSolved': {
                 if (event.method === 'windfall') break;
                 const method = event.method === 'hand' ? terminalText.hand : event.method === 'search' ? terminalText.indexed : '200';
@@ -131,14 +119,6 @@ export class TerminalPanel implements Panel {
                 break;
             }
             case 'findingDiscovered': this.queueLine(`${terminalText.found}  ${findings.find((item) => item.id === event.findingId)?.path ?? event.findingId}  ×${event.count}`, 'finding'); break;
-            case 'actionApplied':
-                if (event.action.type === 'purchase') {
-                    const id = event.action.purchasableId;
-                    this.queueLine(`# ${terminalText.purchased}: ${this.game.content.purchasables.find((item) => item.id === id)?.name ?? id}`, 'notice');
-                }
-                break;
-            case 'unbanned': this.queueLine(`# ${terminalText.unbanned}`, 'notice'); break;
-            case 'captchaFailed': this.queueLine(`# ${terminalText.wrongCaptcha}`, 'warning'); break;
         }
     }
 

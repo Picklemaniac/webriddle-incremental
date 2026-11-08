@@ -39,6 +39,7 @@ export class BrowserPanel implements Panel {
     private followOnArrival = false;
     private loginAddress = '';
     private hoveredLink: string | null = null;
+    private readonly contextMenu = createElement('div', { className: 'menu-popup context-menu', attributes: { role: 'menu' } });
 
     constructor(game: Game) {
         this.game = game;
@@ -60,12 +61,22 @@ export class BrowserPanel implements Panel {
         this.sourcePane.append(createElement('div', { className: 'source-heading' }, [createElement('strong', { text: uiText.pageSource }), createElement('span', { text: uiText.sourceShortcut }), sourceClose]), this.sourceDocument);
         this.content.append(this.viewport, this.sourcePane);
         this.updateSourceVisibility();
-        const titleBar = createElement('header', { className: 'title-bar' }, [createElement('img', { className: 'browser-icon', attributes: { src: '/branding/enigma-web.png', alt: '' } }), this.title, createElement('span', { className: 'window-decoration', text: '▱  ▣', attributes: { 'aria-hidden': 'true' } })]);
+        const windowButtons = createElement('span', { className: 'window-buttons', attributes: { 'aria-hidden': 'true' } },
+            ['minimize', 'maximize', 'close'].map((kind) => createElement('span', { className: `window-button ${kind}` })));
+        const titleBar = createElement('header', { className: 'title-bar' }, [createElement('img', { className: 'browser-icon', attributes: { src: '/branding/enigma-web.png', alt: '' } }), this.title, windowButtons]);
         const toolbar = createElement('div', { className: 'browser-toolbar' }, [this.back, this.forward, this.stop,
             this.tool('↻', menuText.refresh, () => this.navigate(this.viewedUrl, false)),
             this.tool('⌂', menuText.home, () => this.navigate(game.content.startUrl)),
             createElement('span', { className: 'toolbar-divider' }),
-            this.sourceButton, this.tool('▤', menuText.selectAll, () => this.selectAll()), this.throbber]);
+            this.sourceButton,
+            createElement('span', { className: 'toolbar-divider' }),
+            this.tool('★', menuText.favorites, () => this.showFavorites(), true),
+            this.tool('◷', uiText.history, () => this.showHistory(), true),
+            this.throbber]);
+        this.contextMenu.hidden = true;
+        for (const [name, action] of this.contextCommands()) {
+            this.contextMenu.append(name === null ? createElement('div', { className: 'menu-separator' }) : createButton(name, () => { this.hideContextMenu(); action(); }));
+        }
         const go = createElement('button', { text: menuText.go, attributes: { type: 'submit' } });
         const addressForm = createElement('form', { className: 'address-bar' }, [createElement('label', { text: menuText.address, attributes: { for: 'riddle-address' } }), this.address, go]);
         this.address.id = 'riddle-address';
@@ -74,10 +85,9 @@ export class BrowserPanel implements Panel {
         addressForm.addEventListener('submit', (event) => { event.preventDefault(); this.navigate(this.address.value); this.address.blur(); });
         this.viewport.addEventListener('load', () => this.bindPage());
         this.element = createElement('section', { className: 'browser-window', attributes: { 'aria-label': browserName } }, [titleBar, this.createMenus(), toolbar, addressForm, this.content,
-            createElement('footer', { className: 'browser-status' }, [this.status, this.follow, createElement('span', { className: 'status-zone', text: `◉ ${menuText.zone}` })])]);
-        document.addEventListener('keydown', (event) => {
-            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'u') { event.preventDefault(); this.showSource(); }
-        });
+            createElement('footer', { className: 'browser-status' }, [this.status, this.follow, createElement('span', { className: 'status-zone', text: `◉ ${menuText.zone}` })]), this.contextMenu]);
+        document.addEventListener('keydown', (event) => this.handleShortcut(event));
+        document.addEventListener('click', (event) => { if (!this.contextMenu.contains(event.target as Node)) this.hideContextMenu(); });
         game.subscribe((event) => {
             if (event.type === 'stateReplaced') {
                 this.stopLoading();
@@ -156,22 +166,69 @@ export class BrowserPanel implements Panel {
         this.stop.disabled = false;
     }
 
-    private tool(icon: string, label: string, click: () => void): HTMLButtonElement {
+    private tool(icon: string, label: string, click: () => void, secondary = false): HTMLButtonElement {
         const button = createButton('', click);
         button.className = 'tool-button';
         if ([menuText.forward, menuText.stop, menuText.refresh, menuText.home].includes(label as typeof menuText.forward)) button.classList.add('navigation-icon');
+        button.classList.toggle('secondary', secondary);
         button.title = label;
         button.setAttribute('aria-label', label);
         button.append(createElement('span', { className: 'tool-icon', text: icon }), createElement('span', { text: label }));
         return button;
     }
 
+    private contextCommands(): readonly (readonly [string, () => void] | readonly [null])[] {
+        return [
+            [menuText.back, () => this.moveHistory(-1)],
+            [menuText.forward, () => this.moveHistory(1)],
+            [null],
+            [menuText.selectAll, () => this.selectAll()],
+            [null],
+            [menuText.addFavorite, () => this.addFavorite()],
+            [uiText.source, () => this.showSource()],
+            [menuText.refresh, () => this.navigate(this.viewedUrl, false)],
+        ];
+    }
+
+    private showContextMenu(x: number, y: number): void {
+        const [back, forward] = this.contextMenu.querySelectorAll('button');
+        back!.disabled = this.historyIndex <= 0;
+        forward!.disabled = this.historyIndex >= this.history.length - 1;
+        this.contextMenu.hidden = false;
+        const frame = this.viewport.getBoundingClientRect();
+        const window = this.element.getBoundingClientRect();
+        const left = Math.min(frame.left - window.left + x, window.width - this.contextMenu.offsetWidth - 4);
+        const top = Math.min(frame.top - window.top + y, window.height - this.contextMenu.offsetHeight - 4);
+        this.contextMenu.style.left = `${Math.max(0, left)}px`;
+        this.contextMenu.style.top = `${Math.max(0, top)}px`;
+    }
+
+    private hideContextMenu(): void { this.contextMenu.hidden = true; }
+
+    private handleShortcut(event: KeyboardEvent): void {
+        const key = event.key.toLowerCase();
+        if (key === 'escape') this.hideContextMenu();
+        if (!(event.ctrlKey || event.metaKey)) return;
+        if (key === 'u') {
+            event.preventDefault();
+            this.showSource();
+        } else if (key === 'a' && !(event.target as Element).matches?.('input, textarea')) {
+            event.preventDefault();
+            this.selectAll();
+        }
+    }
+
+    private addFavorite(): void {
+        this.game.dispatch({ type: 'addFavorite', url: this.viewedUrl });
+        this.showFavorites();
+    }
+
     private createMenus(): HTMLElement {
         const definitions: readonly [string, readonly [string, () => void][]][] = [
             [menuText.file, [[menuText.importExport, () => this.showSave()]]],
             [menuText.edit, [[menuText.selectAll, () => this.selectAll()]]],
-            [menuText.view, [[uiText.source, () => this.showSource()], [uiText.history, () => this.showHistory()], [menuText.refresh, () => this.navigate(this.viewedUrl, false)]]],
-            [menuText.favorites, [[menuText.addFavorite, () => { this.game.dispatch({ type: 'addFavorite', url: this.viewedUrl }); this.showFavorites(); }], [menuText.organizeFavorites, () => this.showFavorites()]]],
+            [menuText.view, [[menuText.source, () => this.showSource()], [uiText.history, () => this.showHistory()], [menuText.refresh, () => this.navigate(this.viewedUrl, false)]]],
+            [menuText.favorites, [[menuText.addFavorite, () => this.addFavorite()], [menuText.organizeFavorites, () => this.showFavorites()]]],
             [menuText.tools, [[menuText.internetOptions, () => this.showOptions()]]],
             [menuText.help, [[menuText.about, () => this.dialog.show(dialogText.aboutTitle, [createElement('pre', { text: dialogText.aboutBody.join('\n') })])]]],
         ];
@@ -337,7 +394,13 @@ export class BrowserPanel implements Panel {
             this.hoveredLink = (event.target as Element).closest('a[href]')?.getAttribute('href') ?? null;
         });
         doc.addEventListener('mouseout', (event) => { if (event.relatedTarget === null) this.hoveredLink = null; });
+        doc.addEventListener('contextmenu', (event) => {
+            if ((event.target as Element).matches('input, textarea')) return;
+            event.preventDefault();
+            this.showContextMenu(event.clientX, event.clientY);
+        });
         doc.addEventListener('click', (event) => {
+            this.hideContextMenu();
             const target = event.target as Element;
             const link = target.closest('a[href]');
             if (link) {
@@ -354,7 +417,7 @@ export class BrowserPanel implements Panel {
             }
         });
         doc.addEventListener('keydown', (event) => {
-            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'u') { event.preventDefault(); this.showSource(); }
+            this.handleShortcut(event);
             if (event.key === '\\' && !(event.target as Element).matches('input, textarea')) {
                 document.dispatchEvent(new KeyboardEvent('keydown', { key: '\\', bubbles: true }));
             }

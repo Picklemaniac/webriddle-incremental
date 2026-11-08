@@ -12,21 +12,20 @@ import { startUrl } from './riddle.ts';
 import { labels } from './text.ts';
 import { offeredUpgrades, upgrades, type Upgrade } from './upgrades.ts';
 
+const firstOfferSeconds = 75;
+const currencyFollowSeconds = 6;
+
 const reveals: GameSystem = {
     update(game) {
         const { state } = game;
         if (!state.flags.automated) return;
         const seconds = automationElapsed(state);
         if (state.elapsedSeconds < (state.statistics.nextRevealAt ?? 0)) return;
-        if (!state.flags.insightRevealed) {
-            if (seconds < 45 || (state.resources.insight ?? 0) === 0) return;
-            state.flags.insightRevealed = true;
-            noticeOnce(game, 'insightRevealed');
-        } else if (!isUpgradeRevealed(state, 'curlBatch')) {
-            if (seconds < 90) return;
-            revealUpgrade(game, 'curlBatch');
+        if (!isUpgradeRevealed(state, 'curlBatch')) {
+            if (seconds < firstOfferSeconds) return;
+            revealBeforeCurrency(game, 'curlBatch');
+            return;
         } else if (!state.flags.moneyRevealed) {
-            if (seconds < 135 || !owns(state, 'curlBatch')) return;
             reveal(game, 'moneyRevealed');
         } else if (state.flags.networkRevealed && !isUpgradeRevealed(state, 'throttle')) {
             revealUpgrade(game, 'throttle');
@@ -35,6 +34,10 @@ const reveals: GameSystem = {
             state.flags.machineRevealed = true;
             noticeOnce(game, 'scriptsRevealed');
         } else if (!state.flags.wordsRevealed && seconds >= 240 && state.currentLevel >= 10) {
+            if (!isUpgradeRevealed(state, 'english10k')) {
+                revealBeforeCurrency(game, 'english10k');
+                return;
+            }
             reveal(game, 'wordsRevealed');
         } else {
             if (seconds < 180) return;
@@ -65,6 +68,11 @@ function readyForUpgrade(game: Game, item: Upgrade): boolean {
 function revealUpgrade(game: Game, id: string): void {
     game.state.flags[`seen:${id}`] = true;
     game.state.flags.upgradesRevealed = true;
+}
+
+function revealBeforeCurrency(game: Game, id: string): void {
+    revealUpgrade(game, id);
+    game.state.statistics.nextRevealAt = game.state.elapsedSeconds + currencyFollowSeconds;
 }
 
 function reserveReveal(game: Game): void {
@@ -102,15 +110,15 @@ function reveal(game: Game, flag: 'moneyRevealed' | 'wordsRevealed'): void {
 export const actOneContent: GameContent = {
     tickSeconds: 0.25,
     startUrl,
-    resources: [{ id: 'money', name: labels.money }, { id: 'words', name: labels.words }, { id: 'insight', name: labels.insight }],
+    resources: [{ id: 'money', name: labels.money }, { id: 'words', name: labels.words }],
     baseStats: { requestsPerThread: 2, threadsPerScript: 1, scriptSlots: 1, ticketValue: 3, scourValue: 25,
-        ticketBotRate: 0.8, scraperRate: 12, proxySlots: 0, extraAddresses: 0, searchEfficiency: 1, dorkChance: 0 },
+        ticketBotRate: 1, scraperRate: 12, proxySlots: 0, extraAddresses: 0, searchEfficiency: 1, dorkChance: 0 },
     purchasables: upgrades.map((item) => ({
         ...item, isAvailable: (state) => isUpgradeRevealed(state, item.id) && item.isAvailable(state) &&
             (item.id !== 'crackHtpasswd' || (state.findings.htpasswd ?? 0) > 0),
     })),
     milestones: [
-        { id: 'automated', name: labels.automate, isReached: (state) => state.flags.automated === true },
+        { id: 'automated', name: 'Automate', isReached: (state) => state.flags.automated === true },
         { id: 'firstUpgrade', name: 'First upgrade', isReached: (state) => Object.keys(state.purchases).length > 0 },
         ...[10, 50, 100, 200, 300, 500, 700, 1000].map((level) => ({ id: `level${level}`, name: `Level ${level}`, isReached: (state: Game['state']) => state.currentLevel >= level })),
     ],

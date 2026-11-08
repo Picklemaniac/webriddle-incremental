@@ -6,10 +6,17 @@ export function fill(template: string, values: Readonly<Record<string, string | 
     return template.replace(/\{(\w+)\}/g, (placeholder, key: string) => String(values[key] ?? placeholder));
 }
 
+export const automationText = {
+    program: 'dirbuster',
+    description: 'A program that tries page names from a list of words until one exists.',
+    run: 'Run',
+} as const;
+
 export const notices = {
-    insightRevealed: 'Insight earned: 5 by hand, 1 by script.',
-    firstHandSolve: '+5 insight.',
-    moneyRevealed: 'Faster hardware costs money. You still have a day job.',
+    moneyRevealed: 'That costs money. You still have a day job.',
+    solveByHand: 'dirbuster is stuck. Solve this level yourself and it can learn the trick.',
+    learnedByHand: 'You worked out how this level works. dirbuster can now be taught the same trick.',
+    learnedFromForum: 'Someone on the riddle forum explained this one. dirbuster can now be taught the trick.',
     wordsRevealed: 'Your wordlists ran dry. Scour the web for words to build bigger ones.',
     bruteForce: 'Nothing left in your wordlists. Falling back to brute force: aaaa, aaab, aaac...',
     scriptsRevealed: 'You can run more than one script now. Not all of them have to dirbust.',
@@ -74,7 +81,7 @@ export const upgradeText = {
     throttle: { name: 'Throttle', description: 'Stay inside the rate limit. No wasted requests or new heat.' },
     ram: { name: 'More RAM', description: 'Room for a second script.' },
     wgetMirror: { name: 'wget --mirror', description: 'Assign scripts to scrape words: 12 words per second each.' },
-    autoReplyMacros: { name: 'Auto-reply macros', description: 'Assign scripts to close tickets: $0.80 per second each.' },
+    autoReplyMacros: { name: 'Auto-reply macros', description: 'Assign scripts to close tickets: $1 per second each.' },
     isdn: { name: 'ISDN', description: 'Twice the requests per thread.' },
     english10k: { name: 'english-10k.txt', description: '10,000 entries. Covers more unusual words.' },
     newPc: { name: 'New PC', description: 'Two more script slots.' },
@@ -115,24 +122,24 @@ export const upgradeText = {
 export type UpgradeId = keyof typeof upgradeText;
 
 export const findingText = {
-    robots: { description: '+3 insight per find.', file: 'User-agent: *\nDisallow: /answers/' },
-    readme: { description: '+5 insight per find.', file: 'lowercase. no spaces. look at the source.' },
+    robots: { description: '+$15 per find.', file: 'User-agent: *\nDisallow: /answers/' },
+    readme: { description: '+$25 per find.', file: 'lowercase. no spaces. look at the source.' },
     sitemap: { description: 'Skip 3 levels per find.', file: '<urlset>\n  <!-- A few paths that should not be here. -->\n</urlset>' },
     dictionary: { description: '+1,000 words per find.', file: '# An old wordlist. Still useful.' },
-    notes: { description: '+12 insight per find.', file: 'The picture is not always the clue.' },
+    notes: { description: '+$60 per find.', file: 'The picture is not always the clue.' },
     cache: { description: 'Skip 5 levels per find.', file: 'Index of /cache/\nFive pages, already answered.' },
     git: { description: '+10% search efficiency per copy, up to 5 copies.', file: 'An old revision of the riddle. Some patterns have not changed.' },
-    htpasswd: { description: 'Unlocks Crack .htpasswd. Duplicates give +15 insight.', file: '# Recovered credentials. The tools to read them are in Upgrades.' },
+    htpasswd: { description: 'Unlocks Crack .htpasswd. Duplicates give +$75.', file: '# Recovered credentials. The tools to read them are in Upgrades.' },
     backup: { description: 'Skip 12 levels per find.', file: 'backup.zip\n12 readable pages recovered.' },
     env: { description: '+25% search efficiency per copy, up to 5 copies.', file: 'RIDDLE_MODE=production\nDEBUG=true' },
     walkthrough: { description: 'Skip 25 levels per find.', file: 'Someone has been here before. The next 25 answers are legible.' },
-    source: { description: '+50 insight per find.', file: 'A fragment of the machinery behind the pages.' },
+    source: { description: '+$250 per find.', file: 'A fragment of the machinery behind the pages.' },
 } as const satisfies Record<string, { readonly description: string; readonly file: string }>;
 
 export type FindingId = keyof typeof findingText;
 
 export const labels = {
-    automate: 'Automate',
+    automate: 'Automate?',
     youPanel: 'You',
     scriptsPanel: 'Scripts',
     networkPanel: 'Network',
@@ -140,7 +147,6 @@ export const labels = {
     findingsPanel: 'Findings',
     money: 'Money',
     words: 'Words',
-    insight: 'Insight',
     work: 'Close a ticket',
     scour: 'Scour the web',
     dirbusting: 'Dirbusting',
