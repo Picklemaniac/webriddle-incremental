@@ -1,7 +1,7 @@
 import type { GameState } from '../core/state.ts';
 import { saveMigrations } from './migrations.ts';
 
-export const currentSaveVersion = 4;
+export const currentSaveVersion = 5;
 
 const exportPrefix = 'WEBRIDDLE-';
 const exportSuffix = '-END';
@@ -152,26 +152,7 @@ function fieldsMatch(value: unknown, checks: Readonly<Record<string, ValueCheck>
 }
 
 function validCaptcha(value: unknown): boolean {
-    if (value === null) {
-        return true;
-    }
-    if (!fieldsMatch(value, {
-        kind: (kind) => kind === 'images' || kind === 'text',
-        stage: (stage) => stage === 'checkbox' || stage === 'challenge',
-        subject: (subject) => typeof subject === 'string',
-        imageIds: arrayOf(nonnegativeInteger),
-        correctTiles: arrayOf(nonnegativeInteger),
-        word: (word) => typeof word === 'string',
-    }, true)) {
-        return false;
-    }
-    const captcha = value as NonNullable<GameState['captcha']>;
-    const orderedTiles = captcha.correctTiles.every((tile, index) =>
-        tile < captcha.imageIds.length && (index === 0 || tile > captcha.correctTiles[index - 1]!),
-    );
-    return orderedTiles && (captcha.kind === 'images'
-        ? captcha.imageIds.length === 9 && captcha.correctTiles.length > 0 && captcha.subject.trim().length > 0
-        : captcha.word.trim().length > 0);
+    return value === null || fieldsMatch(value, { word: (word) => typeof word === 'string' && word.trim().length > 0 }, true);
 }
 
 function validateState(value: unknown): void {

@@ -69,6 +69,11 @@ describe('save format', () => {
         });
     });
 
+    it('keeps only the word of an old image or checkbox captcha', () => {
+        const save = { version: 4, savedAt: 0, state: { captcha: { kind: 'images', stage: 'checkbox', subject: 'bridge', imageIds: [1], correctTiles: [0], word: 'apple' } } };
+        expect(migrateSave(save, saveMigrations, 5).state).toEqual({ captcha: { word: 'apple' } });
+    });
+
     it('rejects saves from a newer version', () => {
         const futureSave = JSON.stringify({ version: currentSaveVersion + 1, savedAt: 0, state: defaults });
         expect(() => parseSave(futureSave, defaults)).toThrow(SaveError);
@@ -154,46 +159,21 @@ describe('save format', () => {
         expect(() => parseSave(JSON.stringify({ version: currentSaveVersion, savedAt, state: {} }), defaults)).toThrow(SaveError);
     });
 
-    it('round-trips both captcha kinds, proxies, favorites, and signed random state', () => {
-        for (const kind of ['images', 'text'] as const) {
-            const state = structuredClone(defaults);
-            state.randomState = -123456;
-            state.network = {
-                heat: 100,
-                bannedUntil: 90,
-                proxies: [{ address: '192.0.2.1:8000', latencyMilliseconds: 60, diesAtSeconds: 360 }],
-            };
-            state.favorites = ['http://riddle.example/level1.htm'];
-            state.captcha = {
-                kind,
-                stage: 'challenge',
-                subject: 'bridge',
-                imageIds: [1, 2, 3, 4, 5, 6, 7, 8, 9],
-                correctTiles: [0, 4, 8],
-                word: 'apple',
-            };
-            expect(parseSave(serializeSave(state, 0), defaults).state).toEqual(state);
-        }
+    it('round-trips a captcha, proxies, favorites, and signed random state', () => {
+        const state = structuredClone(defaults);
+        state.randomState = -123456;
+        state.network = {
+            heat: 100,
+            bannedUntil: 90,
+            proxies: [{ address: '192.0.2.1:8000', latencyMilliseconds: 60, diesAtSeconds: 360 }],
+        };
+        state.favorites = ['http://riddle.example/level1.htm'];
+        state.captcha = { word: 'apple' };
+        expect(parseSave(serializeSave(state, 0), defaults).state).toEqual(state);
     });
 
-    it('rejects malformed captcha variants and tile selections', () => {
-        const captcha = {
-            kind: 'images',
-            stage: 'challenge',
-            subject: 'bridge',
-            imageIds: [1, 2, 3, 4, 5, 6, 7, 8, 9],
-            correctTiles: [0, 4, 8],
-            word: 'apple',
-        };
-        for (const invalid of [
-            { ...captcha, kind: 'checkbox' },
-            { ...captcha, stage: 'done' },
-            { ...captcha, correctTiles: [9] },
-            { ...captcha, correctTiles: [4, 0] },
-            { ...captcha, correctTiles: [0, 0] },
-            { ...captcha, correctTiles: [] },
-            { ...captcha, kind: 'text', word: '' },
-        ]) {
+    it('rejects a captcha without a word', () => {
+        for (const invalid of [{}, { word: '' }, { word: 5 }]) {
             const save = JSON.stringify({ version: currentSaveVersion, savedAt: 0, state: { captcha: invalid } });
             expect(() => parseSave(save, defaults)).toThrow(SaveError);
         }

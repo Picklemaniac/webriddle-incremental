@@ -28,7 +28,6 @@ export class StatusPanel implements Panel {
     private readonly proxySummary = createElement('span', { className: 'proxy-summary' });
     private readonly proxyList = createElement('div', { className: 'proxy-list' });
     private readonly proxies = createElement('div', { className: 'proxy-controls' });
-    private readonly replaceDead: HTMLButtonElement;
 
     constructor(game: Game) {
         this.game = game;
@@ -57,18 +56,8 @@ export class StatusPanel implements Panel {
         }
         for (const [id, label] of [['connection', labels.connection], ['tool', labels.tool], ['slots', uiText.slots], ['threads', uiText.threads], ['efficiency', uiText.efficiency]]) this.machineValues.set(id!, this.addStat(this.machineElement, label!));
         for (const [id, label] of [['sending', labels.sending], ['allowed', labels.rateLimit], ['ips', labels.ips], ['status', labels.heat]]) this.networkValues.set(id!, this.addStat(this.networkElement, label!));
-        this.replaceDead = createButton('', () => {
-            game.state.network.proxies.forEach((proxy, index) => {
-                if (proxy.diesAtSeconds <= game.state.elapsedSeconds) game.dispatch({ type: 'replaceProxy', proxyIndex: index });
-            });
-            this.render();
-        });
-        setText(this.replaceDead, uiText.replaceDeadProxies);
-        this.replaceDead.className = 'replace-dead-proxies';
-        this.replaceDead.title = uiText.replacement;
         this.proxies.append(
             createElement('div', { className: 'stat-row' }, [createElement('span', { text: uiText.proxies }), this.proxySummary]),
-            this.replaceDead,
             createElement('details', { className: 'proxy-details' }, [createElement('summary', { text: uiText.individualProxies }), this.proxyList]),
         );
         this.networkElement.classList.add('network-panel');
@@ -107,7 +96,6 @@ export class StatusPanel implements Panel {
         const aliveCount = liveProxies(game);
         const deadCount = game.state.network.proxies.length - aliveCount;
         this.proxies.hidden = game.state.network.proxies.length === 0;
-        this.replaceDead.hidden = deadCount === 0;
         this.proxySummary.classList.toggle('has-dead-proxies', deadCount > 0);
         setText(this.proxySummary, fill(uiText.proxyCount, { working: aliveCount, dead: deadCount }));
         game.state.network.proxies.forEach((proxy, index) => {

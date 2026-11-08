@@ -9,6 +9,8 @@ import { createButton, createElement, createTitleBar, setText } from './dom.ts';
 import { GameDialog } from './dialog.ts';
 import type { Panel } from './panel.ts';
 
+const viewSourcePrefix = 'view-source:';
+
 export class BrowserPanel implements Panel {
     readonly element: HTMLElement;
     private readonly game: Game;
@@ -79,6 +81,7 @@ export class BrowserPanel implements Panel {
         const addressForm = createElement('form', { className: 'address-bar' }, [createElement('label', { text: menuText.address, attributes: { for: 'riddle-address' } }), this.address, go]);
         this.address.id = 'riddle-address';
         this.address.addEventListener('focus', () => this.pinPage());
+        this.address.addEventListener('blur', () => { if (!this.addressEdited && !this.pendingNavigation && !this.sourceOpen) this.pinnedUrl = null; });
         this.address.addEventListener('input', () => { this.addressEdited = true; });
         addressForm.addEventListener('submit', (event) => { event.preventDefault(); this.navigate(this.address.value); this.address.blur(); });
         this.viewport.addEventListener('load', () => this.bindPage());
@@ -109,7 +112,7 @@ export class BrowserPanel implements Panel {
             if (this.lastUrl && this.history[this.historyIndex] !== browserUrl) this.recordHistory(browserUrl);
             this.lastUrl = browserUrl;
         }
-        if (!this.addressEdited && document.activeElement !== this.address && !this.pendingNavigation) this.address.value = browserUrl;
+        if (!this.addressEdited && document.activeElement !== this.address && !this.pendingNavigation) this.address.value = this.shownAddress(browserUrl);
         this.page = this.game.content.resolvePage(browserUrl, this.game.state);
         if (this.sourceOpen) this.renderSource();
         if (this.page.html !== this.renderedHtml) {
@@ -137,6 +140,11 @@ export class BrowserPanel implements Panel {
 
     navigate(rawAddress: string, record = true, historyIndex?: number): void {
         let address = rawAddress.trim();
+        if (address.toLowerCase().startsWith(viewSourcePrefix)) {
+            address = address.slice(viewSourcePrefix.length).trim();
+            this.sourceOpen = true;
+            this.updateSourceVisibility();
+        }
         try {
             if (/^[\w-]+\.[\w-]+\//.test(address) && !address.includes('://')) address = `${new URL(this.game.content.startUrl).protocol}//${address}`;
             address = new URL(address, this.viewedUrl).href;
@@ -144,7 +152,7 @@ export class BrowserPanel implements Panel {
         this.pinPage();
         this.stopLoading();
         this.addressEdited = false;
-        this.address.value = address;
+        this.address.value = this.shownAddress(address);
         this.throbber.classList.add('loading');
         setText(this.status, `${menuText.statusOpening}…`);
         const delay = Math.max(100, 550 / Math.sqrt(Math.max(1, this.game.stat('requestsPerThread') / 2)));
@@ -280,12 +288,15 @@ export class BrowserPanel implements Panel {
 
     private closeSource(): void {
         this.sourceOpen = false;
+        if (!this.addressEdited && document.activeElement !== this.address) this.pinnedUrl = null;
         this.updateSourceVisibility();
         this.render();
         if (document.activeElement !== this.address) this.viewport.focus({ preventScroll: true });
     }
 
     private get viewedUrl(): string { return this.pinnedUrl ?? (this.lastUrl || this.game.state.browserUrl); }
+
+    private shownAddress(url: string): string { return this.sourceOpen ? `${viewSourcePrefix}${url}` : url; }
 
     private pinPage(): void { this.pinnedUrl ??= this.lastUrl || this.game.state.browserUrl; }
 
@@ -390,6 +401,11 @@ export class BrowserPanel implements Panel {
         else this.navigate(address);
     }
 
+    private submitCaptcha(doc: Document): void {
+        const answer = doc.querySelector<HTMLInputElement>('[data-captcha-input]')?.value.trim() ?? '';
+        if (answer !== '') this.game.dispatch({ type: 'answerCaptcha', answer });
+    }
+
     private bindPage(): void {
         const doc = this.viewport.contentDocument;
         this.hoveredLink = null;
@@ -411,17 +427,12 @@ export class BrowserPanel implements Panel {
                 event.preventDefault();
                 this.openLink(link.getAttribute('href')!, link.getAttribute('target') === '_blank');
             }
-            const tile = target.closest('[data-captcha-tile]');
-            if (tile) tile.setAttribute('aria-pressed', String(tile.getAttribute('aria-pressed') !== 'true'));
-            if (target.closest('[data-captcha-checkbox]')) this.game.dispatch({ type: 'answerCaptcha', answer: '' });
-            if (target.closest('[data-captcha-verify]')) {
-                const input = doc.querySelector<HTMLInputElement>('[data-captcha-input]');
-                const answer = input?.value ?? [...doc.querySelectorAll('[data-captcha-tile][aria-pressed=true]')].map((item) => item.getAttribute('data-captcha-tile')).join(',');
-                this.game.dispatch({ type: 'answerCaptcha', answer });
-            }
+            if (target.closest('[data-captcha-refresh]')) this.game.dispatch({ type: 'answerCaptcha', answer: '' });
+            if (target.closest('[data-captcha-submit]')) this.submitCaptcha(doc);
         });
         doc.addEventListener('keydown', (event) => {
             this.handleShortcut(event);
+            if (event.key === 'Enter' && (event.target as Element).matches('[data-captcha-input]')) this.submitCaptcha(doc);
             if (event.key === '\\' && !(event.target as Element).matches('input, textarea')) {
                 document.dispatchEvent(new KeyboardEvent('keydown', { key: '\\', bubbles: true }));
             }

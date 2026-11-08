@@ -23,7 +23,6 @@
 .dashboard .machine-details[open] > summary { margin-bottom: 12px; }
 .dashboard .proxy-summary { color: var(--text-dim); }
 .dashboard .proxy-summary.has-dead-proxies { color: var(--problem); }
-.dashboard .replace-dead-proxies { display: block; width: 100%; margin: 9px 0; }
 .dashboard .proxy-details { margin-top: 12px; }
 .dashboard .proxy-details > summary { font-size: 11px; }
 .dashboard .proxy-list { margin-top: 10px; }

@@ -97,11 +97,10 @@ describe('Act I', () => {
         game.advance(150);
         expect(game.state.captcha).not.toBeNull();
         expect(effectiveRate(game)).toBe(0);
-        game.dispatch({ type: 'answerCaptcha', answer: '' });
         game.dispatch({ type: 'answerCaptcha', answer: 'wrong' });
         expect(game.state.captcha).not.toBeNull();
-        const challenge = game.state.captcha!;
-        game.dispatch({ type: 'answerCaptcha', answer: challenge.kind === 'text' ? challenge.word : challenge.correctTiles.join(',') });
+        expect(game.state.flags.captchaRejected).toBe(true);
+        game.dispatch({ type: 'answerCaptcha', answer: game.state.captcha!.word.toUpperCase() });
         expect(game.state.captcha).toBeNull();
         game.state.purchases.throttle = 1;
         game.invalidateStats();

@@ -88,7 +88,7 @@ describe('Act I pacing', () => {
     it('keeps the slower seed 3 opening paced and completes the wall without offline gains', () => {
         const report = simulatePlayer(continuousActiveProfile, actOneContent, { days: 1, seed: 3, stepSeconds: 1 });
         // This seed currently exceeds the 3-hour target. The CLI still reports that failure.
-        const openingChecks = assessActOnePacing(report).filter((check) => check.name !== 'Level 1000 in 2–3 active hours');
+        const openingChecks = assessActOnePacing(report).filter((check) => check.name !== 'Level 1000 in 3–4 active hours');
         expect(openingChecks.filter((check) => !check.passed)).toEqual([]);
         expect(report.milestoneTimings.some((timing) => timing.milestoneId === 'level1000')).toBe(true);
         expect(report.offlineProgressShare).toBe(0);

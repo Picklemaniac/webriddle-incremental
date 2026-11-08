@@ -7,11 +7,6 @@ interface Proxy {
 }
 
 export interface CaptchaChallenge {
-    kind: 'images' | 'text';
-    stage: 'checkbox' | 'challenge';
-    subject: string;
-    imageIds: number[];
-    correctTiles: number[];
     word: string;
 }
 

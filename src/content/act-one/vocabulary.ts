@@ -12,7 +12,3 @@ export function wordAtRank(rank: number): string {
 export function rankOfWord(word: string): number {
     return ranksByWord.get(word) ?? vocabularySize;
 }
-
-export function sampleWord(unit: number): string {
-    return wordAtRank(1 + Math.floor(unit * vocabularySize));
-}

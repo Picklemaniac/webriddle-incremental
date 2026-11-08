@@ -1,10 +1,11 @@
 import type { GameSystem } from '../../core/content.ts';
 import type { Game } from '../../core/game.ts';
+import type { Modifier } from '../../core/stats.ts';
 import { createCaptcha } from './captchas.ts';
 import { dirbustingScripts } from './economy.ts';
 import { increment, noticeOnce, owns } from './progress.ts';
 
-const requestsPerAddress = 15;
+const requestsPerAddress = 10;
 const banSeconds = 90;
 
 export function liveProxies(game: Game): number {
@@ -15,8 +16,9 @@ export function networkCapacity(game: Game): number {
     return requestsPerAddress * (1 + liveProxies(game) + game.stat('extraAddresses'));
 }
 
-export function requestedRate(game: Game): number {
-    return dirbustingScripts(game) * game.stat('threadsPerScript') * game.stat('requestsPerThread');
+export function requestedRate(game: Game, extraModifiers: readonly Modifier[] = []): number {
+    const stat = (statId: string): number => extraModifiers.length === 0 ? game.stat(statId) : game.statWith(statId, extraModifiers);
+    return dirbustingScripts(game) * stat('threadsPerScript') * stat('requestsPerThread');
 }
 
 export function isBanned(game: Game): boolean {

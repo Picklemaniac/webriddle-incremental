@@ -27,6 +27,8 @@ const textFileStyle = 'body{margin:8px;background:#000;color:#ddd}pre{margin:0;f
 
 const drawnTextStyle = 'body{margin:8px;background:#000}.drawn{display:inline-block;padding:28px 36px;background:#101010;color:#f0f0f0;border:2px solid #f2f2f2;font:bold 44px "Courier New",monospace;letter-spacing:4px}';
 
+const captchaStyle = 'body{margin:16px 20px;background:#fff;color:#000;font:16px "Times New Roman",Times,serif}h1{margin:0 0 12px;font-size:28px}p{margin:10px 0}.captcha{display:block;max-width:100%;height:auto;border:1px solid #808080}.error{color:#c00000}input{font:15px "Courier New",monospace}button{font:13px Tahoma,Arial,sans-serif}.link{padding:0;border:0;background:none;color:#0000ee;text-decoration:underline;cursor:pointer;font:16px "Times New Roman",Times,serif}hr{border:0;border-top:1px solid #808080;margin:18px 0 8px}address{font-style:italic;font-size:14px}';
+
 const errorStyle = 'body{background:#111;color:#ccc;margin:36px;font:13px Verdana,sans-serif;line-height:1.8}h2{font-size:20px}hr{border:0;border-top:1px solid #444}';
 
 function escapeHtml(text: string): string {
@@ -109,9 +111,10 @@ export function canonicalUrl(url: string): string {
 
 export function resolvePage(url: string, state: GameState): Page {
     const address = canonicalUrl(url);
+    const banned = state.captcha !== null && state.network.bannedUntil > state.elapsedSeconds;
+    if (banned && address.startsWith(`${riddleOrigin}/`)) return captchaPage(state.captcha!, state.flags.captchaRejected === true);
     const start = startPage(address, scrollbarStyle, pictureStyle);
     if (start !== null) return start;
-    if (state.captcha !== null && state.network.bannedUntil > state.elapsedSeconds) return captchaPage(state.captcha, state.flags.captchaRejected === true);
     if (!address.startsWith(`${riddleOrigin}/`)) return errorPage('unavailable');
     if (address === `${riddleOrigin}/present.gif`) return imageFilePage('present.gif', `<div class="drawn">${entrance(7).answer}</div>`, drawnTextStyle);
     const known = state.visitedLevels[address];
@@ -157,9 +160,44 @@ function errorPage(kind: 'notFound' | 'unavailable' | 'unauthorized'): Page {
 }
 
 function captchaPage(challenge: CaptchaChallenge, rejected: boolean): Page {
-    const checkbox = `<button class="checkbox" data-captcha-checkbox>□ &nbsp; ${captchaText.checkbox}</button>`;
-    const images = `<p>${captchaText.selectAll} <strong>${escapeHtml(challenge.subject)}</strong></p><div class="grid">${challenge.imageIds.map((id, index) => `<button class="tile" data-captcha-tile="${index}" aria-pressed="false"><img src="${imagePath(id)}" alt="Tile ${index + 1}"></button>`).join('')}</div>`;
-    const word = `<p>${captchaText.typeWord}</p><svg width="280" height="80" viewBox="0 0 280 80"><path d="M0 40 Q80 0 280 60" fill="none" stroke="#859cba"/><text x="16" y="54" font-family="Georgia" font-style="italic" font-size="32" letter-spacing="4" fill="#d8d8d8" transform="rotate(-4 140 40)">${escapeHtml(challenge.word)}</text></svg><input data-captcha-input aria-label="${captchaText.typeWord}" autocomplete="off">`;
-    return documentPage(captchaText.title, `<h2>${captchaText.title}</h2><p>${captchaText.automated}</p><div class="box">${challenge.stage === 'checkbox' ? checkbox : `${challenge.kind === 'images' ? images : word}<div class="footer"><span>${rejected ? captchaText.tryAgain : ''}</span><button data-captcha-verify>${captchaText.verify}</button></div>`}</div>`, 429,
-        'body{margin:8px 12px;background:#111;color:#ddd;font:13px Arial;text-align:center}h2{font-size:18px;margin:0 0 4px}p{margin:0}.box{width:264px;max-width:100%;margin:8px auto;padding:8px;border:1px solid #555;background:#202020;box-sizing:border-box}.box p{margin-bottom:6px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}.tile{padding:0;border:0;aspect-ratio:1;min-width:0;background:#333;cursor:pointer}.tile img{width:100%;height:100%;object-fit:cover;display:block}.tile[aria-pressed=true]{outline:4px solid #6d9fef;outline-offset:-4px;transform:scale(.9)}button{padding:6px;background:#3459a1;color:white;border:1px solid #7694cc;cursor:pointer}.checkbox{width:100%;padding:22px 4px;background:#292929;color:#eee;border:0;font-size:17px}.footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px;color:#f2a3a3}svg{max-width:100%}input{box-sizing:border-box;width:100%;padding:8px;background:#111;border:1px solid #666;color:#fff}@media(max-height:400px){.box{width:224px}}');
+    const server = fill(captchaText.server, { host: new URL(riddleOrigin).host });
+    const page = (picture: string): string => [
+        `<h1>${captchaText.title}</h1>`,
+        `<p>${captchaText.explanation}</p>`,
+        `<p>${captchaText.typeWord}</p>`,
+        picture,
+        rejected ? `<p class="error">${captchaText.tryAgain}</p>` : '',
+        `<p><input data-captcha-input aria-label="${captchaText.typeWord}" autocomplete="off" spellcheck="false" size="16"> <button data-captcha-submit>${captchaText.submit}</button></p>`,
+        `<p><button class="link" data-captcha-refresh>${captchaText.newPicture}</button></p>`,
+        `<hr><address>${server}</address>`,
+    ].join('\n');
+    const html = documentPage(captchaText.title, page(captchaPicture(challenge.word)), 429, captchaStyle);
+    return { ...html, source: `<html>\n<head>\n<title>${captchaText.title}</title>\n</head>\n<body>\n${page('<img src="/captcha.php" width="260" height="70" alt="">')}\n</body>\n</html>` };
+}
+
+function captchaPicture(word: string): string {
+    let seed = [...word].reduce((hash, character) => Math.imul(hash ^ character.charCodeAt(0), 16777619), 2166136261) >>> 0;
+    const random = (): number => {
+        seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
+        return seed / 4294967296;
+    };
+    const fonts = ['Georgia', 'Times New Roman', 'Courier New', 'Verdana'];
+    const spacing = 30;
+    const start = (260 - spacing * (word.length - 1)) / 2;
+    const letters = [...word].map((letter, index) => {
+        const x = start + index * spacing + (random() - 0.5) * 8;
+        const y = 46 + (random() - 0.5) * 14;
+        const rotation = (random() - 0.5) * 50;
+        return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-family="${fonts[Math.floor(random() * fonts.length)]}" font-size="${Math.round(36 + random() * 8)}" font-weight="bold" text-anchor="middle" transform="rotate(${rotation.toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)})">${escapeHtml(letter)}</text>`;
+    });
+    const curve = (): string => `<path d="M0 ${(20 + random() * 30).toFixed(0)} C80 ${(random() * 70).toFixed(0)} 180 ${(random() * 70).toFixed(0)} 260 ${(20 + random() * 30).toFixed(0)}" fill="none" stroke="#555" stroke-width="1.5"/>`;
+    const specks = Array.from({ length: 40 }, () => `<rect x="${(random() * 260).toFixed(0)}" y="${(random() * 70).toFixed(0)}" width="2" height="2" fill="#555"/>`);
+    return [
+        '<svg class="captcha" width="260" height="70" viewBox="0 0 260 70" role="img">',
+        `<defs><filter id="warp"><feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="${seed % 1000}"/><feDisplacementMap in="SourceGraphic" scale="6"/></filter></defs>`,
+        '<rect width="260" height="70" fill="#e4e4dc"/>',
+        `<g filter="url(#warp)" fill="#1c1c1c">${letters.join('')}${curve()}${curve()}</g>`,
+        specks.join(''),
+        '</svg>',
+    ].join('');
 }

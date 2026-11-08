@@ -202,8 +202,11 @@ try {
     await sleep(2500);
     assert.equal(await evaluate(`document.querySelector('.browser-viewport').contentDocument.title`), inspectedPage, 'Automation changed the page during inspection');
     assert.equal(await evaluate(`document.querySelector('.source-document').textContent`), inspectedSource, 'Automation changed source during inspection');
+    assert.match(await evaluate(`document.querySelector('.browser-address').value`), /^view-source:http/, 'The address bar shows view-source: while the source is open');
     await screenshot('source-automated');
     await toolbar('View Source');
+    await waitFor(`document.querySelector('.follow-current').hidden`);
+    assert.match(await evaluate(`document.querySelector('.browser-address').value`), /^http/, 'Closing the source drops view-source: from the address');
     const buttons = await evaluate(`[...document.querySelectorAll('.resource-action')].map(button => button.getBoundingClientRect().width)`);
     assert.ok(buttons.every((width) => width === buttons[0]), 'Resource buttons differ in width');
     assert.equal(await evaluate(`document.querySelector('.proxy-details').open`), false);
@@ -216,10 +219,11 @@ try {
     game.state.flags[`seen:${unbought.id}`] = true;
     for (const resource of ['insight', 'money', 'data']) game.state.resources[resource] = 1_000_000;
     await importGame(game);
-    await waitFor(`!document.querySelector('.replace-dead-proxies').hidden`);
-    await evaluate(`document.querySelector('.replace-dead-proxies').click()`);
-    await waitFor(`document.querySelector('.replace-dead-proxies').hidden`);
-    assert.match(await evaluate(`document.querySelector('.proxy-summary').textContent`), /0 dead/);
+    await waitFor(`!/, 0 dead/.test(document.querySelector('.proxy-summary').textContent)`);
+    await evaluate(`document.querySelector('.proxy-details').open = true`);
+    await evaluate(`document.querySelectorAll('.proxy-row.dead button').forEach((button) => button.click())`);
+    await waitFor(`/, 0 dead/.test(document.querySelector('.proxy-summary').textContent)`);
+    await evaluate(`document.querySelector('.proxy-details').open = false`);
     await evaluate(`(()=>{const card=[...document.querySelectorAll('.upgrade-card')].find(card=>!card.hidden&&!card.disabled);if(!card)throw new Error('Expected an affordable upgrade');card.click();card.click();})()`);
     assert.equal(await evaluate(`document.querySelectorAll('.upgrade-card.leaving').length`), 1, 'A double click must purchase only one card');
     await sleep(700);
@@ -231,21 +235,18 @@ try {
     } else assert.equal(await evaluate(`document.querySelector('.dev-panel')`), null);
 
     game.state.captcha = createCaptcha(game);
-    game.state.captcha.kind = 'images';
     game.state.network.bannedUntil = game.state.elapsedSeconds + 90;
     await importGame(game);
-    await waitFor(`document.querySelector('.browser-viewport').contentDocument.querySelector('[data-captcha-checkbox]') !== null`);
-    await evaluate(`document.querySelector('.browser-viewport').contentDocument.querySelector('[data-captcha-checkbox]').click()`);
-    await waitFor(`document.querySelector('.browser-viewport').contentDocument.querySelector('[data-captcha-tile]') !== null`);
+    await waitFor(`document.querySelector('.browser-viewport').contentDocument.querySelector('[data-captcha-input]') !== null`);
+    assert.doesNotMatch(await evaluate(`document.querySelector('.browser-viewport').contentDocument.body.innerHTML`), new RegExp(`>${game.state.captcha.word}<`), 'The captcha word must not appear as plain text');
     await screenshot('captcha');
     await assertCaptchaFits();
     await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: false });
     await sleep(300);
     await assertCaptchaFits();
     await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
-    for (const tile of game.state.captcha.correctTiles) await evaluate(`document.querySelector('.browser-viewport').contentDocument.querySelector('[data-captcha-tile="${tile}"]').click()`);
-    await evaluate(`document.querySelector('.browser-viewport').contentDocument.querySelector('[data-captcha-verify]').click()`);
-    await waitFor(`document.querySelector('.browser-viewport').contentDocument.querySelector('[data-captcha-verify]') === null`);
+    await evaluate(`(() => { const doc = document.querySelector('.browser-viewport').contentDocument; doc.querySelector('[data-captcha-input]').value = ${JSON.stringify(game.state.captcha.word)}; doc.querySelector('[data-captcha-submit]').click(); })()`);
+    await waitFor(`document.querySelector('.browser-viewport').contentDocument.querySelector('[data-captcha-submit]') === null`);
     game.state.captcha = null;
     game.state.network.bannedUntil = 0;
 
@@ -357,7 +358,7 @@ async function assertLayout(width) {
 }
 
 async function assertCaptchaFits() {
-    const dimensions = await evaluate(`(()=>{const frame=document.querySelector('.browser-viewport');return {height:frame.clientHeight,bottom:frame.contentDocument.querySelector('[data-captcha-verify]').getBoundingClientRect().bottom};})()`);
+    const dimensions = await evaluate(`(()=>{const frame=document.querySelector('.browser-viewport');return {height:frame.clientHeight,bottom:frame.contentDocument.querySelector('[data-captcha-submit]').getBoundingClientRect().bottom};})()`);
     assert.ok(dimensions.bottom <= dimensions.height, `Captcha button is below the viewport: ${JSON.stringify(dimensions)}`);
 }
 

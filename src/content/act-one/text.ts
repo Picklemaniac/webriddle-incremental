@@ -35,7 +35,7 @@ export const setupText = {
 } as const;
 
 export const notices = {
-    firstRateLimit: '429 Too Many Requests. The server only accepts about 15 requests per second from one IP address and rejects the rest. While you send more than that, your Heat rises, and at 100% Heat the server bans you for a while.',
+    firstRateLimit: '429 Too Many Requests. The server allows 10 requests per second per IP address. Above that, your Heat rises until you get banned.',
     userAgentBlock: '403 Forbidden on every request. The server now blocks DirBuster, but it still lets your browser in.',
     folderBlock: 'DirBuster finds nothing new. The next levels are inside a folder, and DirBuster does not search inside folders.',
     extensionBlock: 'No .htm page matches. The next level has a different file extension.',
@@ -158,8 +158,8 @@ export const upgradeText = {
     isdn: { name: 'ISDN', description: 'A phone line that is twice as fast as your modem.' },
     english10k: { name: 'english-10k.txt', description: 'A list of the 10,000 most common English words.' },
     newPc: { name: 'New PC', description: 'A faster computer that can run two more scripts.' },
-    certification: { name: 'Certification', description: 'A help desk certificate that triples your pay.' },
-    rssFeeds: { name: 'RSS feeds', description: 'News feeds that triple the data you collect.' },
+    certification: { name: 'Certification', description: 'A help desk certificate that doubles your pay.' },
+    rssFeeds: { name: 'RSS feeds', description: 'News feeds that double the data you collect.' },
     dirb: { name: 'dirb', description: 'A tool for finding hidden pages. Unlike your script, it also searches inside folders.' },
     freeProxies: { name: 'Free proxy list', description: 'Three free proxies to send requests from. They stop working after a few minutes.' },
     threads8: { name: 'Eight threads', description: 'Your script sends twice as many requests at a time.' },
@@ -171,8 +171,8 @@ export const upgradeText = {
     sizeFilter: { name: 'Response-size filter', description: 'DirBuster ignores pages that are the same size as a missing page.' },
     dorking: { name: 'Search engine dorking', description: 'Finds levels that search engines have already indexed.' },
     gobuster: { name: 'gobuster', description: 'A faster tool than dirb.' },
-    seniorCertification: { name: 'Senior certification', description: 'A senior help desk certificate that triples your pay again.' },
-    archives: { name: 'Public archives', description: 'Old newsgroup and mailing list archives that triple your data again.' },
+    seniorCertification: { name: 'Senior certification', description: 'A senior help desk certificate that doubles your pay again.' },
+    archives: { name: 'Public archives', description: 'Old newsgroup and mailing list archives that double your data again.' },
     proxyPool: { name: 'Larger proxy pool', description: 'Six more free proxies.' },
     cable: { name: 'Cable internet', description: 'Internet over the TV cable, three times as fast as ADSL.' },
     mutationRules: { name: 'Mutation rules', description: 'DirBuster also tries each word with digits for letters, like l1ght.' },
@@ -186,7 +186,7 @@ export const upgradeText = {
     clusterBomb: { name: 'Cluster bomb', description: 'DirBuster tries every user name with every password.' },
     crackHtpasswd: { name: 'Crack .htpasswd', description: 'Cracks the passwords in the .htpasswd file you found.' },
     fiber: { name: 'Fiber', description: 'A fiber connection, three times as fast as cable.' },
-    addressBlock: { name: 'Address block', description: 'A block of 64 IP addresses that you rent.' },
+    addressBlock: { name: 'Address block', description: 'A block of 128 IP addresses that you rent.' },
     combinator: { name: 'Combinator', description: 'DirBuster also tries two common words joined together.' },
     indexCache: { name: 'Cached search results', description: 'Old copies of search results that list more levels.' },
     leavePcOn: { name: 'Leave the PC on', description: 'Your computer keeps working for up to 24 hours while you are away, instead of 12.' },
@@ -312,7 +312,6 @@ export const uiText = {
     proxies: 'Proxies',
     proxyCount: '{working} working, {dead} dead',
     individualProxies: 'Proxy list',
-    replaceDeadProxies: 'Replace dead proxies',
     replacement: 'Replacing a proxy is free.',
     threads: 'Threads per script',
     slots: 'Script slots',
@@ -408,13 +407,13 @@ export const errorPages = {
 } as const;
 
 export const captchaText = {
-    title: 'Verify that you are human',
-    checkbox: 'I\'m not a robot',
-    automated: 'Your requests look automated.',
-    selectAll: 'Select all images with',
-    typeWord: 'Type the word you see',
-    verify: 'VERIFY',
-    tryAgain: 'Please try again.',
+    title: 'Too Many Requests',
+    explanation: 'Your IP address has sent too many requests to this server.',
+    typeWord: 'Type the word in the picture to continue.',
+    submit: 'Continue',
+    tryAgain: 'That was not the word in the picture. Here is a new one.',
+    newPicture: 'Get a new picture',
+    server: 'Apache/2.0.55 (Unix) Server at {host} Port 80',
 } as const;
 
 export const dialogText = {

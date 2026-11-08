@@ -32,6 +32,14 @@ export const saveMigrations: readonly SaveMigration[] = [
             return { ...save, state };
         },
     },
+    {
+        fromVersion: 4,
+        migrate: (save) => {
+            const state = { ...(save.state as Record<string, unknown>) };
+            if (isRecord(state.captcha)) state.captcha = typeof state.captcha.word === 'string' ? { word: state.captcha.word } : null;
+            return { ...save, state };
+        },
+    },
 ];
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -10,7 +10,7 @@ import { canonicalUrl, resolvePage } from './pages.ts';
 import { automationElapsed, isUpgradeRevealed, owns, solveLevel, wasNoticed } from './progress.ts';
 import { homeUrl, startUrl } from './riddle.ts';
 import { labels } from './text.ts';
-import { offeredUpgrades, upgrades, type Upgrade } from './upgrades.ts';
+import { capacityUpgrades, offeredUpgrades, speedUpgrades, upgrades, type Upgrade } from './upgrades.ts';
 
 const firstOfferSeconds = 75;
 const currencyFollowSeconds = 6;
@@ -28,8 +28,6 @@ const reveals: GameSystem = {
             return;
         } else if (!state.flags.insightRevealed) {
             reveal(game, 'insightRevealed');
-        } else if (state.flags.networkRevealed && !isUpgradeRevealed(state, 'throttle')) {
-            revealUpgrade(game, 'throttle');
         } else if (!state.flags.moneyRevealed && seconds >= moneyIntroductionSeconds && owns(state, 'curlBatch')) {
             if (!isUpgradeRevealed(state, 'ram')) {
                 revealBeforeCurrency(game, 'ram');
@@ -51,7 +49,9 @@ const reveals: GameSystem = {
             if (offers.filter((item) => isUpgradeRevealed(state, item.id)).length >= (seconds < 600 ? 3 : 6)) return;
             const candidates = offers.filter((item) => !isUpgradeRevealed(state, item.id) && readyForUpgrade(game, item));
             const blocker = currentSearch(game).blockedBy;
+            const capped = requestedRate(game) > networkCapacity(game);
             candidates.sort((first, second) => Number(second.fixes === blocker) - Number(first.fixes === blocker) ||
+                Number(capped && capacityUpgrades.has(second.id)) - Number(capped && capacityUpgrades.has(first.id)) ||
                 Number(second.id === 'ram') - Number(first.id === 'ram'));
             const next = candidates[0];
             if (next === undefined) return;
@@ -67,9 +67,17 @@ function readyForUpgrade(game: Game, item: Upgrade): boolean {
     if (item.price.money !== undefined && !state.flags.moneyRevealed) return false;
     if (item.price.data !== undefined && !state.flags.dataRevealed) return false;
     if (item.id === 'throttle') return state.flags.networkRevealed === true;
+    if (speedUpgrades.has(item.id) && !speedsUp(game, item)) return false;
     if (item.id === 'wgetMirror') return state.flags.dataRevealed === true && state.flags.scriptsRevealed === true;
     if (item.id === 'autoReplyMacros' || item.id === 'otherRiddles') return state.flags.scriptsRevealed === true;
     return true;
+}
+
+function speedsUp(game: Game, item: Upgrade): boolean {
+    const capacity = networkCapacity(game);
+    const after = requestedRate(game, item.modifiers?.(1));
+    if (!owns(game.state, 'throttle')) return after <= capacity;
+    return Math.min(after, capacity) >= 1.5 * Math.min(requestedRate(game), capacity);
 }
 
 function revealUpgrade(game: Game, id: string): void {
@@ -119,8 +127,8 @@ export const actOneContent: GameContent = {
     homeUrl,
     startUrl,
     resources: [{ id: 'insight', name: labels.insight }, { id: 'money', name: labels.money }, { id: 'data', name: labels.data }],
-    baseStats: { requestsPerThread: 2, threadsPerScript: 1, scriptSlots: 1, riddleRate: 0.5, workRate: 1.5, scourRate: 2048,
-        ticketBotRate: 0.8, riddleBotRate: 0.25, scraperRate: 2048, proxySlots: 0, extraAddresses: 0, searchEfficiency: 1, dorkChance: 0 },
+    baseStats: { requestsPerThread: 2, threadsPerScript: 1, scriptSlots: 1, riddleRate: 0.3, workRate: 1, scourRate: 1024,
+        ticketBotRate: 0.6, riddleBotRate: 0.2, scraperRate: 1024, proxySlots: 0, extraAddresses: 0, searchEfficiency: 1, dorkChance: 0 },
     purchasables: upgrades.map((item) => ({
         ...item, isAvailable: (state) => isUpgradeRevealed(state, item.id) && item.isAvailable(state) &&
             (item.id !== 'crackHtpasswd' || (state.findings.htpasswd ?? 0) > 0),
