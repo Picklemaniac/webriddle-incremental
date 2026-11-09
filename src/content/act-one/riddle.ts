@@ -36,6 +36,7 @@ export const salts = {
     key: 23,
     display: 24,
     hotspot: 25,
+    hint: 26,
 } as const;
 
 export function unitHash(level: number, salt: number): number {

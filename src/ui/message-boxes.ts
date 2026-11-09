@@ -3,10 +3,7 @@ import { automationText, dialogText, notices, type NoticeId } from '../content/a
 import { GameDialog } from './dialog.ts';
 import { createElement } from './dom.ts';
 
-const messageBoxNotices: ReadonlySet<NoticeId> = new Set<NoticeId>([
-    'firstRateLimit', 'userAgentBlock', 'folderBlock', 'extensionBlock', 'wildcardBlock', 'credentialsBlock',
-    'leetAnswer', 'numberAnswer', 'twoWordsAnswer', 'phraseWall',
-]);
+const messageBoxNotices: ReadonlySet<NoticeId> = new Set<NoticeId>(['firstRateLimit']);
 
 export class MessageBoxes {
     private readonly dialog = new GameDialog();

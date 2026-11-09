@@ -2,7 +2,7 @@ import { glyphRows, type Drawing, type DrawingKind } from './drawings.ts';
 import { atomicNumberSpelling, characterColors, encode, keyboardShift, toRomanNumerals, vigenere, type Encoding } from './encodings.ts';
 import { pickByUnit, ramp, salts, unitHash } from './riddle.ts';
 import type { Sound } from './sounds.ts';
-import { methodHints } from './text.ts';
+import { puzzleHints } from './text.ts';
 import { vocabularySize, wordAtRank } from './vocabulary.ts';
 
 type AlternateExtension = 'gif' | 'txt' | 'json' | 'css' | 'xml' | 'wav' | 'zip';
@@ -44,7 +44,15 @@ interface ClueContext {
     readonly level: number;
     readonly unit: number;
     readonly withImage: boolean;
+    readonly titleFree: boolean;
     readonly pageName?: (level: number) => string | null;
+}
+
+type HintKey = keyof typeof puzzleHints;
+
+interface Hint {
+    readonly place: 'title' | 'line';
+    readonly key: HintKey | ((context: ClueContext) => HintKey);
 }
 
 interface Method {
@@ -53,6 +61,7 @@ interface Method {
     readonly encoding?: Encoding;
     readonly htmOnly?: boolean;
     readonly exact?: boolean;
+    readonly hint?: Hint;
     readonly clue: (context: ClueContext) => Clue | null;
 }
 
@@ -61,7 +70,7 @@ interface Spot {
     readonly weight: number;
     readonly usesTitle?: boolean;
     readonly fits?: (text: string, context: ClueContext) => boolean;
-    readonly place: (text: string) => Clue;
+    readonly place: (text: string, context: ClueContext) => Clue;
 }
 
 const lineWidth = 36;
@@ -75,74 +84,74 @@ const methods: readonly Method[] = [
     cipher('a1z26', 12),
     cipher('rot13', 16),
     alternative('alternate', 20, ['gif', 'txt', 'json', 'css']),
-    cipher('atbash', 24),
+    cipher('atbash', 24, inTitle('atbash')),
     cipher('morse', 28),
     cipher('nato', 32),
-    { name: 'capitals', fromLevel: 36, clue: ({ word, answer, level }) => ({ lines: lineUp(capitalized(word, answer, level)) }) },
+    { name: 'capitals', fromLevel: 36, hint: inTitle('capitals'), clue: ({ word, answer, level }) => ({ lines: lineUp(capitalized(word, answer, level)) }) },
     { name: 'interleaved', fromLevel: 38, clue: interleaved },
     drawn('semaphore', 40),
-    hinted('caesar', 45, () => methodHints.caesar),
-    cipher('shift', 50),
+    cipher('caesar', 45, inTitle('caesar')),
+    cipher('shift', 50, inTitle('shift')),
     cipher('binary', 55),
     cipher('upsideDown', 58),
     drawn('pigpen', 62),
-    cipher('phone', 65),
-    { name: 'boldLetters', fromLevel: 68, clue: ({ word, answer, level }) => ({ emphasis: emphasized(word, answer, level) }) },
+    cipher('phone', 65, inTitle('phone')),
+    { name: 'boldLetters', fromLevel: 68, hint: inTitle('boldLetters'), clue: ({ word, answer, level }) => ({ emphasis: emphasized(word, answer, level) }) },
     drawn('blink', 70),
-    cipher('braille', 75),
+    cipher('braille', 75, inTitle('braille')),
     drawn('mirror', 80),
-    { name: 'acrostic', fromLevel: 85, clue: ({ word, answer, level }) => ({ lines: lineUp(acrostic(word, answer, level)) }) },
-    { name: 'lastLetters', fromLevel: 90, clue: ({ word, answer, level }) => { const words = telestich(word, answer, level); return words === null ? null : { lines: lineUp(words) }; } },
-    cipher('polybius', 95),
-    drawn('flags', 100),
-    cipher('tap', 105),
+    { name: 'acrostic', fromLevel: 85, hint: inTitle('acrostic'), clue: ({ word, answer, level }) => ({ lines: lineUp(acrostic(word, answer, level)) }) },
+    { name: 'lastLetters', fromLevel: 90, hint: inTitle('lastLetters'), clue: ({ word, answer, level }) => { const words = telestich(word, answer, level); return words === null ? null : { lines: lineUp(words) }; } },
+    cipher('polybius', 95, inTitle('polybius')),
+    drawn('flags', 100, inTitle('flags')),
+    cipher('tap', 105, inTitle('tap')),
     { name: 'script', fromLevel: 110, htmOnly: true, exact: true, clue: ({ word, unit }) => ({ script: passwordCheck(word, unit) }) },
-    hinted('keyboard', 115, (unit) => (keyboardShift(unit) > 0 ? methodHints.keyboardRight : methodHints.keyboardLeft)),
+    cipher('keyboard', 115, inTitle(({ unit }) => (keyboardShift(unit) > 0 ? 'keyboardRight' : 'keyboardLeft'))),
     alternative('xmlFile', 120, ['xml']),
-    { name: 'swatches', fromLevel: 125, clue: ({ word }) => ({ colors: characterColors(word) }) },
-    { name: 'scrambled', fromLevel: 128, clue: scrambled },
-    drawn('braille', 130),
-    { name: 'clocksPicture', fromLevel: 135, clue: ({ word }) => ({ title: methodHints.clocks, drawing: { kind: 'clocks', text: word } }) },
+    { name: 'swatches', fromLevel: 125, hint: inTitle('colors'), clue: ({ word }) => ({ colors: characterColors(word) }) },
+    { name: 'scrambled', fromLevel: 128, hint: inTitle('scrambled'), clue: scrambled },
+    drawn('braille', 130, inTitle('braille')),
+    drawn('clocks', 135, inTitle('clocks')),
     cipher('hex', 140),
-    { name: 'letterGrid', fromLevel: 145, clue: ({ word, level }) => ({ grid: letterGrid(word, level) }) },
+    { name: 'letterGrid', fromLevel: 145, hint: inTitle('letterGrid'), clue: ({ word, level }) => ({ grid: letterGrid(word, level) }) },
     { name: 'vigenere', fromLevel: 150, clue: keyed },
     alternative('wavFile', 152, ['wav']),
     cipher('ascii', 155),
-    { name: 'earlierAnswers', fromLevel: 160, clue: earlierAnswers },
+    { name: 'earlierAnswers', fromLevel: 160, hint: onLine('earlierAnswers'), clue: earlierAnswers },
     drawn('bits', 165),
-    { name: 'fakeTags', fromLevel: 168, clue: ({ word, answer, level }) => ({ tags: acrostic(word, answer, level).split(' ').filter((tag) => /^[a-z]+$/.test(tag)) }) },
-    cipher('bacon', 170),
+    { name: 'fakeTags', fromLevel: 168, hint: inTitle('fakeTags'), clue: ({ word, answer, level }) => ({ tags: acrostic(word, answer, level).split(' ').filter((tag) => /^[a-z]+$/.test(tag)) }) },
+    cipher('bacon', 170, inTitle('bacon')),
     { name: 'morseSound', fromLevel: 175, clue: ({ word }) => ({ sound: { kind: 'morse', text: word } }) },
-    cipher('dna', 185),
+    cipher('dna', 185, inTitle('dna')),
     alternative('zipFile', 188, ['zip']),
-    drawn('pixels', 192),
+    drawn('pixels', 192, inTitle('colors')),
     cipher('url', 200),
-    { name: 'spacers', fromLevel: 205, clue: ({ word }) => ({ spacers: [...word].map((letter) => letter.charCodeAt(0) - 96) }) },
-    hinted('railFence', 210, () => methodHints.railFence),
+    { name: 'spacers', fromLevel: 205, hint: inTitle('spacers'), clue: ({ word }) => ({ spacers: [...word].map((letter) => letter.charCodeAt(0) - 96) }) },
+    cipher('railFence', 210, inTitle('railFence')),
     cipher('entities', 220),
     drawn('rotated', 225),
-    { name: 'squashedPicture', fromLevel: 230, clue: ({ word }) => ({ drawing: { kind: 'plain', text: word }, drawingDisplay: 'squashed' }) },
-    hinted('keyboardGrid', 235, () => methodHints.keyboardGrid),
+    { name: 'squashedPicture', fromLevel: 230, hint: inTitle('squashed'), clue: ({ word }) => ({ drawing: { kind: 'plain', text: word }, drawingDisplay: 'squashed' }) },
+    cipher('keyboardGrid', 235, inTitle('keyboardGrid')),
     cipher('octal', 240),
-    { name: 'elements', fromLevel: 250, clue: elements },
+    { name: 'elements', fromLevel: 250, hint: inTitle('elements'), clue: elements },
     cipher('roman', 260),
-    drawn('transparent', 268),
+    drawn('transparent', 268, inTitle('transparent')),
     cipher('rot47', 270),
     cipher('base64', 280),
-    { name: 'caselessBase64', fromLevel: 290, clue: caselessBase64 },
-    drawn('dark', 295),
-    hinted('base36', 300, () => methodHints.base36),
+    { name: 'caselessBase64', fromLevel: 290, hint: inTitle('caselessBase64'), clue: caselessBase64 },
+    drawn('dark', 295, inTitle('dark')),
+    cipher('base36', 300, inTitle('base36')),
     cipher('arithmetic', 310),
-    cipher('dvorak', 325),
+    cipher('dvorak', 325, inTitle('dvorak')),
     cipher('codepoints', 340),
-    { name: 'renamed', fromLevel: 345, clue: ({ word }) => ({ renamed: word }) },
-    drawn('flash', 355),
+    { name: 'renamed', fromLevel: 345, hint: inTitle('renamed'), clue: ({ word }) => ({ renamed: word }) },
+    drawn('flash', 355, inTitle('flash')),
     cipher('adfgvx', 370),
-    { name: 'utf16', fromLevel: 380, encoding: 'utf16', clue: (context) => (context.word.length % 2 === 0 ? placed(encode(context.word, 'utf16'), context) : null) },
-    { name: 'spectrogram', fromLevel: 390, clue: ({ word }) => withLine(methodHints.spectrogram, { sound: { kind: 'spectrogram', text: word } }) },
-    hinted('pollux', 410, () => methodHints.pollux),
-    { name: 'sharesPicture', fromLevel: 430, clue: ({ word }) => withLine(methodHints.shares, { drawing: { kind: 'shares', text: word } }) },
-    drawn('delayed', 445),
+    { name: 'utf16', fromLevel: 380, encoding: 'utf16', hint: inTitle('utf16'), clue: (context) => (context.word.length % 2 === 0 ? placed(encode(context.word, 'utf16'), context) : null) },
+    { name: 'spectrogram', fromLevel: 390, hint: onLine('spectrogram'), clue: ({ word }) => ({ sound: { kind: 'spectrogram', text: word } }) },
+    cipher('pollux', 410, inTitle('pollux')),
+    drawn('shares', 430, onLine('shares')),
+    drawn('delayed', 445, inTitle('delayed')),
     { name: 'layered', fromLevel: 460, clue: layered },
 ];
 
@@ -155,12 +164,12 @@ const spots: readonly Spot[] = [
     { fromLevel: 60, weight: 1, place: (text) => ({ belowFold: lineUp(text) }) },
     { fromLevel: 100, weight: 1, place: (text) => ({ farComment: text }) },
     { fromLevel: 140, weight: 1, place: (text) => ({ meta: text }) },
-    { fromLevel: 140, weight: 1, place: (text) => ({ hotspot: text }) },
-    { fromLevel: 200, weight: 1, place: (text) => ({ attribute: text }) },
+    { fromLevel: 140, weight: 1, place: (text, context) => withLine(variant('hotspot', context.level), { hotspot: text }) },
     { fromLevel: 180, weight: 1, place: (text) => ({ stylesheet: text }) },
+    { fromLevel: 200, weight: 1, place: (text) => ({ attribute: text }) },
     { fromLevel: 220, weight: 1, fits: (text, context) => context.withImage && /^[a-z0-9._-]{1,40}$/i.test(text), place: (text) => ({ imageName: `${text}.jpg` }) },
-    { fromLevel: 260, weight: 1, fits: printable, place: (text) => ({ lines: [methodHints.imageNote], imageNote: text }) },
-    { fromLevel: 320, weight: 1, fits: printable, place: (text) => ({ lines: [methodHints.zipped], zipped: text }) },
+    { fromLevel: 260, weight: 1, fits: printable, place: (text, context) => withLine(variant('imageNote', context.level), { imageNote: text }) },
+    { fromLevel: 320, weight: 1, fits: printable, place: (text, context) => withLine(variant('zipped', context.level), { zipped: text }) },
 ];
 
 const textEncodings: readonly (readonly [Encoding, number])[] = [
@@ -175,16 +184,17 @@ export function wordClue(level: number, answer: string, pageName: (level: number
     const unit = unitHash(level, salts.clue);
     for (let offset = 0; offset < pool.length; offset++) {
         const method = pool[order[(level + offset) % pool.length]!]!;
-        const clue = method.clue({ word: layer(answer, level, method), answer, level, unit, withImage, pageName });
-        if (clue !== null && !revealsAnswer(clue, answer)) return { method: method.name, ...clue };
+        const context: ClueContext = { word: layer(answer, level, method), answer, level, unit, withImage, titleFree: method.hint?.place !== 'title', pageName };
+        const clue = method.clue(context);
+        if (clue !== null && !revealsAnswer(clue, answer)) return { method: method.name, ...withHint(clue, method.hint, context) };
     }
-    return { method: 'rot13', ...placed(encode(answer, 'rot13'), { word: answer, answer, level, unit, withImage }) };
+    return { method: 'rot13', ...placed(encode(answer, 'rot13'), { word: answer, answer, level, unit, withImage, titleFree: true }) };
 }
 
 export function encodedClue(text: string, encoding: Encoding, level: number, unit: number): Clue {
     const encoded = encode(text, encoding, unit);
     const used = encoded === text ? 'rot13' : encoding;
-    return { method: used, ...placed(encode(text, used, unit), { word: text, answer: text, level, unit, withImage: true }) };
+    return { method: used, ...placed(encode(text, used, unit), { word: text, answer: text, level, unit, withImage: true, titleFree: true }) };
 }
 
 export function textEncodingFor(level: number, unit: number): Encoding {
@@ -204,18 +214,36 @@ export function yearClue(year: number, level: number, unit: number): Clue {
     return pickByUnit(options.filter(([fromLevel]) => fromLevel <= level), unit)[1]();
 }
 
-function cipher(encoding: Encoding, fromLevel: number): Method {
-    return { name: encoding, fromLevel, encoding, clue: (context) => placed(encode(context.word, encoding, context.unit), context) };
+function cipher(encoding: Encoding, fromLevel: number, hint?: Hint): Method {
+    return { name: encoding, fromLevel, encoding, hint, clue: (context) => placed(encode(context.word, encoding, context.unit), context) };
 }
 
-function hinted(encoding: Encoding, fromLevel: number, hint: (unit: number) => string): Method {
-    return { name: encoding, fromLevel, encoding, clue: (context) => ({ title: hint(context.unit), ...placed(encode(context.word, encoding, context.unit), context, false) }) };
-}
-
-function drawn(kind: DrawingKind, fromLevel: number): Method {
+function drawn(kind: DrawingKind, fromLevel: number, hint?: Hint): Method {
     return {
-        name: `${kind}Picture`, fromLevel, clue: ({ word, level }) => ({ drawing: { kind, text: word }, drawingDisplay: drawingDisplay(level) }),
+        name: `${kind}Picture`, fromLevel, hint, clue: ({ word, level }) => {
+            const display = drawingDisplay(level);
+            const clue: Clue = { drawing: { kind, text: word }, drawingDisplay: display };
+            return display === 'hidden' ? withLine(variant('hiddenPicture', level), clue) : clue;
+        },
     };
+}
+
+function inTitle(key: Hint['key']): Hint {
+    return { place: 'title', key };
+}
+
+function onLine(key: Hint['key']): Hint {
+    return { place: 'line', key };
+}
+
+function variant(key: HintKey, level: number): string {
+    return pickByUnit(puzzleHints[key], unitHash(level, salts.hint));
+}
+
+function withHint(clue: Clue, hint: Hint | undefined, context: ClueContext): Clue {
+    if (hint === undefined) return clue;
+    const text = variant(typeof hint.key === 'function' ? hint.key(context) : hint.key, context.level);
+    return hint.place === 'title' && clue.title === undefined ? { ...clue, title: text } : withLine(text, clue);
 }
 
 function drawingDisplay(level: number): 'hidden' | 'rollover' | undefined {
@@ -229,14 +257,14 @@ function layer(answer: string, level: number, method: Method): string {
     return encode(answer, pickByUnit(innerLayers.filter((inner) => inner !== method.encoding), unitHash(level, salts.layerEncoding)));
 }
 
-function placed(text: string, context: ClueContext, titleFree = true): Clue {
-    const open = spots.filter((spot) => spot.fromLevel <= context.level && (titleFree || spot.usesTitle !== true) && (spot.fits?.(text, context) ?? true));
+function placed(text: string, context: ClueContext): Clue {
+    const open = spots.filter((spot) => spot.fromLevel <= context.level && (context.titleFree || spot.usesTitle !== true) && (spot.fits?.(text, context) ?? true));
     let roll = fraction(context.unit * 7) * open.reduce((sum, spot) => sum + spot.weight, 0);
     for (const spot of open) {
         roll -= spot.weight;
-        if (roll < 0) return spot.place(text);
+        if (roll < 0) return spot.place(text, context);
     }
-    return open[0]!.place(text);
+    return open[0]!.place(text, context);
 }
 
 function short(text: string): boolean {
@@ -257,7 +285,7 @@ function alternative(name: string, fromLevel: number, extensions: readonly Alter
     return {
         name, fromLevel, htmOnly: true, clue: ({ word, level }) => {
             const extension = pickByUnit(extensions, unitHash(level, salts.extension));
-            return { lines: [methodHints[extension]], alternate: { extension, text: word } };
+            return { lines: [variant(`${extension}File`, level)], alternate: { extension, text: word } };
         },
     };
 }
@@ -278,7 +306,7 @@ function keyed(context: ClueContext): Clue {
             break;
         }
     }
-    return { title: key, ...placed(vigenere(context.word, key), context, false) };
+    return { title: key, ...placed(vigenere(context.word, key), { ...context, titleFree: false }) };
 }
 
 function earlierAnswers(context: ClueContext): Clue | null {
@@ -300,7 +328,7 @@ function earlierAnswers(context: ClueContext): Clue | null {
         return found.every((item): item is string => item !== null) ? found : null;
     };
     const chosen = (fraction(unit * 5) < 0.5 ? references(true) : null) ?? references(false);
-    return chosen === null ? null : withLine(methodHints.earlierAnswers, placed(chosen.join(' '), context));
+    return chosen === null ? null : placed(chosen.join(' '), context);
 }
 
 function scrambled({ word, level }: ClueContext): Clue | null {
@@ -361,7 +389,7 @@ function withLine(line: string, clue: Clue): Clue {
 
 function elements(context: ClueContext): Clue | null {
     const spelling = atomicNumberSpelling(context.word);
-    return spelling === null ? null : { title: methodHints.elements, ...placed(spelling, context, false) };
+    return spelling === null ? null : placed(spelling, context);
 }
 
 function passwordCheck(word: string, unit: number): string {

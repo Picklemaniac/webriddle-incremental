@@ -1,6 +1,6 @@
 import { entrance, levelPage, type LevelPage } from '../src/content/act-one/levels.ts';
 import type { Clue } from '../src/content/act-one/methods.ts';
-import { alternateFiles, clueLines, handcraftedText, linkedFiles, methodHints, pageText, riddleHomeText } from '../src/content/act-one/text.ts';
+import { alternateFiles, clueLines, handcraftedText, linkedFiles, pageText, puzzleHints, riddleHomeText } from '../src/content/act-one/text.ts';
 import { table } from './markdown.ts';
 
 interface Entry {
@@ -18,7 +18,7 @@ interface Survey {
 
 const lastLevel = 1400;
 
-const puzzleNames: Readonly<Record<string, string>> = {
+export const puzzleNames: Readonly<Record<string, string>> = {
     reversed: 'Reversed text', a1z26: 'Letter numbers (A = 1)', rot13: 'ROT13', alternate: 'Same name as the picture as .gif, .txt, .json or .css',
     earlierAnswers: 'Letters from the names of earlier levels', xmlFile: 'Same name as the picture as .xml', wavFile: 'Same name as the picture as .wav', zipFile: 'Same name as the picture as .zip',
     atbash: 'Atbash', morse: 'Morse code', nato: 'NATO alphabet', capitals: 'Capital letters in a line of words', semaphorePicture: 'Semaphore picture',
@@ -46,9 +46,11 @@ const openingPuzzles: Readonly<Record<number, string>> = {
     5: 'Binary', 6: 'The picture as a .gif file', 7: 'The answer is the picture tooltip', 8: 'ROT13', 9: 'Reversed text', 404: 'Easter egg', 418: 'Easter egg',
 };
 
-const placeHints: Readonly<Record<string, string>> = {
-    'Inside the picture file': 'methodHints.imageNote',
-    'Zip file stuck to the end of the picture': 'methodHints.zipped',
+const placeHints: Readonly<Record<string, keyof typeof puzzleHints>> = {
+    'Inside the picture file': 'imageNote',
+    'Zip file stuck to the end of the picture': 'zipped',
+    'Page behind an invisible link on the picture': 'hotspot',
+    'Picture at zero size, only in the source': 'hiddenPicture',
 };
 
 const answerTypes: readonly { readonly name: string; readonly hints: readonly string[]; readonly matches: (survey: Survey) => boolean }[] = [
@@ -94,13 +96,17 @@ export function levelTextDocument(): string {
         const method = survey.clue.method;
         if (survey.level >= 11 && method !== undefined) methods.set(method, [...(methods.get(method) ?? []), survey]);
     }
-    const spotHintKeys = new Set(Object.values(placeHints));
+    const placeGroups = new Set<string>(Object.values(placeHints));
+    const variants = (group: string, where?: string): string[] => (puzzleHints[group as keyof typeof puzzleHints] ?? []).map((_, index) => numbered(`puzzleHints.${group}.${index}`, where));
     const puzzleRows = [...methods].map(([method, list]) => {
-        const hints = new Map<string, string>();
+        const groups = new Map<string, string>();
         for (const survey of list) {
-            for (const [key, where] of survey.texts) if (key.startsWith('methodHints.') && !spotHintKeys.has(key) && !hints.has(key)) hints.set(key, where);
+            for (const [key, where] of survey.texts) {
+                const group = key.split('.')[1]!;
+                if (key.startsWith('puzzleHints.') && !placeGroups.has(group) && !groups.has(group)) groups.set(group, where);
+            }
         }
-        return [puzzleNames[method] ?? method, String(list[0]!.level), lines([...hints].map(([key, where]) => numbered(key, where))), exampleOf(list[0]!)];
+        return [puzzleNames[method] ?? method, String(list[0]!.level), lines([...groups].flatMap(([group, where]) => variants(group, where))), exampleOf(list[0]!)];
     });
 
     const places = new Map<string, Survey[]>();
@@ -109,7 +115,7 @@ export function levelTextDocument(): string {
         for (const place of placesOf(survey)) places.set(place, [...(places.get(place) ?? []), survey]);
     }
     const placeRows = [...places].map(([place, list]) => [place, String(list[0]!.level), String(list.length),
-        placeHints[place] === undefined ? '—' : numbered(placeHints[place]!, 'Line under the picture')]);
+        lines(placeHints[place] === undefined ? [] : variants(placeHints[place]!, 'Line under the picture'))]);
 
     const answerRows = answerTypes.map(({ name, hints, matches }) => {
         const first = surveys.find((survey) => survey.level >= 11 && matches(survey));
@@ -145,7 +151,7 @@ export function levelTextDocument(): string {
 
 function textEntries(): Entry[] {
     return [
-        ...entries('handcraftedText', handcraftedText), ...entries('methodHints', methodHints), ...entries('clueLines', clueLines), ...entries('pageText', pageText),
+        ...entries('handcraftedText', handcraftedText), ...entries('puzzleHints', puzzleHints), ...entries('clueLines', clueLines), ...entries('pageText', pageText),
         ...entries('alternateFiles', alternateFiles), ...entries('linkedFiles', linkedFiles),
         ...riddleHomeText.hints.map((text, index) => ({ key: `riddleHomeText.hints.${index}`, text })), { key: 'riddleHomeText.moreHints', text: riddleHomeText.moreHints },
     ];
@@ -187,7 +193,7 @@ function surveyLevels(): Survey[] {
 }
 
 function placesOf({ page, clue }: Survey): string[] {
-    const hints = new Set<string>(Object.values(methodHints));
+    const hints = new Set<string>(Object.values(puzzleHints).flat());
     const found = [
         clue.lines?.some((line) => !hints.has(line)) === true && 'Lines under the picture', clue.comment !== undefined && 'Comment in the source',
         clue.farComment !== undefined && 'Comment far down the source', clue.title !== undefined && !hints.has(clue.title) && 'Title',

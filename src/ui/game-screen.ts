@@ -10,7 +10,6 @@ import type { Panel } from './panel.ts';
 import { PurchasesPanel } from './purchases-panel.ts';
 import { SetupWindows } from './setup-windows.ts';
 import { SetupWizard } from './setup-wizard.ts';
-import { startSound } from './sound.ts';
 import { StatusPanel } from './status-panel.ts';
 import { TerminalPanel } from './terminal-panel.ts';
 
@@ -49,7 +48,6 @@ export class GameScreen {
         const support = createElement('div', { className: 'dashboard-support' }, [status.networkElement, findings.element]);
         this.dashboard = createElement('div', { className: 'dashboard' }, [status.element, purchases.element, support, status.machineElement]);
         this.element.append(createElement('div', { className: 'workspace' }, [browserColumn, terminalSlot]), this.dashboard);
-        startSound(game);
         this.render();
     }
 

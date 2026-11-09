@@ -165,7 +165,7 @@ strong { font-weight: 600; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 0 12px 12px; }
 .dialog-actions button { min-width: 80px; }
 .dialog-link { display: block; text-align: left; width: 100%; margin-bottom: 5px; overflow: hidden; text-overflow: ellipsis; }
-.source-document { color: #111; background: #fff; border: 2px inset #eee; padding: 10px; overflow: auto; font: 13px/1.6 'Courier New', monospace; max-height: 55vh; margin: 0; white-space: pre; }
+.source-document { color: #111; background: #fff; border: 2px inset #eee; padding: 10px; overflow: auto; font: 13px/1.6 'Courier New', monospace; max-height: 55vh; margin: 0; white-space: pre; tab-size: 4; }
 .save-text { width: 100%; font: 11px/1.6 'IBM Plex Mono', monospace; background: white; color: black; border: 2px inset white; }
 .checkbox-label { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; }
 .login-field { display: grid; grid-template-columns: 100px 1fr; gap: 8px; align-items: center; margin: 10px 0; }

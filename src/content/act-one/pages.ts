@@ -1,6 +1,7 @@
 import type { Page } from '../../core/content.ts';
 import type { CaptchaChallenge, GameState } from '../../core/state.ts';
 import { findingFile, findings } from './findings.ts';
+import { contentType, doctype, formatSource } from './html-source.ts';
 import { imagePath } from './images.ts';
 import { drawPicture, type Picture } from './drawings.ts';
 import { entrance, inWildcardFolder, levelPage, urlOfLevel, type LevelFile, type LevelPage } from './levels.ts';
@@ -46,7 +47,7 @@ function escapeHtml(text: string): string {
 
 function documentPage(title: string, body: string, statusCode: number, style: string, source?: string): Page {
     const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${scrollbarStyle}${style}</style></head><body>${body}</body></html>`;
-    return { title, html, source: source ?? html, statusCode };
+    return { title, html, source: source ?? formatSource(`<html><head><title>${escapeHtml(title)}</title></head><body>${body}</body></html>`), statusCode };
 }
 
 function textFilePage(name: string, text: string): Page {
@@ -146,10 +147,12 @@ function levelSource(page: LevelPage, link: string | null): string {
         (page.hotspot.x + 0.08) * pictureWidth, (page.hotspot.y + 0.12) * pictureHeight].map(Math.round).join(',')}" href="${hotspot.name}"></map>`];
     const font = (line: string): string => `<p><font face="Times New Roman" size="4">${escapeHtml(line)}</font></p>`;
     const linked = (kind: LevelFile['linked'], tag: (file: LevelFile) => string): string[] => page.files.filter((file) => file.linked === kind).map(tag);
-    return [
+    const source = formatSource([
+        doctype,
         '<html>',
         '<head>',
         `<title>${escapeHtml(page.title)}</title>`,
+        contentType,
         ...(page.meta === null ? [] : [`<meta name="description" content="${escapeHtml(page.meta)}">`]),
         ...linked('stylesheet', (file) => `<link rel="stylesheet" type="text/css" href="${file.name}">`),
         ...linked('script', (file) => `<script type="text/javascript" src="${file.name}"></script>`),
@@ -178,8 +181,8 @@ function levelSource(page: LevelPage, link: string | null): string {
         ...page.comments.map((comment) => `<!-- ${comment.replaceAll('-->', '--&gt;')} -->`),
         '</body>',
         '</html>',
-        ...(page.farComment === null ? [] : [`${'\n'.repeat(80)}<!-- ${page.farComment.replaceAll('-->', '--&gt;')} -->`]),
-    ].join('\n');
+    ].join(''));
+    return page.farComment === null ? source : `${source}${'\n'.repeat(80)}<!-- ${page.farComment.replaceAll('-->', '--&gt;')} -->`;
 }
 
 export function canonicalUrl(url: string): string {
@@ -226,7 +229,7 @@ function filePage({ name, content }: LevelFile): Page {
     if ('sound' in content) return soundFilePage(name, content.sound);
     if ('bytesOf' in content) return textFilePage(name, binaryText(content.bytesOf));
     if ('page' in content) {
-        const source = `<html>\n<head>\n<title></title>\n</head>\n<body bgcolor="#000000" text="#DDDDDD">\n<center>\n<p>${escapeHtml(content.page)}</p>\n</center>\n</body>\n</html>`;
+        const source = formatSource(`${doctype}<html><head><title></title>${contentType}</head><body bgcolor="#000000" text="#DDDDDD"><center><p>${escapeHtml(content.page)}</p></center></body></html>`);
         return documentPage('', `<p>${escapeHtml(content.page)}</p>`, 200, noteStyle, source);
     }
     return textFilePage(name, content.text);
@@ -255,7 +258,7 @@ function captchaPage(challenge: CaptchaChallenge, rejected: boolean): Page {
         `<hr><address>${server}</address>`,
     ].join('\n');
     const html = documentPage(captchaText.title, page(captchaPicture(challenge.word)), 429, captchaStyle);
-    return { ...html, source: `<html>\n<head>\n<title>${captchaText.title}</title>\n</head>\n<body>\n${page('<img src="/captcha.php" width="260" height="70" alt="">')}\n</body>\n</html>` };
+    return { ...html, source: formatSource(`<html><head><title>${captchaText.title}</title></head><body>${page('<img src="/captcha.php" width="260" height="70" alt="">')}</body></html>`) };
 }
 
 function captchaPicture(word: string): string {

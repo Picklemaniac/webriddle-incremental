@@ -190,7 +190,6 @@ function validateState(value: unknown): void {
         captcha: validCaptcha,
         favorites: arrayOf(string),
         visitedLevels: recordOf(positiveInteger),
-        settings: (candidate) => fieldsMatch(candidate, { sound: boolean }),
     };
     if (!isPlainObject(value)) {
         throw new SaveError('The save data has an invalid game state.');

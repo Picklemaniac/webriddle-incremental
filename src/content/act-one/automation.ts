@@ -4,12 +4,6 @@ import { entrance, type EntranceKind } from './levels.ts';
 import { effectiveRate } from './network.ts';
 import { automationBootSeconds, automationElapsed, increment, noticeOnce, solveLevel } from './progress.ts';
 import { capabilitySignature, planSearch, searchCapabilities, type BlockReason, type SearchPlan } from './search.ts';
-import type { NoticeId } from './text.ts';
-
-const blockedNotices: Readonly<Partial<Record<BlockReason, NoticeId>>> = {
-    userAgent: 'userAgentBlock', folder: 'folderBlock', extension: 'extensionBlock',
-    wildcard: 'wildcardBlock', credentials: 'credentialsBlock',
-};
 const wordlistKinds: ReadonlySet<EntranceKind> = new Set<EntranceKind>(['word', 'extension', 'credentials']);
 const plans = new Map<string, SearchPlan>();
 
@@ -45,15 +39,9 @@ export const dirbuster: GameSystem = {
                 continue;
             }
             const plan = currentSearch(game);
-            const notice = plan.blockedBy === null ? undefined : blockedNotices[plan.blockedBy];
-            if (notice) noticeOnce(game, notice);
             if (plan.blockedBy !== null) break;
             if (plan.bruteForce) noticeOnce(game, 'bruteForce');
             if (plan.bruteForce && wordlistKinds.has(target.kind)) state.flags.wordlistExhausted = true;
-            if (target.kind === 'leet') noticeOnce(game, 'leetAnswer');
-            if (target.kind === 'number') noticeOnce(game, 'numberAnswer');
-            if (target.kind === 'twoWords') noticeOnce(game, 'twoWordsAnswer');
-            if (target.kind === 'phrase') noticeOnce(game, 'phraseWall');
             const remaining = Math.max(0, plan.hitAt - state.search.requestsSpent);
             if (budget < remaining) {
                 state.search.requestsSpent += budget;

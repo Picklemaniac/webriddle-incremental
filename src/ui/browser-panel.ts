@@ -357,10 +357,7 @@ export class BrowserPanel implements Panel {
     }
 
     private showOptions(): void {
-        const sound = createElement('input', { attributes: { type: 'checkbox' } });
-        sound.checked = this.game.state.settings.sound;
-        sound.addEventListener('change', () => this.game.dispatch({ type: 'setSound', enabled: sound.checked }));
-        this.dialog.show(dialogText.optionsTitle, [createElement('label', { className: 'checkbox-label' }, [sound, dialogText.optionsSound]), createElement('p', { text: dialogText.optionsSaving })]);
+        this.dialog.show(dialogText.optionsTitle, [createElement('p', { text: dialogText.optionsSaving })]);
     }
 
     private showSave(): void {

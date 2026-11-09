@@ -1,4 +1,5 @@
 import type { Page } from '../../core/content.ts';
+import { contentType, doctype, formatSource } from './html-source.ts';
 import { imagePath, imageWithWord } from './images.ts';
 import { enigmaticsUrl, hallOfFameUrl, hintsUrl, homeUrl, nordinhoUrl, riddleHomeUrl, rulesUrl, startUrl, toolUrls } from './riddle.ts';
 import { browserName, fill, riddleHomeText, riddleName, startPageText } from './text.ts';
@@ -61,7 +62,7 @@ export function startPage(address: string, scrollbarStyle: string, pictureStyle:
         '</body>',
         '</html>',
     ].join('\n');
-    return { title: site.title, html: page(true), source: page(false), statusCode: 200 };
+    return { title: site.title, html: page(true), source: formatSource(`${doctype}${page(false).replace('</title>', `</title>${contentType}`)}`), statusCode: 200 };
 }
 
 function enigmaWebHome(rendered: boolean): string {

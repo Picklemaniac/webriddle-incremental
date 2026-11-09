@@ -210,13 +210,13 @@ function blink(text: string): Picture {
         elapsed += units;
         return Number(start.toFixed(5));
     });
-    const animate = (attribute: string, on: string, off: string): string => `<animate attributeName="${attribute}" calcMode="discrete" dur="${(total * 0.3).toFixed(1)}s" repeatCount="indefinite" `
-        + `keyTimes="${keyTimes.join(';')}" values="${timeline.map(([lit]) => (lit ? on : off)).join(';')}"/>`;
-    const content = '<rect width="48" height="48" fill="#000"/>'
-        + `<circle cx="24" cy="24" r="22" fill="#fff6c8" opacity="0">${animate('opacity', '0.35', '0')}</circle>`
-        + '<rect x="9" y="9" width="30" height="30" rx="5" fill="#2a2a2a" stroke="#555"/>'
-        + `<circle cx="24" cy="24" r="11" fill="#3a3320">${animate('fill', '#ffe27a', '#3a3320')}</circle>`;
-    return svgPicture(48, 48, content, 2);
+    const animate = `<animate attributeName="opacity" calcMode="discrete" dur="${(total * 0.3).toFixed(1)}s" repeatCount="indefinite" `
+        + `keyTimes="${keyTimes.join(';')}" values="${timeline.map(([lit]) => (lit ? 1 : 0)).join(';')}"/>`;
+    const content = '<defs><radialGradient id="glow"><stop offset="0" stop-color="#fffdf2"/><stop offset="0.12" stop-color="#fff1c4"/>'
+        + '<stop offset="0.35" stop-color="#ffcf70" stop-opacity="0.45"/><stop offset="1" stop-color="#ffb347" stop-opacity="0"/></radialGradient></defs>'
+        + '<rect width="64" height="64" fill="#000"/><circle cx="32" cy="32" r="2.5" fill="#2b2720"/>'
+        + `<circle cx="32" cy="32" r="31" fill="url(#glow)" opacity="0">${animate}</circle>`;
+    return svgPicture(64, 64, content, 2);
 }
 
 function plain(text: string): Picture {

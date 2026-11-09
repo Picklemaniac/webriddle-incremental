@@ -99,7 +99,7 @@ describe('save format', () => {
         const save = JSON.stringify({
             version: currentSaveVersion,
             savedAt: 0,
-            state: { currentLevel: 7, search: { requestsSpent: 125 }, network: { heat: 10 }, settings: {} },
+            state: { currentLevel: 7, search: { requestsSpent: 125 }, network: { heat: 10 } },
         });
         const state = parseSave(save, defaults).state;
         expect(state).toEqual({
@@ -129,7 +129,6 @@ describe('save format', () => {
         ['negative finding count', { findings: { robots: -1 } }],
         ['fractional purchase count', { purchases: { booster: 0.5 } }],
         ['non-boolean flag', { flags: { automated: 'yes' } }],
-        ['non-boolean sound setting', { settings: { sound: 1 } }],
         ['zero current level', { currentLevel: 0 }],
         ['zero visited level', { visitedLevels: { 'http://riddle.example/': 0 } }],
         ['negative search progress', { search: { requestsSpent: -1 } }],

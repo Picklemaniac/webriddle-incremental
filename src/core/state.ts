@@ -42,7 +42,6 @@ export interface GameState {
     captcha: CaptchaChallenge | null;
     favorites: string[];
     visitedLevels: Record<string, number>;
-    settings: { sound: boolean };
 }
 
 export function createInitialState(content: GameContent, seed: number): GameState {
@@ -66,6 +65,5 @@ export function createInitialState(content: GameContent, seed: number): GameStat
         captcha: null,
         favorites: [],
         visitedLevels: { [content.startUrl]: 1 },
-        settings: { sound: true },
     };
 }

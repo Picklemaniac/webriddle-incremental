@@ -165,9 +165,6 @@ export const actOneContent: GameContent = {
             case 'addFavorite':
                 if (!game.state.favorites.includes(action.url)) game.state.favorites.push(action.url);
                 return true;
-            case 'setSound':
-                game.state.settings.sound = action.enabled;
-                return true;
             default: return false;
         }
     },
