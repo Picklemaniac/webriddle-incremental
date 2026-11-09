@@ -146,6 +146,8 @@ try {
     assert.equal(await evaluate(`document.querySelectorAll('.terminal-lines .terminal-line').length`), 0, 'Startup must not dump old events');
     await menu('Favorites', 'Add to Favorites...');
     assert.match(await evaluate(`document.querySelector('dialog[open]').textContent`), /lighthouse.htm/);
+    await clickText('dialog[open] .favorite-row', 'Delete');
+    assert.doesNotMatch(await evaluate(`document.querySelector('dialog[open]').textContent`), /lighthouse.htm/, 'Deleting a favorite removes it from the list');
     await closeDialog();
     await menu('File', 'Import and Export...');
     await clickText('dialog[open]', 'Export');

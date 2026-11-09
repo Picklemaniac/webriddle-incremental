@@ -154,6 +154,15 @@ describe('Act I', () => {
         expect([...seen].sort()).toEqual(['boldLetters', 'caselessBase64', 'fakeTags', 'interleaved', 'spacers']);
     });
 
+    it('adds and removes favorites', () => {
+        const game = newGame();
+        expect(game.dispatch({ type: 'addFavorite', url: riddleHomeUrl })).toBe(true);
+        expect(game.state.favorites).toEqual([riddleHomeUrl]);
+        expect(game.dispatch({ type: 'removeFavorite', url: riddleHomeUrl })).toBe(true);
+        expect(game.state.favorites).toEqual([]);
+        expect(game.dispatch({ type: 'removeFavorite', url: riddleHomeUrl })).toBe(false);
+    });
+
     it('does not repeat a puzzle method within fifteen levels once enough methods are unlocked', () => {
         const lastSeen = new Map<string, number>();
         for (let level = 200; level <= 1400; level++) {

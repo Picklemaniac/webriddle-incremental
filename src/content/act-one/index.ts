@@ -165,6 +165,12 @@ export const actOneContent: GameContent = {
             case 'addFavorite':
                 if (!game.state.favorites.includes(action.url)) game.state.favorites.push(action.url);
                 return true;
+            case 'removeFavorite': {
+                const index = game.state.favorites.indexOf(action.url);
+                if (index === -1) return false;
+                game.state.favorites.splice(index, 1);
+                return true;
+            }
             default: return false;
         }
     },

@@ -3,7 +3,7 @@ import type { Page } from '../core/content.ts';
 import { createInitialState } from '../core/state.ts';
 import { canonicalUrl } from '../content/act-one/pages.ts';
 import { urlOfLevel } from '../content/act-one/levels.ts';
-import { browserName, dialogText, menuText, uiText } from '../content/act-one/text.ts';
+import { browserName, dialogText, fill, menuText, uiText } from '../content/act-one/text.ts';
 import { decodeExport, encodeExport, parseSave, serializeSave } from '../persistence/save.ts';
 import { createButton, createElement, createTitleBar, setText } from './dom.ts';
 import { GameDialog } from './dialog.ts';
@@ -343,17 +343,28 @@ export class BrowserPanel implements Panel {
     }
 
     private showFavorites(): void {
-        this.showLinks(menuText.favorites, this.game.state.favorites);
+        const favorites = this.game.state.favorites;
+        this.dialog.show(menuText.favorites, favorites.length ? favorites.map((url) => {
+            const link = this.dialogLink(url);
+            const remove = createButton(menuText.deleteFavorite, () => {
+                this.game.dispatch({ type: 'removeFavorite', url });
+                this.showFavorites();
+            });
+            remove.setAttribute('aria-label', fill(uiText.deleteFavorite, { address: url }));
+            return createElement('div', { className: 'favorite-row' }, [link, remove]);
+        }) : [createElement('p', { text: uiText.none })]);
     }
 
     private showHistory(): void { this.showLinks(uiText.history, [...new Set(this.history)].reverse()); }
 
     private showLinks(title: string, links: readonly string[]): void {
-        this.dialog.show(title, links.length ? links.map((url) => {
-            const button = createButton(url, () => { this.dialog.close(); this.navigate(url); });
-            button.className = 'dialog-link';
-            return button;
-        }) : [createElement('p', { text: uiText.none })]);
+        this.dialog.show(title, links.length ? links.map((url) => this.dialogLink(url)) : [createElement('p', { text: uiText.none })]);
+    }
+
+    private dialogLink(url: string): HTMLButtonElement {
+        const button = createButton(url, () => { this.dialog.close(); this.navigate(url); });
+        button.className = 'dialog-link';
+        return button;
     }
 
     private showOptions(): void {
