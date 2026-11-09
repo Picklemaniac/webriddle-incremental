@@ -58,7 +58,7 @@ export const handcraftedText = {
     level3: 'get to the source of the problem.',
     level3Comment: 'beneath.htm',
     level4: 'it\'s dark down here.',
-    level5Title: 'it blinks',
+    level5Title: 'bits and pieces',
     level6: 'i have a GIFT for you.',
     level7Tooltip: 'hidden',
     level8Title: 'half moon',

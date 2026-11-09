@@ -12,6 +12,7 @@ import { encodeExport, serializeSave } from '../src/persistence/save.ts';
 import { AutoPlayer } from '../src/simulation/auto-player.ts';
 import { actOneStrategy } from '../src/simulation/act-one-strategy.ts';
 import { upgrades } from '../src/content/act-one/upgrades.ts';
+import { handcraftedText } from '../src/content/act-one/text.ts';
 
 const origin = process.env.WEBRIDDLE_TEST_URL ?? 'http://127.0.0.1:5173';
 const expectsDevelopmentTools = process.env.WEBRIDDLE_TEST_PRODUCTION !== '1';
@@ -108,16 +109,16 @@ try {
     await toolbar('Back');
     await waitFor(`document.querySelector('.browser-viewport')?.contentDocument?.querySelector('.number')?.textContent === '4'`);
     await toolbar('Forward');
-    await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === 'it blinks'`);
+    await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === ${JSON.stringify(handcraftedText.level5Title)}`);
     await toolbar('Back');
     await toolbar('Stop');
     await sleep(650);
-    assert.equal(await evaluate(`document.querySelector('.browser-viewport').contentDocument.title`), 'it blinks');
+    assert.equal(await evaluate(`document.querySelector('.browser-viewport').contentDocument.title`), handcraftedText.level5Title);
     assert.equal(await evaluate(`document.querySelector('.tool-button[aria-label="Forward"]').disabled`), true);
     await toolbar('Home');
     await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === 'Welcome to Enigma Web'`);
     await evaluate(`document.querySelector('.follow-current').click()`);
-    await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === 'it blinks'`);
+    await waitFor(`document.querySelector('.browser-viewport').contentDocument.title === ${JSON.stringify(handcraftedText.level5Title)}`);
     await evaluate(`document.querySelector('.browser-viewport').contentDocument.body.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 60, clientY: 60 }))`);
     assert.equal(await evaluate(`document.querySelector('.context-menu').hidden`), false, 'Right-click opens the page menu');
     await screenshot('context-menu');
