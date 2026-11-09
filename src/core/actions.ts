@@ -9,4 +9,6 @@ export type Action =
     | { readonly type: 'replaceProxy'; readonly proxyIndex: number }
     | { readonly type: 'answerCaptcha'; readonly answer: string }
     | { readonly type: 'addFavorite'; readonly url: string }
-    | { readonly type: 'removeFavorite'; readonly url: string };
+    | { readonly type: 'removeFavorite'; readonly url: string }
+    | { readonly type: 'setHomePage'; readonly url: string }
+    | { readonly type: 'clearHistory' };

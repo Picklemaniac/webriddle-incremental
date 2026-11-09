@@ -3,13 +3,20 @@ import type { Page } from '../core/content.ts';
 import { createInitialState } from '../core/state.ts';
 import { canonicalUrl } from '../content/act-one/pages.ts';
 import { urlOfLevel } from '../content/act-one/levels.ts';
-import { browserName, dialogText, fill, menuText, uiText } from '../content/act-one/text.ts';
+import { browserName, dialogText, fileTypes, fill, menuText, uiText } from '../content/act-one/text.ts';
 import { decodeExport, encodeExport, parseSave, serializeSave } from '../persistence/save.ts';
 import { createButton, createElement, createTitleBar, setText } from './dom.ts';
 import { GameDialog } from './dialog.ts';
 import type { Panel } from './panel.ts';
 
 const viewSourcePrefix = 'view-source:';
+
+interface MenuCommand {
+    readonly label: string;
+    readonly action: (() => void) | undefined;
+}
+
+type MenuItem = MenuCommand | null;
 
 export class BrowserPanel implements Panel {
     readonly element: HTMLElement;
@@ -65,8 +72,8 @@ export class BrowserPanel implements Panel {
         this.updateSourceVisibility();
         const titleBar = createTitleBar([createElement('img', { className: 'browser-icon', attributes: { src: 'branding/enigma-web.png', alt: '' } }), this.title]);
         const toolbar = createElement('div', { className: 'browser-toolbar' }, [this.back, this.forward, this.stop,
-            this.tool('↻', menuText.refresh, () => this.navigate(this.viewedUrl, false)),
-            this.tool('⌂', menuText.home, () => this.navigate(game.content.homeUrl)),
+            this.tool('↻', menuText.refresh, () => this.refresh()),
+            this.tool('⌂', menuText.home, () => this.goHome()),
             createElement('span', { className: 'toolbar-divider' }),
             this.sourceButton,
             createElement('span', { className: 'toolbar-divider' }),
@@ -74,9 +81,10 @@ export class BrowserPanel implements Panel {
             this.tool('◷', uiText.history, () => this.showHistory(), true),
             this.throbber]);
         this.contextMenu.hidden = true;
-        for (const [name, action] of this.contextCommands()) {
-            this.contextMenu.append(name === null ? createElement('div', { className: 'menu-separator' }) : createButton(name, () => { this.hideContextMenu(); action(); }));
-        }
+        this.sourceDocument.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+            this.openContextMenu(this.sourceMenu(event.target as Element), event.clientX, event.clientY);
+        });
         const go = createElement('button', { text: menuText.go, attributes: { type: 'submit' } });
         const addressForm = createElement('form', { className: 'address-bar' }, [createElement('label', { text: menuText.address, attributes: { for: 'riddle-address' } }), this.address, go]);
         this.address.id = 'riddle-address';
@@ -183,69 +191,146 @@ export class BrowserPanel implements Panel {
         return button;
     }
 
-    private contextCommands(): readonly (readonly [string, () => void] | readonly [null])[] {
+    private pageMenu(target: Element, doc: Document): MenuItem[] {
+        const copy = this.copyCommand(doc.getSelection()?.toString() ?? '');
+        const anchor = target.closest('a[href]');
+        const link = anchor === null ? null : { url: this.absolute(anchor.getAttribute('href')!), newWindow: anchor.getAttribute('target') === '_blank' };
+        const pictureAddress = target.closest('img[data-address]')?.getAttribute('data-address');
+        if (pictureAddress) {
+            const picture = this.absolute(pictureAddress);
+            return [
+                ...(link === null ? [] : [{ label: menuText.openLink, action: () => this.openLink(link.url, link.newWindow) }]),
+                { label: menuText.showPicture, action: () => this.navigate(picture) },
+                null,
+                { label: menuText.copyShortcut, action: () => this.copyText(link?.url ?? picture) },
+                null,
+                { label: menuText.properties, action: () => this.showProperties(picture) },
+            ];
+        }
+        if (link !== null) {
+            return [
+                { label: menuText.open, action: () => this.openLink(link.url, link.newWindow) },
+                null,
+                copy,
+                { label: menuText.copyShortcut, action: () => this.copyText(link.url) },
+                null,
+                { label: menuText.addFavorite, action: () => this.addFavorite(link.url) },
+                { label: menuText.properties, action: () => this.showProperties(link.url) },
+            ];
+        }
         return [
-            [menuText.back, () => this.moveHistory(-1)],
-            [menuText.forward, () => this.moveHistory(1)],
-            [null],
-            [menuText.selectAll, () => this.selectAll()],
-            [null],
-            [menuText.addFavorite, () => this.addFavorite()],
-            [uiText.source, () => this.showSource()],
-            [menuText.refresh, () => this.navigate(this.viewedUrl, false)],
+            { label: menuText.back, action: this.historyIndex > 0 ? () => this.moveHistory(-1) : undefined },
+            { label: menuText.forward, action: this.historyIndex < this.history.length - 1 ? () => this.moveHistory(1) : undefined },
+            null,
+            copy,
+            { label: menuText.selectAll, action: () => this.selectAll() },
+            null,
+            { label: uiText.source, action: () => this.showSource() },
+            { label: menuText.refresh, action: () => this.refresh() },
+            null,
+            { label: menuText.addFavorite, action: () => this.addFavorite() },
+            { label: menuText.properties, action: () => this.showProperties(this.viewedUrl, this.page.title) },
         ];
     }
 
-    private showContextMenu(x: number, y: number): void {
-        const [back, forward] = this.contextMenu.querySelectorAll('button');
-        back!.disabled = this.historyIndex <= 0;
-        forward!.disabled = this.historyIndex >= this.history.length - 1;
+    private sourceMenu(target: Element): MenuItem[] {
+        const href = target.closest('a[href]')?.getAttribute('href');
+        const link = href ? this.absolute(href) : null;
+        return [
+            ...(link === null ? [] : [{ label: menuText.open, action: () => this.navigate(link) }, { label: menuText.copyShortcut, action: () => this.copyText(link) }, null]),
+            this.copyCommand(document.getSelection()?.toString() ?? ''),
+            { label: menuText.selectAll, action: () => this.selectAll() },
+            null,
+            { label: menuText.closeSource, action: () => this.closeSource() },
+        ];
+    }
+
+    private copyCommand(text: string): MenuCommand {
+        return { label: menuText.copy, action: text === '' ? undefined : () => this.copyText(text) };
+    }
+
+    private openContextMenu(items: readonly MenuItem[], x: number, y: number): void {
+        this.contextMenu.replaceChildren(...this.menuElements(items, () => this.hideContextMenu()));
         this.contextMenu.hidden = false;
-        const frame = this.viewport.getBoundingClientRect();
-        const window = this.element.getBoundingClientRect();
-        const left = Math.min(frame.left - window.left + x, window.width - this.contextMenu.offsetWidth - 4);
-        const top = Math.min(frame.top - window.top + y, window.height - this.contextMenu.offsetHeight - 4);
-        this.contextMenu.style.left = `${Math.max(0, left)}px`;
-        this.contextMenu.style.top = `${Math.max(0, top)}px`;
+        const bounds = this.element.getBoundingClientRect();
+        this.contextMenu.style.left = `${Math.max(0, Math.min(x - bounds.left, bounds.width - this.contextMenu.offsetWidth - 4))}px`;
+        this.contextMenu.style.top = `${Math.max(0, Math.min(y - bounds.top, bounds.height - this.contextMenu.offsetHeight - 4))}px`;
+    }
+
+    private menuElements(items: readonly MenuItem[], close: () => void): HTMLElement[] {
+        return items.map((item) => {
+            if (item === null) return createElement('div', { className: 'menu-separator' });
+            const button = createButton(item.label, () => { close(); item.action?.(); });
+            button.disabled = item.action === undefined;
+            return button;
+        });
     }
 
     private hideContextMenu(): void { this.contextMenu.hidden = true; }
 
     private handleShortcut(event: KeyboardEvent): void {
-        const key = event.key.toLowerCase();
-        if (key === 'escape') this.hideContextMenu();
-        if (!(event.ctrlKey || event.metaKey)) return;
-        if (key === 'u') {
-            event.preventDefault();
-            this.showSource();
-        } else if (key === 'a' && !(event.target as Element).matches?.('input, textarea')) {
-            event.preventDefault();
-            this.selectAll();
+        if (event.key === 'Escape') {
+            this.hideContextMenu();
+            if (this.pendingNavigation) this.stopLoading();
+            return;
         }
+        if (document.querySelector('dialog[open]') !== null) return;
+        const command = this.shortcut(event);
+        if (command === undefined) return;
+        event.preventDefault();
+        command();
     }
 
-    private addFavorite(): void {
-        this.game.dispatch({ type: 'addFavorite', url: this.viewedUrl });
+    private shortcut(event: KeyboardEvent): (() => void) | undefined {
+        const key = event.key.toLowerCase();
+        const control = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey;
+        const alt = event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
+        const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
+        const typing = (event.target as Element).matches?.('input, textarea') === true;
+        if (alt && key === 'arrowleft') return () => this.moveHistory(-1);
+        if (alt && key === 'arrowright') return () => this.moveHistory(1);
+        if (alt && key === 'home') return () => this.goHome();
+        if ((alt && key === 'd') || (control && key === 'l') || (plain && !event.shiftKey && key === 'f6')) return () => this.focusAddress();
+        if (plain && key === 'backspace' && !typing && this.element.contains(document.activeElement)) return () => this.moveHistory(event.shiftKey ? 1 : -1);
+        if ((plain && !event.shiftKey && key === 'f5') || (control && key === 'r')) return () => this.refresh();
+        if (!control) return undefined;
+        if (key === 'u') return () => this.showSource();
+        if (key === 'a' && !typing) return () => this.selectAll();
+        if (key === 'd') return () => this.addFavorite();
+        if (key === 'i') return () => this.showFavorites();
+        if (key === 'h') return () => this.showHistory();
+        return undefined;
+    }
+
+    private addFavorite(url = this.viewedUrl): void {
+        this.game.dispatch({ type: 'addFavorite', url });
         this.showFavorites();
     }
 
     private createMenus(): HTMLElement {
-        const definitions: readonly [string, readonly [string, () => void][]][] = [
-            [menuText.file, [[menuText.importExport, () => this.showSave()]]],
-            [menuText.edit, [[menuText.selectAll, () => this.selectAll()]]],
-            [menuText.view, [[menuText.source, () => this.showSource()], [uiText.history, () => this.showHistory()], [menuText.refresh, () => this.navigate(this.viewedUrl, false)]]],
-            [menuText.favorites, [[menuText.addFavorite, () => this.addFavorite()], [menuText.organizeFavorites, () => this.showFavorites()]]],
-            [menuText.tools, [[menuText.internetOptions, () => this.showOptions()]]],
-            [menuText.help, [[menuText.about, () => this.dialog.show(dialogText.aboutTitle, [createElement('pre', { text: dialogText.aboutBody.join('\n') })])]]],
+        const definitions: readonly (readonly [string, () => readonly MenuItem[]])[] = [
+            [menuText.file, () => [{ label: menuText.importExport, action: () => this.showSave() }]],
+            [menuText.edit, () => [this.copyCommand(this.selectedText()), { label: menuText.selectAll, action: () => this.selectAll() }]],
+            [menuText.view, () => [{ label: menuText.source, action: () => this.showSource() }, { label: uiText.history, action: () => this.showHistory() }, { label: menuText.refresh, action: () => this.refresh() }]],
+            [menuText.favorites, () => [
+                { label: menuText.addFavorite, action: () => this.addFavorite() },
+                { label: menuText.organizeFavorites, action: () => this.showFavorites() },
+                ...(this.game.state.favorites.length === 0 ? [] : [null, ...this.game.state.favorites.map((url) => ({ label: url.replace(/^https?:\/\//, ''), action: () => this.navigate(url) }))]),
+            ]],
+            [menuText.tools, () => [{ label: menuText.internetOptions, action: () => this.showOptions() }]],
+            [menuText.help, () => [{ label: menuText.about, action: () => this.showAbout() }]],
         ];
         const bar = createElement('nav', { className: 'menu-bar' });
         for (const [label, commands] of definitions) {
             const details = createElement('details', { className: 'browser-menu' });
             const popup = createElement('div', { className: 'menu-popup' });
-            for (const [name, action] of commands) popup.append(createButton(name, () => { details.open = false; action(); }));
+            const populate = (): void => popup.replaceChildren(...this.menuElements(commands(), () => { details.open = false; }));
+            populate();
             details.append(createElement('summary', { text: label }), popup);
             details.addEventListener('toggle', () => {
-                if (details.open) for (const other of bar.querySelectorAll('details')) if (other !== details) other.open = false;
+                if (!details.open) return;
+                populate();
+                for (const other of bar.querySelectorAll('details')) if (other !== details) other.open = false;
             });
             bar.append(details);
         }
@@ -355,10 +440,37 @@ export class BrowserPanel implements Panel {
         }) : [createElement('p', { text: uiText.none })]);
     }
 
-    private showHistory(): void { this.showLinks(uiText.history, [...new Set(this.history)].reverse()); }
+    private showHistory(): void {
+        const current = this.game.state.currentLevel;
+        const levelInput = createElement('input', { attributes: { id: 'history-level', type: 'number', min: '1', max: String(current), autocomplete: 'off' } });
+        levelInput.value = String(current);
+        const goToLevel = (): void => {
+            const level = Math.round(Number(levelInput.value));
+            if (!(level >= 1 && level <= current)) return;
+            this.dialog.close();
+            this.navigate(urlOfLevel(level));
+        };
+        levelInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') goToLevel(); });
+        const recent = [...this.game.state.history].reverse();
+        this.dialog.show(uiText.history, [
+            createElement('h3', { text: uiText.historyLevels }),
+            createElement('div', { className: 'history-go' }, [createElement('label', { text: uiText.historyGoTo, attributes: { for: 'history-level' } }), levelInput, createButton(menuText.go, goToLevel)]),
+            createElement('div', { className: 'history-list' }, Array.from({ length: current }, (_, index) => this.historyEntry(urlOfLevel(current - index), current - index))),
+            createElement('h3', { text: uiText.historyRecent }),
+            recent.length === 0 ? createElement('p', { text: uiText.none }) : createElement('div', { className: 'history-list' }, recent.map((url) => this.historyEntry(url))),
+        ]);
+        levelInput.focus();
+        levelInput.select();
+    }
 
-    private showLinks(title: string, links: readonly string[]): void {
-        this.dialog.show(title, links.length ? links.map((url) => this.dialogLink(url)) : [createElement('p', { text: uiText.none })]);
+    private historyEntry(url: string, level?: number): HTMLButtonElement {
+        const button = createButton('', () => { this.dialog.close(); this.navigate(url); });
+        button.className = 'history-entry';
+        button.title = url;
+        const address = level === undefined ? url.replace(/^https?:\/\//, '') : new URL(url).pathname;
+        button.append(...(level === undefined ? [] : [createElement('span', { className: 'history-level', text: fill(uiText.levelNumber, { level }) })]),
+            createElement('span', { className: 'history-address', text: address }));
+        return button;
     }
 
     private dialogLink(url: string): HTMLButtonElement {
@@ -368,7 +480,62 @@ export class BrowserPanel implements Panel {
     }
 
     private showOptions(): void {
-        this.dialog.show(dialogText.optionsTitle, [createElement('p', { text: dialogText.optionsSaving })]);
+        const home = createElement('input', { attributes: { spellcheck: 'false', autocomplete: 'off' } });
+        home.value = this.game.state.homePage;
+        const clear = createButton(dialogText.clearHistory, () => {
+            this.game.dispatch({ type: 'clearHistory' });
+            clear.disabled = true;
+        });
+        clear.disabled = this.game.state.history.length === 0;
+        const group = (heading: string, body: string, ...controls: HTMLElement[]): HTMLElement =>
+            createElement('fieldset', { className: 'options-group' }, [createElement('legend', { text: heading }), createElement('p', { text: body }), ...controls]);
+        const buttons = (...children: HTMLElement[]): HTMLElement => createElement('div', { className: 'options-buttons' }, children);
+        this.dialog.show(dialogText.optionsTitle, [
+            group(dialogText.homePageHeading, dialogText.homePageBody, createElement('label', { className: 'login-field' }, [menuText.address, home]),
+                buttons(createButton(dialogText.useCurrent, () => { home.value = this.viewedUrl; }), createButton(dialogText.useDefault, () => { home.value = this.game.content.homeUrl; }))),
+            group(dialogText.historyHeading, dialogText.historyBody, buttons(clear)),
+            group(dialogText.progressHeading, dialogText.optionsSaving, buttons(createButton(dialogText.startOver, () => this.startOver()))),
+        ], [createButton(dialogText.ok, () => {
+            this.game.dispatch({ type: 'setHomePage', url: home.value });
+            this.dialog.close();
+        })], false, dialogText.cancel);
+    }
+
+    private startOver(): void {
+        if (!confirm(dialogText.startOverConfirm)) return;
+        this.dialog.close();
+        this.game.replaceState(createInitialState(this.game.content, Math.floor(Math.random() * 2 ** 32)));
+    }
+
+    private showProperties(url: string, title?: string): void {
+        const rows: (readonly [string, string])[] = [...(title ? [[dialogText.propertiesName, title] as const] : []), [dialogText.propertiesType, fileType(url)], [dialogText.propertiesAddress, url]];
+        this.dialog.show(dialogText.propertiesTitle, [createElement('dl', { className: 'properties' }, rows.flatMap(([label, value]) => [createElement('dt', { text: label }), createElement('dd', { text: value })]))]);
+    }
+
+    private showAbout(): void {
+        this.dialog.show(dialogText.aboutTitle, [createElement('pre', { text: dialogText.aboutBody.join('\n') })]);
+    }
+
+    private copyText(text: string): void {
+        void navigator.clipboard?.writeText(text).catch(() => undefined);
+    }
+
+    private selectedText(): string {
+        const doc = this.sourceOpen ? document : this.viewport.contentDocument;
+        return doc?.getSelection()?.toString() ?? '';
+    }
+
+    private absolute(address: string): string {
+        try { return new URL(address, this.viewedUrl).href; } catch { return address; }
+    }
+
+    private refresh(): void { this.navigate(this.viewedUrl, false); }
+
+    private goHome(): void { this.navigate(this.game.state.homePage); }
+
+    private focusAddress(): void {
+        this.address.focus();
+        this.address.select();
     }
 
     private showSave(): void {
@@ -399,9 +566,10 @@ export class BrowserPanel implements Panel {
             const accepted = this.game.dispatch({ type: 'submitCredentials', url, username: username.value, password: password.value });
             if (accepted) { this.dialog.close(); this.render(); } else message.textContent = uiText.wrongCredentials;
         };
-        password.addEventListener('keydown', (event) => { if (event.key === 'Enter') submit(); });
+        for (const field of [username, password]) field.addEventListener('keydown', (event) => { if (event.key === 'Enter') submit(); });
         this.dialog.show(dialogText.loginTitle, [createElement('p', { text: dialogText.loginPrompt }), createElement('p', { text: `${dialogText.loginSite}: ${new URL(url).host}` }), createElement('p', { text: `${dialogText.loginRealm}: ${realm}` }),
             createElement('label', { className: 'login-field' }, [dialogText.loginUser, username]), createElement('label', { className: 'login-field' }, [dialogText.loginPassword, password]), message], [createButton(dialogText.ok, submit)]);
+        username.focus();
     }
 
     private openLink(address: string, newWindow: boolean): void {
@@ -423,9 +591,11 @@ export class BrowserPanel implements Panel {
         });
         doc.addEventListener('mouseout', (event) => { if (event.relatedTarget === null) this.hoveredLink = null; });
         doc.addEventListener('contextmenu', (event) => {
-            if ((event.target as Element).matches('input, textarea')) return;
+            const target = event.target as Element;
+            if (target.matches('input, textarea')) return;
             event.preventDefault();
-            this.showContextMenu(event.clientX, event.clientY);
+            const frame = this.viewport.getBoundingClientRect();
+            this.openContextMenu(this.pageMenu(target, doc), frame.left + event.clientX, frame.top + event.clientY);
         });
         doc.addEventListener('click', (event) => {
             this.hideContextMenu();
@@ -449,4 +619,12 @@ export class BrowserPanel implements Panel {
         const typingElsewhere = document.activeElement?.matches('input, textarea') === true;
         if (captchaInput && !typingElsewhere) captchaInput.focus();
     }
+}
+
+function fileType(url: string): string {
+    try {
+        const path = new URL(url).pathname;
+        const extension = path.endsWith('/') ? 'htm' : /\.(\w+)$/.exec(path)?.[1]?.toLowerCase() ?? '';
+        return fileTypes[extension] ?? dialogText.unknownFileType;
+    } catch { return dialogText.unknownFileType; }
 }

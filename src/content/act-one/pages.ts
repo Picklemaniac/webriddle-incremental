@@ -58,8 +58,8 @@ function imageFilePage(name: string, body: string, style: string, note: string |
     return documentPage(name, body, 200, style, binaryText(name, note, zipped));
 }
 
-function pictureTag(picture: Picture, width = picture.width, height = picture.height, className = ''): string {
-    return `<img src="${picture.src}" width="${width}" height="${height}" alt=""${className === '' ? '' : ` class="${className}"`}>`;
+function pictureTag(picture: Picture, address: string, width = picture.width, height = picture.height, className = ''): string {
+    return `<img src="${picture.src}" width="${width}" height="${height}" alt="" data-address="${escapeHtml(address)}"${className === '' ? '' : ` class="${className}"`}>`;
 }
 
 function soundFilePage(name: string, sound: Sound): Page {
@@ -86,8 +86,9 @@ function picture(page: LevelPage, withExtras = false): string {
     const spot = withExtras && target !== undefined && page.hotspot !== null
         ? `<a class="spot" href="${target.name}" style="left:${(page.hotspot.x * 100).toFixed(1)}%;top:${(page.hotspot.y * 100).toFixed(1)}%;width:8%;height:12%"></a>` : '';
     const rollover = page.files.find((file) => file.display === 'rollover');
-    const over = withExtras && rollover !== undefined && 'drawing' in rollover.content ? `<img class="over" src="${drawPicture(rollover.content.drawing).src}" alt="">` : '';
-    return `<span class="picture"><img src="${imagePath(page.imageId)}" alt=""${title}>${over}<span class="number">${page.level}</span>${spot}</span>`;
+    const over = withExtras && rollover !== undefined && 'drawing' in rollover.content
+        ? `<img class="over" src="${drawPicture(rollover.content.drawing).src}" alt="" data-address="${escapeHtml(rollover.name)}">` : '';
+    return `<span class="picture"><img src="${imagePath(page.imageId)}" alt="" data-address="${escapeHtml(page.imageName)}"${title}>${over}<span class="number">${page.level}</span>${spot}</span>`;
 }
 
 function lineHtml(line: string, dark: (part: string) => string): string {
@@ -113,10 +114,10 @@ function renderLevel(level: number): Page {
             const drawing = drawPicture(file.content.drawing);
             if (file.display === 'squashed') {
                 reserved += 19;
-                return `<p class="drawing">${pictureTag(drawing, pictureWidth, 3, 'squashed')}</p>`;
+                return `<p class="drawing">${pictureTag(drawing, file.name, pictureWidth, 3, 'squashed')}</p>`;
             }
             reserved += drawing.height + 16;
-            return `<p class="drawing">${pictureTag(drawing)}</p>`;
+            return `<p class="drawing">${pictureTag(drawing, file.name)}</p>`;
         }
         if (file.linked === 'sound' && 'sound' in file.content) {
             reserved += 48;
@@ -130,7 +131,7 @@ function renderLevel(level: number): Page {
         ...embedded,
         page.spans.length === 0 ? '' : `<p>${page.spans.map((span) => `<span class="c${span.order}">${escapeHtml(span.letter)}</span>`).join(' ')}</p>`,
         ...page.emphasis.map((line) => `<p>${emphasisHtml(line)}</p>`),
-        page.spacers.length === 0 ? '' : `<p>${page.spacers.map((width) => pictureTag(drawPicture({ kind: 'spacer', text: '' }), width, 1)).join('')}</p>`,
+        page.spacers.length === 0 ? '' : `<p>${page.spacers.map((width) => pictureTag(drawPicture({ kind: 'spacer', text: '' }), 'spacer.gif', width, 1)).join('')}</p>`,
         page.grid.length === 0 ? '' : `<pre class="grid">${escapeHtml(page.grid.join('\n'))}</pre>`,
         page.colors.length === 0 ? '' : `<div class="swatches">${page.colors.map((color) => `<span style="background:${color}"></span>`).join('')}</div>`,
         page.hiddenText === null ? '' : `<p class="hidden">${escapeHtml(page.hiddenText)}</p>`,
@@ -203,7 +204,7 @@ export function resolvePage(url: string, state: GameState): Page {
     const start = startPage(address, scrollbarStyle, pictureStyle);
     if (start !== null) return start;
     if (!address.startsWith(`${riddleOrigin}/`)) return errorPage('unavailable');
-    if (address === `${riddleOrigin}/present.gif`) return imageFilePage('present.gif', pictureTag(drawPicture({ kind: 'gift', text: entrance(7).answer })), gifStyle);
+    if (address === `${riddleOrigin}/present.gif`) return imageFilePage('present.gif', pictureTag(drawPicture({ kind: 'gift', text: entrance(7).answer }), 'present.gif'), gifStyle);
     const known = state.visitedLevels[address];
     if (known !== undefined) return renderLevel(known);
     if (address === urlOfLevel(state.currentLevel)) return renderLevel(state.currentLevel);
@@ -229,7 +230,7 @@ function levelFilePage(address: string, state: GameState): Page | null {
 }
 
 function filePage({ name, content }: LevelFile): Page {
-    if ('drawing' in content) return imageFilePage(name, pictureTag(drawPicture(content.drawing)), gifStyle);
+    if ('drawing' in content) return imageFilePage(name, pictureTag(drawPicture(content.drawing), name), gifStyle);
     if ('sound' in content) return soundFilePage(name, content.sound);
     if ('bytesOf' in content) return textFilePage(name, binaryText(content.bytesOf));
     if ('page' in content) {

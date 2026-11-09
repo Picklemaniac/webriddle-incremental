@@ -154,6 +154,16 @@ describe('Act I', () => {
         expect([...seen].sort()).toEqual(['boldLetters', 'caselessBase64', 'fakeTags', 'interleaved', 'spacers']);
     });
 
+    it('remembers visited pages and the chosen home page', () => {
+        const game = newGame();
+        for (const url of [riddleHomeUrl, rulesUrl, riddleHomeUrl]) game.dispatch({ type: 'navigate', url });
+        expect(game.state.history.slice(-2)).toEqual([canonicalUrl(rulesUrl), canonicalUrl(riddleHomeUrl)]);
+        expect(game.dispatch({ type: 'setHomePage', url: rulesUrl })).toBe(true);
+        expect(game.state.homePage).toBe(canonicalUrl(rulesUrl));
+        expect(game.dispatch({ type: 'clearHistory' })).toBe(true);
+        expect(game.state.history).toEqual([]);
+    });
+
     it('adds and removes favorites', () => {
         const game = newGame();
         expect(game.dispatch({ type: 'addFavorite', url: riddleHomeUrl })).toBe(true);

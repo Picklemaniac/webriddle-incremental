@@ -41,6 +41,8 @@ export interface GameState {
     network: NetworkState;
     captcha: CaptchaChallenge | null;
     favorites: string[];
+    history: string[];
+    homePage: string;
     visitedLevels: Record<string, number>;
 }
 
@@ -64,6 +66,8 @@ export function createInitialState(content: GameContent, seed: number): GameStat
         network: { heat: 0, bannedUntil: 0, proxies: [] },
         captcha: null,
         favorites: [],
+        history: [],
+        homePage: content.homeUrl,
         visitedLevels: { [content.startUrl]: 1 },
     };
 }

@@ -189,6 +189,8 @@ function validateState(value: unknown): void {
         }),
         captcha: validCaptcha,
         favorites: arrayOf(string),
+        history: arrayOf(string),
+        homePage: string,
         visitedLevels: recordOf(positiveInteger),
     };
     if (!isPlainObject(value)) {

@@ -10,6 +10,8 @@ import { canonicalUrl, resolvePage } from './pages.ts';
 import { automationElapsed, isUpgradeRevealed, owns, solveLevel } from './progress.ts';
 import { homeUrl, startUrl } from './riddle.ts';
 import { labels } from './text.ts';
+
+const rememberedPages = 100;
 import { capacityUpgrades, offeredUpgrades, upgrades, type Upgrade } from './upgrades.ts';
 
 const firstOfferSeconds = 75;
@@ -136,6 +138,7 @@ export const actOneContent: GameContent = {
     handleNavigation(game, address) {
         const url = canonicalUrl(address);
         game.state.browserUrl = url;
+        rememberVisit(game.state, url);
         if (url === startUrl) game.state.flags.entered = true;
         const next = entrance(game.state.currentLevel + 1);
         if (!isBanned(game) && next.url === url && next.credentials === null) solveLevel(game, 'hand');
@@ -160,10 +163,17 @@ export const actOneContent: GameContent = {
                 if (action.username.toLowerCase().trim() !== next.credentials.username || action.password.toLowerCase().trim() !== next.credentials.password) return false;
                 solveLevel(game, 'hand');
                 game.state.browserUrl = next.url;
+                rememberVisit(game.state, next.url);
                 return true;
             }
             case 'addFavorite':
                 if (!game.state.favorites.includes(action.url)) game.state.favorites.push(action.url);
+                return true;
+            case 'setHomePage':
+                game.state.homePage = canonicalUrl(action.url);
+                return true;
+            case 'clearHistory':
+                game.state.history = [];
                 return true;
             case 'removeFavorite': {
                 const index = game.state.favorites.indexOf(action.url);
@@ -176,3 +186,7 @@ export const actOneContent: GameContent = {
     },
     offlineCapSeconds: (state) => (owns(state, 'leavePcOn') ? 24 : 12) * 3600,
 };
+
+function rememberVisit(state: Game['state'], url: string): void {
+    state.history = [...state.history.filter((visited) => visited !== url), url].slice(-rememberedPages);
+}
