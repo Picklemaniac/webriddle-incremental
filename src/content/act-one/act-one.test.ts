@@ -308,7 +308,8 @@ describe('Act I', () => {
         const restored = new Game(actOneContent, parseSave(serializeSave(game.state, 0), createInitialState(actOneContent, 99)).state);
         game.advance(600);
         restored.catchUp(600);
-        expect(restored.state).toEqual(game.state);
+        expect(restored.state.statistics.offlineSeconds).toBe(600);
+        expect(withoutTimeAway(restored.state)).toEqual(game.state);
     });
 
     it('uses identical gameplay ticks in a live tab and offline, including a saved fractional tick', () => {
@@ -322,7 +323,8 @@ describe('Act I', () => {
         const offline = new Game(actOneContent, parseSave(serializeSave(live.state, 0), createInitialState(actOneContent, 1)).state);
         for (let tick = 0; tick < 72000; tick++) live.advance(0.05);
         offline.catchUp(3600);
-        expect(live.state).toEqual(offline.state);
+        expect(offline.state.statistics.offlineSeconds).toBe(3600);
+        expect(live.state).toEqual(withoutTimeAway(offline.state));
     });
 
     it('keeps images from visited pages available and shows easter eggs once', () => {
@@ -366,6 +368,12 @@ describe('Act I', () => {
         expect(plan.hitAt).toBeGreaterThan(1e9);
     });
 });
+
+function withoutTimeAway(state: Game['state']): Game['state'] {
+    const statistics = { ...state.statistics };
+    delete statistics.offlineSeconds;
+    return { ...state, statistics };
+}
 
 function layerReadings(answer: string): string[] {
     const shifts = Array.from({ length: 25 }, (_, index) => answer.replace(/[a-z]/g, (letter) => String.fromCharCode(97 + ((letter.charCodeAt(0) - 97 + index + 1) % 26))));

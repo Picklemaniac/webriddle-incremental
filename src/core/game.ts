@@ -75,6 +75,7 @@ export class Game {
         this.catchingUp = true;
         try {
             const summary = simulateOfflineProgress(this, awaySeconds);
+            this.currentState.statistics.offlineSeconds = (this.currentState.statistics.offlineSeconds ?? 0) + summary.simulatedSeconds;
             this.announce({ type: 'offlineProgressApplied', summary });
             return summary;
         } finally {
@@ -131,6 +132,9 @@ export class Game {
         }
         spend(this.currentState, cost);
         this.currentState.purchases[purchasableId] = ownedCount(this.currentState, purchasableId) + 1;
+        const { statistics } = this.currentState;
+        statistics[`boughtAt:${purchasableId}`] ??= this.currentState.elapsedSeconds - (statistics.offlineSeconds ?? 0);
+        statistics[`boughtAtLevel:${purchasableId}`] ??= this.currentState.currentLevel;
         this.invalidateStats();
         return true;
     }

@@ -17,6 +17,17 @@ describe('Game', () => {
         expect(game.stat('income')).toBe(2);
     });
 
+    it('records when and at which level something was first bought, without time spent away', () => {
+        const game = createTestGame();
+        game.catchUp(600);
+        game.advance(5);
+        game.gainResource('points', 10);
+        game.dispatch({ type: 'purchase', purchasableId: 'booster' });
+        expect(game.state.statistics.offlineSeconds).toBe(600);
+        expect(game.state.statistics['boughtAt:booster']).toBe(5);
+        expect(game.state.statistics['boughtAtLevel:booster']).toBe(game.state.currentLevel);
+    });
+
     it('rejects purchases that are unaffordable or sold out', () => {
         const game = createTestGame();
         expect(game.dispatch({ type: 'purchase', purchasableId: 'booster' })).toBe(false);
