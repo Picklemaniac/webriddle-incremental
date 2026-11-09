@@ -23,7 +23,7 @@ export const puzzleNames: Readonly<Record<string, string>> = {
     earlierAnswers: 'Letters from the names of earlier levels', xmlFile: 'Same name as the picture as .xml', wavFile: 'Same name as the picture as .wav', zipFile: 'Same name as the picture as .zip',
     atbash: 'Atbash', morse: 'Morse code', nato: 'NATO alphabet', capitals: 'Capital letters in a line of words', semaphorePicture: 'Semaphore picture',
     caesar: 'Caesar shift of 3', shift: 'Caesar shift of another amount', binary: 'Binary', upsideDown: 'Upside-down text', pigpenPicture: 'Pigpen picture',
-    phone: 'Phone keypad presses', blinkPicture: 'Blinking light (animated Morse)', braille: 'Braille characters', mirrorPicture: 'Mirrored picture of the text',
+    phone: 'Phone keypad presses', braille: 'Braille characters', mirrorPicture: 'Mirrored picture of the text',
     acrostic: 'First letters of words', lastLetters: 'Last letters of words', polybius: 'Polybius square', flagsPicture: 'Signal flags picture', tap: 'Tap code',
     script: 'Password check in a linked .js file', keyboard: 'Keyboard shift', swatches: 'Colour swatches (letter codes as colours)',
     braillePicture: 'Braille picture', hex: 'Hexadecimal', vigenere: 'Vigenère, with the key as the title', ascii: 'ASCII codes', bitsPicture: 'Binary grid picture',
@@ -54,7 +54,8 @@ const placeHints: Readonly<Record<string, keyof typeof puzzleHints>> = {
 };
 
 const answerTypes: readonly { readonly name: string; readonly hints: readonly string[]; readonly matches: (survey: Survey) => boolean }[] = [
-    { name: 'Another file extension than .htm', hints: ['clueLines.extension.0', 'clueLines.extension.1'], matches: (survey) => survey.kind === 'extension' },
+    { name: 'Another file extension than .htm', hints: ['clueLines.extension.0'], matches: (survey) => survey.kind === 'extension' },
+    { name: 'A name that is in no wordlist', hints: [], matches: (survey) => survey.kind === 'name' },
     { name: 'A word with digits for some letters', hints: [], matches: (survey) => survey.kind === 'leet' },
     { name: 'A year', hints: [], matches: (survey) => survey.kind === 'number' },
     { name: 'A user name and password', hints: ['clueLines.credentials'], matches: (survey) => survey.kind === 'credentials' },

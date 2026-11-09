@@ -65,6 +65,7 @@ export const puzzleHints = {
     phone: ['pick up the phone'],
     boldLetters: ['be bold'],
     braille: ['feel your way'],
+    braillePicture: ['not meant for your eyes'],
     acrostic: ['first things first'],
     lastLetters: ['save the best for last'],
     polybius: ['five by five'],
@@ -73,12 +74,13 @@ export const puzzleHints = {
     keyboardRight: ['one step to the right'],
     keyboardLeft: ['one step to the left'],
     colors: ['colour by numbers'],
+    pixels: ['every pixel counts'],
     scrambled: ['order, order'],
     clocks: ['give me a sign'],
     letterGrid: ['seek and you shall find'],
     earlierAnswers: ['you have been here before.'],
     fakeTags: ['tag, you\'re it'],
-    bacon: ['bring home the bacon'],
+    bacon: ['🐖🔪'],
     dna: ['it\'s in your genes'],
     spacers: ['mind the gap'],
     railFence: ['off the rails'],
@@ -105,7 +107,7 @@ export const puzzleHints = {
     txtFile: ['just text me.'],
     jsonFile: ['ask jason.'],
     cssFile: ['it is all a matter of style.'],
-    xmlFile: ['xml marks the spot.'],
+    xmlFile: ['x[[ml]] marks the spot.'],
     wavFile: ['i waved at you.', '👋'],
     zipFile: ['check the archives.', 'it\'s all packed away.'],
 } as const satisfies Record<string, readonly string[]>;
@@ -125,7 +127,7 @@ export const linkedFiles = {
 
 export const clueLines = {
     credentials: 'members only.',
-    extension: ['it\'s all in the ending.', 'same name, different ending.'],
+    extension: ['it\'s all in the ending.'],
 } as const;
 
 export const riddleName = 'Notfinite';

@@ -15,6 +15,7 @@
         "export-text": "node tools/export-text.ts",
         "gallery": "node tools/level-gallery.ts",
         "pictures": "node tools/picture-gallery.ts",
+        "build-props": "node tools/build-props.ts",
         "check:browser": "node tools/browser-check.mjs"
     },
     "devDependencies": {

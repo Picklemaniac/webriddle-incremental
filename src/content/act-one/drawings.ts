@@ -1,6 +1,7 @@
-import { brailleDots, characterColors, morseCode } from './encodings.ts';
+import { brailleDots, characterColors } from './encodings.ts';
+import { clockFace, presentPhoto, semaphoreFigure, semaphoreFigures } from './generated/props.ts';
 
-export type DrawingKind = 'gift' | 'semaphore' | 'clocks' | 'pigpen' | 'flags' | 'braille' | 'blink' | 'plain' | 'mirror' | 'rotated' | 'dark' | 'transparent' | 'flash' | 'delayed'
+export type DrawingKind = 'gift' | 'semaphore' | 'clocks' | 'pigpen' | 'flags' | 'braille' | 'plain' | 'mirror' | 'rotated' | 'dark' | 'transparent' | 'flash' | 'delayed'
     | 'pixels' | 'bits' | 'shares' | 'spacer';
 
 export interface Drawing {
@@ -37,7 +38,7 @@ const semaphorePositions = '01 02 03 04 05 06 07 12 13 46 14 15 16 17 23 24 25 2
 const flagColors = { red: '#d52b1e', blue: '#1d4f91', yellow: '#f6c700', white: '#f7f7f2', black: '#111111' } as const;
 
 const painters: Readonly<Record<DrawingKind, (text: string) => Picture>> = {
-    gift, semaphore, clocks, pigpen, flags, braille, blink, plain, mirror, rotated, dark, transparent, flash, delayed, pixels, bits, shares, spacer,
+    gift, semaphore, clocks, pigpen, flags, braille, plain, mirror, rotated, dark, transparent, flash, delayed, pixels, bits, shares, spacer,
 };
 
 const pictures = new Map<string, Picture>();
@@ -54,57 +55,33 @@ export function drawPicture(drawing: Drawing): Picture {
 }
 
 function gift(word: string): Picture {
-    const tagWidth = word.length * 6 + 7;
-    const width = 44 + tagWidth;
-    const shapes = [
-        box(0, 0, width, 40, '#101018'),
-        box(4, 18, 28, 20, '#d81b30'), box(2, 12, 32, 6, '#a3101f'),
-        box(16, 12, 4, 26, '#ffd23f'), box(4, 26, 28, 3, '#ffd23f'),
-        box(11, 6, 5, 2, '#ffd23f'), box(10, 8, 2, 3, '#ffd23f'), box(12, 10, 5, 2, '#ffd23f'),
-        box(20, 6, 5, 2, '#ffd23f'), box(24, 8, 2, 3, '#ffd23f'), box(19, 10, 5, 2, '#ffd23f'),
-        box(16, 9, 4, 3, '#e0a800'),
-        box(34, 14, 6, 1, '#c8c8c8'),
-        box(40, 9, tagWidth, 13, '#6b4f1d'), box(41, 10, tagWidth - 2, 11, '#fff3c4'),
-        pixelText(word, 44, 12, '#1a1a1a'),
-    ];
-    return svgPicture(width, 40, shapes.join(''), 4, true);
+    const { src, width, height } = presentPhoto;
+    const size = Math.min(30, Math.floor(218 / Math.max(1, word.length)));
+    const label = `<text x="203" y="104" transform="rotate(-8 203 104)" text-anchor="middle" font-family="Comic Sans MS, Comic Sans, cursive" font-weight="bold" `
+        + `font-size="${size}" fill="#ffffff" stroke="#3a0000" stroke-width="0.8" paint-order="stroke">${word}</text>`;
+    return svgPicture(width, height, `<image href="${src}" width="${width}" height="${height}"/>${label}`, 1);
 }
 
 function semaphore(text: string): Picture {
-    return symbolRow(text, 56, 60, 8, '#e9eef2', (character) => {
-        const pair = semaphorePositions[character.charCodeAt(0) - 97];
-        return pair === undefined ? '' : signaller(Number(pair[0]), Number(pair[1]));
+    const { width, height } = semaphoreFigure;
+    return symbolRow(text, width, height, 6, '#ffffff', (character) => {
+        const figure = semaphoreFigures[character];
+        return figure === undefined ? '' : `<image href="${figure}" width="${width}" height="${height}"/>`;
     });
 }
 
-function signaller(first: number, second: number): string {
-    const angle = (position: number): number => 90 + position * 45;
-    const [left, right] = [first, second].sort((one, other) => Math.cos(angle(one) * Math.PI / 180) - Math.cos(angle(other) * Math.PI / 180));
-    const arm = (shoulder: number, position: number): string => `<g transform="translate(${shoulder} 25) rotate(${angle(position)})">`
-        + `<path d="M0 0H15" stroke="#333" stroke-width="2.5" stroke-linecap="round"/><path d="M14 -4H22V4Z" fill="#d52b1e"/><path d="M14 -4V4H22Z" fill="#f6c700"/></g>`;
-    return '<circle cx="28" cy="16" r="5" fill="#333"/>'
-        + '<path d="M28 21V41M28 41L23 55M28 41L33 55M24 25H32" stroke="#333" stroke-width="3" stroke-linecap="round" fill="none"/>'
-        + arm(24, left!) + arm(32, right!);
-}
-
 function clocks(text: string): Picture {
-    return symbolRow(text, 34, 34, 10, '#e9e4d8', (character) => {
+    return symbolRow(text, 44, 44, 10, null, (character) => {
         const pair = semaphorePositions[character.charCodeAt(0) - 97];
         if (pair === undefined) return '';
-        const hand = (position: number, length: number, width: number): string => {
-            const angle = (180 + position * 45) * Math.PI / 180;
-            return `<path d="M17 17L${(17 + length * Math.sin(angle)).toFixed(2)} ${(17 - length * Math.cos(angle)).toFixed(2)}" stroke="#222" stroke-width="${width}" stroke-linecap="round"/>`;
-        };
-        const ticks = Array.from({ length: 12 }, (_, hour) => {
-            const angle = hour * Math.PI / 6;
-            return `<path d="M${(17 + 12 * Math.sin(angle)).toFixed(2)} ${(17 - 12 * Math.cos(angle)).toFixed(2)}L${(17 + 14 * Math.sin(angle)).toFixed(2)} ${(17 - 14 * Math.cos(angle)).toFixed(2)}" stroke="#555" stroke-width="1"/>`;
-        }).join('');
-        return `<circle cx="17" cy="17" r="15" fill="#fdfdf8" stroke="#333" stroke-width="1.5"/>${ticks}${hand(Number(pair[0]), 7, 2.5)}${hand(Number(pair[1]), 11, 1.5)}<circle cx="17" cy="17" r="1.5" fill="#222"/>`;
+        const angle = (position: string): string => String((180 + Number(position) * 45) % 360);
+        const face = clockFace.replace('{hour}', angle(pair[0]!)).replace('{minute}', angle(pair[1]!));
+        return `<image href="data:image/svg+xml,${encodeURIComponent(face)}" x="2" y="2" width="40" height="40"/>`;
     });
 }
 
 function pigpen(text: string): Picture {
-    return symbolRow(text, 28, 28, 10, '#f2ead3', (character) => {
+    return symbolRow(text, 28, 28, 10, null, (character) => {
         const index = character.charCodeAt(0) - 97;
         if (index < 0 || index > 25) return '';
         const dotted = (index >= 9 && index < 18) || index >= 22;
@@ -120,14 +97,14 @@ function pigpen(text: string): Picture {
             lines = ['M1 1L8 14L15 1', 'M1 1L14 8L1 15', 'M15 1L2 8L15 15', 'M1 15L8 2L15 15'][wedge]!;
             dot = ([[8, 6], [6, 8], [10, 8], [8, 10]] as const)[wedge]!;
         }
-        return `<g transform="translate(6 6)"><path d="${lines}" stroke="#2b2b2b" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" fill="none"/>`
-            + `${dotted ? `<circle cx="${dot[0]}" cy="${dot[1]}" r="1.8" fill="#2b2b2b"/>` : ''}</g>`;
+        return `<g transform="translate(6 6)"><path d="${lines}" stroke="#dddddd" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" fill="none"/>`
+            + `${dotted ? `<circle cx="${dot[0]}" cy="${dot[1]}" r="1.8" fill="#dddddd"/>` : ''}</g>`;
     });
 }
 
 function flags(text: string): Picture {
     const outline = ' stroke="#333" stroke-width="0.6"';
-    return symbolRow(text, 36, 26, 6, '#c7d3dc', (character) => {
+    return symbolRow(text, 36, 26, 6, null, (character) => {
         const design = flagDesign(character);
         if (design === '') return '';
         const edge = character === 'a' || character === 'b' ? swallowtail('none', outline) : `<rect width="30" height="20" fill="none"${outline}/>`;
@@ -185,38 +162,12 @@ function swallowtail(color: string, extra = ''): string {
 }
 
 function braille(text: string): Picture {
-    return symbolRow(text, 16, 22, 12, '#151515', (character) => {
+    return symbolRow(text, 16, 22, 12, null, (character) => {
         const dots = brailleDots(character);
         return [[5, 5], [5, 11], [5, 17], [11, 5], [11, 11], [11, 17]].map(([x, y], index) => (dots >> index) & 1
             ? `<circle cx="${x}" cy="${y}" r="2.4" fill="#eeeeee"/>`
             : `<circle cx="${x}" cy="${y}" r="1" fill="#444444"/>`).join('');
     }, 2);
-}
-
-function blink(text: string): Picture {
-    const timeline: [boolean, number][] = [];
-    for (const word of text.split(' ')) {
-        for (const character of word) {
-            for (const symbol of morseCode(character) ?? '') timeline.push([true, symbol === '-' ? 3 : 1], [false, 1]);
-            timeline[timeline.length - 1]![1] = 3;
-        }
-        timeline[timeline.length - 1]![1] = 7;
-    }
-    timeline[timeline.length - 1]![1] = 14;
-    const total = timeline.reduce((sum, [, units]) => sum + units, 0);
-    let elapsed = 0;
-    const keyTimes = timeline.map(([, units]) => {
-        const start = elapsed / total;
-        elapsed += units;
-        return Number(start.toFixed(5));
-    });
-    const animate = `<animate attributeName="opacity" calcMode="discrete" dur="${(total * 0.3).toFixed(1)}s" repeatCount="indefinite" `
-        + `keyTimes="${keyTimes.join(';')}" values="${timeline.map(([lit]) => (lit ? 1 : 0)).join(';')}"/>`;
-    const content = '<defs><radialGradient id="glow"><stop offset="0" stop-color="#fffdf2"/><stop offset="0.12" stop-color="#fff1c4"/>'
-        + '<stop offset="0.35" stop-color="#ffcf70" stop-opacity="0.45"/><stop offset="1" stop-color="#ffb347" stop-opacity="0"/></radialGradient></defs>'
-        + '<rect width="64" height="64" fill="#000"/><circle cx="32" cy="32" r="2.5" fill="#2b2720"/>'
-        + `<circle cx="32" cy="32" r="31" fill="url(#glow)" opacity="0">${animate}</circle>`;
-    return svgPicture(64, 64, content, 2);
 }
 
 function plain(text: string): Picture {
@@ -264,7 +215,7 @@ function pixels(text: string): Picture {
 
 function bits(text: string): Picture {
     const codes = [...text].map((character) => character.charCodeAt(0));
-    const squares = codes.flatMap((code, row) => Array.from({ length: 8 }, (_, column) => box(column * 5 + 2, row * 5 + 2, 4, 4, (code >> (7 - column)) & 1 ? '#f0f0f0' : '#2b2b2b')));
+    const squares = codes.flatMap((code, row) => Array.from({ length: 8 }, (_, column) => ((code >> (7 - column)) & 1 ? [box(column * 5 + 2, row * 5 + 2, 4, 4, '#f0f0f0')] : [])).flat());
     return svgPicture(43, codes.length * 5 + 3, box(0, 0, 43, codes.length * 5 + 3, '#000000') + squares.join(''), 2, true);
 }
 
@@ -292,13 +243,13 @@ function spacer(): Picture {
     return svgPicture(1, 1, '', 1);
 }
 
-function symbolRow(text: string, cellWidth: number, cellHeight: number, perRow: number, background: string, symbol: (character: string) => string, scale = 1, definitions = ''): Picture {
+function symbolRow(text: string, cellWidth: number, cellHeight: number, perRow: number, background: string | null, symbol: (character: string) => string, scale = 1, definitions = ''): Picture {
     const characters = [...text];
     const columns = Math.min(perRow, characters.length);
     const rows = Math.ceil(characters.length / perRow);
     const cells: Cell[] = characters.map((character, index) => ({ character, x: (index % perRow) * cellWidth, y: Math.floor(index / perRow) * cellHeight }));
     const content = cells.filter((cell) => cell.character !== ' ').map((cell) => `<g transform="translate(${cell.x} ${cell.y})">${symbol(cell.character)}</g>`).join('');
-    return svgPicture(columns * cellWidth, rows * cellHeight, `${definitions}${box(0, 0, columns * cellWidth, rows * cellHeight, background)}${content}`, scale);
+    return svgPicture(columns * cellWidth, rows * cellHeight, `${definitions}${background === null ? '' : box(0, 0, columns * cellWidth, rows * cellHeight, background)}${content}`, scale);
 }
 
 function svgPicture(width: number, height: number, content: string, scale: number, crisp = false): Picture {

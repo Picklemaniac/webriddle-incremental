@@ -17,7 +17,6 @@ const alphabet = 'abcdefghijklmnopqrstuvwxyz';
 const lastLevel = 1400;
 const alphabetKinds = new Set<DrawingKind>(['semaphore', 'clocks', 'pigpen', 'flags', 'braille']);
 const notes: Partial<Record<DrawingKind, string>> = {
-    blink: 'Animated. The light spells the word in Morse code.',
     dark: 'Nearly black on purpose. You need to brighten it to read it.',
     transparent: 'Black text on a transparent background, so it disappears on the black page until you select it.',
     flash: 'Animated. The text shows for a moment every three seconds.',
@@ -25,7 +24,7 @@ const notes: Partial<Record<DrawingKind, string>> = {
     shares: 'Overlay the two halves (difference blend) to read the text.',
     plain: 'On the page it is squashed to 3 pixels high. Opening the file shows it like this.',
 };
-const kinds: readonly DrawingKind[] = ['gift', 'semaphore', 'clocks', 'pigpen', 'flags', 'braille', 'blink', 'plain', 'mirror', 'rotated', 'dark', 'transparent',
+const kinds: readonly DrawingKind[] = ['gift', 'semaphore', 'clocks', 'pigpen', 'flags', 'braille', 'plain', 'mirror', 'rotated', 'dark', 'transparent',
     'flash', 'delayed', 'pixels', 'bits', 'shares'];
 
 const firstLevels = new Map<string, number>();

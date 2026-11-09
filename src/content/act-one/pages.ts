@@ -90,6 +90,10 @@ function picture(page: LevelPage, withExtras = false): string {
     return `<span class="picture"><img src="${imagePath(page.imageId)}" alt=""${title}>${over}<span class="number">${page.level}</span>${spot}</span>`;
 }
 
+function lineHtml(line: string, dark: (part: string) => string): string {
+    return line.split(/\[\[|\]\]/).map((part, index) => (index % 2 === 1 ? dark(escapeHtml(part)) : escapeHtml(part))).join('');
+}
+
 function emphasisHtml(line: readonly { readonly text: string; readonly bold: boolean }[]): string {
     return line.map((segment) => (segment.bold ? `<b>${escapeHtml(segment.text)}</b>` : escapeHtml(segment.text))).join('');
 }
@@ -122,7 +126,7 @@ function renderLevel(level: number): Page {
     });
     const body = [
         link === null ? picture(page, true) : `<a href="${link}">${picture(page)}</a>`,
-        ...page.lines.map((line) => `<p>${escapeHtml(line)}</p>`),
+        ...page.lines.map((line) => `<p>${lineHtml(line, (part) => `<span class="hidden">${part}</span>`)}</p>`),
         ...embedded,
         page.spans.length === 0 ? '' : `<p>${page.spans.map((span) => `<span class="c${span.order}">${escapeHtml(span.letter)}</span>`).join(' ')}</p>`,
         ...page.emphasis.map((line) => `<p>${emphasisHtml(line)}</p>`),
@@ -145,7 +149,7 @@ function levelSource(page: LevelPage, link: string | null): string {
     const image = `<img src="${page.imageName}" width="${pictureWidth}" height="${pictureHeight}" border="0"${name}${title}${hotspot === undefined ? '' : ' usemap="#map"'}${swap}>`;
     const area = hotspot === undefined || page.hotspot === null ? [] : [`<map name="map"><area shape="rect" coords="${[page.hotspot.x * pictureWidth, page.hotspot.y * pictureHeight,
         (page.hotspot.x + 0.08) * pictureWidth, (page.hotspot.y + 0.12) * pictureHeight].map(Math.round).join(',')}" href="${hotspot.name}"></map>`];
-    const font = (line: string): string => `<p><font face="Times New Roman" size="4">${escapeHtml(line)}</font></p>`;
+    const font = (line: string): string => `<p><font face="Times New Roman" size="4">${lineHtml(line, (part) => `<font color="#000000">${part}</font>`)}</font></p>`;
     const linked = (kind: LevelFile['linked'], tag: (file: LevelFile) => string): string[] => page.files.filter((file) => file.linked === kind).map(tag);
     const source = formatSource([
         doctype,

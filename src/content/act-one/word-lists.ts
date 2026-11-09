@@ -61,4 +61,11 @@ export const folderNames: readonly string[] = [
     'umber', 'vapor', 'willow', 'xenon', 'yarrow', 'zenith',
 ];
 
+export const answerNames: readonly string[] = [
+    'vega', 'lyra', 'rigel', 'deneb', 'altair', 'draco', 'orion', 'mira', 'sirius', 'castor', 'mizar', 'alcor', 'algol', 'spica',
+    'auriga', 'cygnus', 'aquila', 'lepus', 'vela', 'pavo', 'grus', 'indus', 'odin', 'thor', 'loki', 'freya', 'frigg', 'balder',
+    'zeus', 'hera', 'ares', 'hermes', 'apollo', 'athena', 'hades', 'gaia', 'helios', 'selene', 'osiris', 'anubis', 'horus',
+    'thoth', 'amun', 'bastet', 'freyr', 'njord', 'vidar', 'idun', 'bragi', 'avalon', 'thule', 'ophir',
+];
+
 export const handcraftedAnswerWords: readonly string[] = ['beneath', 'lighthouse', 'midnight', 'bridge', 'moon', 'mirror', 'dusk'];

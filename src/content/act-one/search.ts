@@ -177,6 +177,7 @@ function kindPlan(target: Entrance, capabilities: SearchCapabilities): SearchPla
                 return bruteForcePlan('a-z', target.answer.length, target.positionUnit);
             }
             return pairPlan(firstWord, secondWord, target.positionUnit, capabilities, fill(searchText.wordPairs, { list: starterWordlist.fileName }), (first, second) => page(`${first}${second}`));
+        case 'name':
         case 'phrase':
             return bruteForcePlan('a-z', target.answer.length, target.positionUnit);
     }

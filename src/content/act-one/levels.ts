@@ -5,10 +5,10 @@ import { encodedClue, textEncodingFor, wordClue, yearClue, type Clue } from './m
 import { pickByUnit, ramp, riddleOrigin, salts, startUrl, unitHash } from './riddle.ts';
 import type { Sound } from './sounds.ts';
 import { alternateFiles, clueLines, fill, handcraftedText, linkedFiles, pageText, riddleName } from './text.ts';
-import { vocabularySize, wordAtRank } from './vocabulary.ts';
-import { folderNames } from './word-lists.ts';
+import { rankOfWord, vocabularySize, wordAtRank } from './vocabulary.ts';
+import { answerNames, folderNames } from './word-lists.ts';
 
-export type EntranceKind = 'fixed' | 'word' | 'extension' | 'leet' | 'number' | 'credentials' | 'twoWords' | 'phrase';
+export type EntranceKind = 'fixed' | 'word' | 'extension' | 'name' | 'leet' | 'number' | 'credentials' | 'twoWords' | 'phrase';
 
 interface Credentials {
     readonly username: string;
@@ -83,6 +83,7 @@ const levelsPerFolder = 100;
 const untitledShare = 0.3;
 
 const wildcardFolders = new Set(['basalt', 'ember']);
+const unlistedNames = answerNames.filter((name) => wordAtRank(rankOfWord(name)) !== name);
 export const otherExtensions: readonly string[] = ['html', 'php', 'asp', 'txt'];
 
 const handcraftedEntrances: Readonly<Record<number, HandcraftedEntrance>> = {
@@ -246,6 +247,10 @@ function generatedEntrance(level: number, attempt = 0): Entrance {
             };
             return buildEntrance(level, kind, word, extension, [word], null, clue, folder);
         }
+        case 'name': {
+            const name = pickByUnit(unlistedNames, unit(salts.rank));
+            return buildEntrance(level, kind, name, 'htm', [name], null, wordClue(level, name, wordPageName), folder);
+        }
         case 'leet': {
             const word = sampleWord(level, unit(salts.rank));
             const answer = toLeet(word, unit(salts.leet));
@@ -320,6 +325,7 @@ function wordPageName(level: number): string | null {
 function chooseKind(level: number): EntranceKind {
     const weights: readonly (readonly [EntranceKind, number])[] = [
         ['extension', ramp(level, 150, 400, 0.08, 0.2)],
+        ['name', ramp(level, 250, 1000, 0.015, 0.03)],
         ['leet', ramp(level, 300, 600, 0.06, 0.16)],
         ['number', ramp(level, 400, 700, 0.06, 0.1)],
         ['credentials', ramp(level, 500, 800, 0.05, 0.1)],
