@@ -22,6 +22,11 @@ const downloadFiles: Readonly<Partial<Record<UpgradeId, string>>> = {
 const durations: Readonly<Record<SetupKind, number>> = { install: 1.6, download: 2, hardware: 1.4, connection: 2.4 };
 const maximumWindows = 3;
 
+export function setupSeconds(upgradeId: string): number {
+    const kind = kinds[upgradeId as UpgradeId];
+    return kind === undefined ? 0 : durations[kind];
+}
+
 export class SetupWindows {
     private readonly element = createElement('div', { className: 'setup-windows', attributes: { role: 'status' } });
 

@@ -8,6 +8,7 @@ import { formatBytes, formatNumber } from '../format.ts';
 import { formatAmount } from './amounts.ts';
 import { createButton, createElement, section } from './dom.ts';
 import type { Panel } from './panel.ts';
+import { setupSeconds } from './setup-windows.ts';
 
 const statLabels: Readonly<Record<string, { readonly label: string; readonly value: string }>> = statText;
 const requestStats: ReadonlySet<string> = new Set(['threadsPerScript', 'requestsPerThread']);
@@ -25,6 +26,7 @@ export class PurchasesPanel implements Panel {
     private readonly tooltip = createElement('div', { className: 'win-tooltip', attributes: { role: 'tooltip' } });
     private tooltipTimer: ReturnType<typeof setTimeout> | undefined;
     private purchaseLockUntil = 0;
+    private newCardsAfter = 0;
 
     constructor(game: Game) {
         this.game = game;
@@ -44,9 +46,13 @@ export class PurchasesPanel implements Panel {
         this.element.append(this.empty, list);
         document.body.append(this.tooltip);
         game.subscribe((event) => {
+            if (event.type === 'actionApplied' && event.action.type === 'purchase' && !game.isCatchingUp) {
+                this.newCardsAfter = Math.max(this.newCardsAfter, performance.now() + setupSeconds(event.action.purchasableId) * 1000);
+            }
             if (event.type !== 'stateReplaced') return;
             this.leaving.clear();
             this.purchaseLockUntil = 0;
+            this.newCardsAfter = 0;
         });
     }
 
@@ -60,8 +66,8 @@ export class PurchasesPanel implements Panel {
             const card = this.cards.get(item.id)!;
             const leaving = this.leaving.has(item.id);
             const affordable = canAfford(this.game.state, item.price);
-            const waitingForLeavingCard = card.hidden && this.leaving.size > 0;
-            card.hidden = leaving ? false : !offered.has(item.id) || waitingForLeavingCard;
+            const heldBack = card.hidden && (this.leaving.size > 0 || now < this.newCardsAfter);
+            card.hidden = leaving ? false : !offered.has(item.id) || heldBack;
             card.disabled = leaving || !affordable || now < this.purchaseLockUntil;
             card.classList.toggle('unaffordable', !affordable && !leaving);
             card.classList.toggle('leaving', leaving);
