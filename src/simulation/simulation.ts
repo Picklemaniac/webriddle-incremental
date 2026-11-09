@@ -45,6 +45,10 @@ interface AdvanceClock {
     readonly offline: boolean;
 }
 
+export function milestoneTiming(report: SimulationReport, milestoneId: string): MilestoneTiming | undefined {
+    return report.milestoneTimings.find((timing) => timing.milestoneId === milestoneId);
+}
+
 export function simulatePlayer(profile: PlayerProfile, content: GameContent, options: SimulationOptions): SimulationReport {
     if (!Number.isInteger(options.days) || options.days < 1 || !Number.isFinite(options.stepSeconds) || options.stepSeconds <= 0) {
         throw new Error('Simulation days must be a positive integer and the step must be positive.');

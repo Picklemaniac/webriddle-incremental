@@ -10,12 +10,13 @@ type SetupKind = 'install' | 'download' | 'hardware' | 'connection';
 const kinds: Readonly<Partial<Record<UpgradeId, SetupKind>>> = {
     wgetMirror: 'install', autoReplyMacros: 'install', dirb: 'install', gobuster: 'install', ffuf: 'install', proxyChecker: 'install', crackHtpasswd: 'install',
     english10k: 'download', dictWords: 'download', scrabble: 'download', rockyou: 'download', freeProxies: 'download',
-    ram: 'hardware', newPc: 'hardware', secondPc: 'hardware', server: 'hardware',
-    isdn: 'connection', adsl: 'connection', cable: 'connection', fiber: 'connection',
+    customFuzzer: 'install', namesList: 'download', moreLeaks: 'download',
+    ram: 'hardware', newPc: 'hardware', secondPc: 'hardware', server: 'hardware', dedicatedServer: 'hardware', serverRack: 'hardware',
+    isdn: 'connection', adsl: 'connection', cable: 'connection', fiber: 'connection', gigabit: 'connection',
 };
 
 const downloadFiles: Readonly<Partial<Record<UpgradeId, string>>> = {
-    english10k: 'english-10k.txt', dictWords: 'words', scrabble: 'scrabble.txt', rockyou: 'rockyou.txt', freeProxies: 'proxies.txt',
+    english10k: 'english-10k.txt', dictWords: 'words', scrabble: 'scrabble.txt', rockyou: 'rockyou.txt', freeProxies: 'proxies.txt', namesList: 'names.txt', moreLeaks: 'leaks.txt',
 };
 
 const durations: Readonly<Record<SetupKind, number>> = { install: 1.6, download: 2, hardware: 1.4, connection: 2.4 };

@@ -5,7 +5,7 @@ import './ui/onboarding.css';
 import { GameLoop } from './app/game-loop.ts';
 import { gameContent } from './content/index.ts';
 import { Game } from './core/game.ts';
-import { createInitialState } from './core/state.ts';
+import { createInitialState, randomSeed } from './core/state.ts';
 import { autosaveSlotName, SaveSlots } from './persistence/save-slots.ts';
 import { GameScreen } from './ui/game-screen.ts';
 
@@ -76,8 +76,4 @@ function startAutosave(): void {
         }
     });
     addEventListener('pagehide', autosave);
-}
-
-function randomSeed(): number {
-    return Math.floor(Math.random() * 2 ** 32);
 }

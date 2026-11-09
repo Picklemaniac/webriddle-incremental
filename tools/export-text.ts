@@ -3,14 +3,18 @@ import * as text from '../src/content/act-one/text.ts';
 import { findings } from '../src/content/act-one/findings.ts';
 import { vocabulary } from '../src/content/act-one/generated/vocabulary.ts';
 import { actOneContent } from '../src/content/act-one/index.ts';
-import { entrance, levelPage } from '../src/content/act-one/levels.ts';
+import { entrance, firstGeneratedLevel, levelPage } from '../src/content/act-one/levels.ts';
 import { riddleOrigin, startUrl } from '../src/content/act-one/riddle.ts';
 import { planSearch, searchCapabilities } from '../src/content/act-one/search.ts';
 import { upgrades } from '../src/content/act-one/upgrades.ts';
 import { folderNames, subjects } from '../src/content/act-one/word-lists.ts';
 import { createInitialState } from '../src/core/state.ts';
-import { levelTextDocument } from './level-text.ts';
+import { saveErrorText } from '../src/persistence/save.ts';
+import { lastLevel, levelTextDocument } from './level-text.ts';
 import { codeBlock, table } from './markdown.ts';
+import { inRows } from './shared.ts';
+
+const wordsPerLine = 12;
 
 type TextEntry = readonly [key: string, value: string];
 
@@ -55,7 +59,7 @@ sections.push('## upgradeText', 'Cards in the order the game lists them. Cost an
     'One example of each answer family from the fixed riddle seed, plus a few landmark levels. Not the complete set.',
     table(pageColumns, generatedExamples().map(pageRow)),
     '## Search phase labels',
-    'Built from `searchText` with wordlist names, collected from levels 6–1400 with representative upgrades.',
+    `Built from \`searchText\` with wordlist names, collected from levels 6–${lastLevel} with representative upgrades.`,
     codeBlock(searchLabels().join('\n')),
     '## Generated word pools',
     'These words can appear in answers, page titles, filenames, hidden clues, captcha prompts and terminal requests. Sources: [word-lists.ts](../src/content/act-one/word-lists.ts) and [generated/vocabulary.ts](../src/content/act-one/generated/vocabulary.ts).',
@@ -66,7 +70,7 @@ sections.push('## upgradeText', 'Cards in the order the game lists them. Cost an
     codeBlock(wordLines(vocabulary.slice(0, 36))),
     '## Save import messages',
     'These stay in [save.ts](../src/persistence/save.ts) because the save format is shared by every act.',
-    table(['Source location', 'Message or expression'], await saveMessages()),
+    table(['Key', 'Text'], flattenText('saveErrorText', saveErrorText)),
 );
 
 const markdown = `${sections.join('\n\n')}\n`;
@@ -94,7 +98,7 @@ function pageRow(level: number): readonly string[] {
 
 function generatedExamples(): number[] {
     const examples = new Map<string, number>();
-    for (let level = 10; level < 1400; level++) {
+    for (let level = firstGeneratedLevel - 1; level < lastLevel; level++) {
         const kind = entrance(level + 1).kind;
         if (!examples.has(kind)) examples.set(kind, level);
     }
@@ -108,22 +112,12 @@ function searchLabels(): string[] {
     const variants = [complete, { ...complete, cracked: false }, { ...complete, mutations: false },
         { ...complete, lists: complete.lists.slice(0, 1), mutations: false, rockyou: false, numberRanges: false, cracked: false, combinator: false }];
     const labels = new Set<string>();
-    for (let level = 6; level <= 1400; level++) {
+    for (let level = 6; level <= lastLevel; level++) {
         for (const capabilities of variants) for (const phase of planSearch(level, capabilities).phases) labels.add(phase.label);
     }
     return [...labels].sort();
 }
 
 function wordLines(words: readonly string[]): string {
-    const lines: string[] = [];
-    for (let index = 0; index < words.length; index += 12) lines.push(words.slice(index, index + 12).join(', '));
-    return lines.join('\n');
-}
-
-async function saveMessages(): Promise<TextEntry[]> {
-    const source = await readFile(new URL('../src/persistence/save.ts', import.meta.url), 'utf8');
-    return source.split(/\r?\n/).flatMap((line, index) => {
-        const match = line.match(/throw new SaveError\((.+)\);/);
-        return match ? [[`src/persistence/save.ts:${index + 1}`, match[1]!] as const] : [];
-    });
+    return inRows(words, wordsPerLine).map((row) => row.join(', ')).join('\n');
 }

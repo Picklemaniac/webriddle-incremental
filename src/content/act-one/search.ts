@@ -1,7 +1,8 @@
 import type { GameState } from '../../core/state.ts';
 import { toLeet } from './encodings.ts';
 import { entrance, folderFor, otherExtensions, userAgentBlockLevel, type Entrance } from './levels.ts';
-import { salts, unitHash } from './riddle.ts';
+import { owns } from './progress.ts';
+import { firstYear, salts, unitHash, yearCount } from './riddle.ts';
 import { fill, searchText } from './text.ts';
 import { rankOfWord, vocabularySize, wordAtRank } from './vocabulary.ts';
 import { answerNames } from './word-lists.ts';
@@ -15,7 +16,7 @@ interface WordlistDefinition {
 
 export type BlockReason = 'unguessable' | 'userAgent' | 'folder' | 'extension' | 'wildcard' | 'credentials';
 
-interface SearchPhase {
+export interface SearchPhase {
     readonly label: string;
     readonly size: number;
     readonly candidate: (index: number) => string;
@@ -53,6 +54,7 @@ export interface SearchCapabilities {
 }
 
 const starterWordlist: WordlistDefinition = { id: 'words', fileName: 'words.txt', size: 1_000, coverage: 300 };
+export const starterWordlistName = starterWordlist.fileName;
 
 const purchasableWordlists: readonly WordlistDefinition[] = [
     { id: 'english10k', fileName: 'english-10k.txt', size: 10_000, coverage: 900 },
@@ -82,23 +84,35 @@ const mutationVariants: Variants = {
     format: (word, variant) => page(toLeet(word, variant / mutationsPerWord)),
 };
 
+export function currentPhase(plan: SearchPlan, requestsSpent: number): { readonly phase: SearchPhase | undefined; readonly spent: number } {
+    let spent = requestsSpent;
+    let phase = plan.phases[0];
+    for (const candidate of plan.phases) {
+        phase = candidate;
+        const boundary = candidate.requestsUntilNext ?? candidate.size;
+        if (spent < boundary) break;
+        spent -= boundary;
+    }
+    return { phase, spent };
+}
+
 export function searchCapabilities(state: GameState): SearchCapabilities {
-    const owns = (id: string): boolean => (state.purchases[id] ?? 0) > 0;
+    const owned = (id: string): boolean => owns(state, id);
     return {
-        lists: [starterWordlist, ...purchasableWordlists.filter((list) => owns(list.id))],
-        sortedByFrequency: owns('sortByFrequency'),
-        recursion: owns('dirb') || owns('gobuster') || owns('ffuf'),
-        extensions: owns('extensionList'),
-        mutations: owns('mutationRules'),
-        rockyou: owns('rockyou'),
-        moreLeaks: owns('moreLeaks'),
-        names: owns('namesList'),
-        numberRanges: owns('numberRanges'),
-        clusterBomb: owns('clusterBomb'),
-        cracked: owns('crackHtpasswd'),
-        combinator: owns('combinator'),
-        userAgent: owns('fakeUserAgent'),
-        sizeFilter: owns('sizeFilter') || owns('ffuf'),
+        lists: [starterWordlist, ...purchasableWordlists.filter((list) => owned(list.id))],
+        sortedByFrequency: owned('sortByFrequency'),
+        recursion: owned('dirb') || owned('gobuster') || owned('ffuf'),
+        extensions: owned('extensionList'),
+        mutations: owned('mutationRules'),
+        rockyou: owned('rockyou'),
+        moreLeaks: owned('moreLeaks'),
+        names: owned('namesList'),
+        numberRanges: owned('numberRanges'),
+        clusterBomb: owned('clusterBomb'),
+        cracked: owned('crackHtpasswd'),
+        combinator: owned('combinator'),
+        userAgent: owned('fakeUserAgent'),
+        sizeFilter: owned('sizeFilter') || owned('ffuf'),
     };
 }
 
@@ -149,21 +163,17 @@ function kindPlan(target: Entrance, capabilities: SearchCapabilities): SearchPla
             if (capabilities.mutations) routes.push(wordPlan(rankOfWord(firstWord), firstWord.length, target.positionUnit, capabilities, mutationVariants));
             const leetCoverage = capabilities.moreLeaks ? rockyouList.withMoreLeaks : rockyouList.leetCoverage;
             if (capabilities.rockyou && target.positionUnit < leetCoverage) {
-                routes.push({
-                    phases: [{ label: rockyouList.fileName, size: rockyouList.size, candidate: (index) => page(toLeet(listEntry(index, false), (index % 89) / 89)) }],
-                    hitAt: Math.max(1, Math.ceil((target.positionUnit / leetCoverage) * rockyouList.size)),
-                    blockedBy: null,
-                    bruteForce: false,
-                });
+                const phase: SearchPhase = { label: rockyouList.fileName, size: rockyouList.size, candidate: (index) => page(toLeet(listEntry(index, false), (index % 89) / 89)) };
+                routes.push(found([phase], position(target.positionUnit / leetCoverage, rockyouList.size)));
             }
             return routes.reduce((best, route) => route.hitAt < best.hitAt ? route : best);
         }
         case 'number': {
             const year = Number(target.answer);
             if (capabilities.numberRanges) {
-                return { phases: [{ label: searchText.years, size: 1_100, candidate: (index) => page(String(1000 + index)) }], hitAt: year - 999, blockedBy: null, bruteForce: false };
+                return found([{ label: searchText.years, size: yearCount, candidate: (index) => page(String(firstYear + index)) }], year - firstYear + 1);
             }
-            return { phases: [{ label: searchText.allNumbers, size: 10_000, candidate: (index) => page(String(index).padStart(4, '0')) }], hitAt: year + 1, blockedBy: null, bruteForce: false };
+            return found([{ label: searchText.allNumbers, size: 10_000, candidate: (index) => page(String(index).padStart(4, '0')) }], year + 1);
         }
         case 'credentials': {
             if (!capabilities.clusterBomb && !capabilities.cracked) {
@@ -176,7 +186,7 @@ function kindPlan(target: Entrance, capabilities: SearchCapabilities): SearchPla
                 return { ...door, phases: [...completedPhases(door), cracked], hitAt: door.hitAt + 1 };
             }
             const pairs = pairPlan(secondWord, thirdWord, target.positionUnit, capabilities, () => searchText.credentialPairs, login);
-            return { phases: [...completedPhases(door), ...pairs.phases], hitAt: door.hitAt + pairs.hitAt, blockedBy: null, bruteForce: false };
+            return found([...completedPhases(door), ...pairs.phases], door.hitAt + pairs.hitAt);
         }
         case 'twoWords':
             if (!capabilities.combinator) {
@@ -185,12 +195,8 @@ function kindPlan(target: Entrance, capabilities: SearchCapabilities): SearchPla
             return pairPlan(firstWord, secondWord, target.positionUnit, capabilities, (first, second) => fill(searchText.wordPairs, { first, second }), (first, second) => page(`${first}${second}`));
         case 'name': {
             if (!capabilities.names || target.positionUnit >= namesList.coverage) return bruteForcePlan('a-z', target.answer.length, target.positionUnit);
-            return {
-                phases: [{ label: namesList.fileName, size: namesList.size, candidate: (index) => page(answerNames[index % answerNames.length]!) }],
-                hitAt: Math.max(1, Math.ceil((target.positionUnit / namesList.coverage) * namesList.size)),
-                blockedBy: null,
-                bruteForce: false,
-            };
+            const phase: SearchPhase = { label: namesList.fileName, size: namesList.size, candidate: (index) => page(answerNames[index % answerNames.length]!) };
+            return found([phase], position(target.positionUnit / namesList.coverage, namesList.size));
         }
         case 'phrase':
             return bruteForcePlan('a-z', target.answer.length, target.positionUnit);
@@ -214,7 +220,7 @@ function wordPlan(rank: number, length: number, unit: number, capabilities: Sear
             const fraction = capabilities.sortedByFrequency
                 ? Math.min(1, (rank - previousCoverage - 1 + unit) / (list.coverage - previousCoverage))
                 : unit;
-            return { phases, hitAt: offset + Math.max(1, Math.ceil(fraction * phaseSize)), blockedBy: null, bruteForce: false };
+            return found(phases, offset + position(fraction, phaseSize));
         }
         offset += phaseSize;
         previousCoverage = list.coverage;
@@ -228,24 +234,19 @@ function pairPlan(first: string, second: string, unit: number, capabilities: Sea
     format: (first: string, second: string) => string): SearchPlan {
     const pairLists = capabilities.lists.filter((list) => list.coverage <= pairCoverage);
     const listFor = (word: string): WordlistDefinition => pairLists.find((list) => rankOfWord(word) <= list.coverage) ?? pairLists[pairLists.length - 1]!;
-    const position = (word: string, list: WordlistDefinition, wordUnit: number): number => {
+    const listPosition = (word: string, list: WordlistDefinition, wordUnit: number): number => {
         const rank = Math.min(list.coverage, rankOfWord(word));
-        const fraction = capabilities.sortedByFrequency ? (rank - 1 + wordUnit) / list.coverage : wordUnit;
-        return Math.max(1, Math.ceil(fraction * list.size));
+        return position(capabilities.sortedByFrequency ? (rank - 1 + wordUnit) / list.coverage : wordUnit, list.size);
     };
     const firstList = listFor(first);
     const secondList = listFor(second);
     const entry = (index: number): string => listEntry(index, capabilities.sortedByFrequency);
-    return {
-        phases: [{
-            label: label(firstList.fileName, secondList.fileName),
-            size: firstList.size * secondList.size,
-            candidate: (index) => format(entry(Math.floor(index / secondList.size)), entry(index % secondList.size)),
-        }],
-        hitAt: (position(first, firstList, unit) - 1) * secondList.size + position(second, secondList, (unit * 7.31) % 1),
-        blockedBy: null,
-        bruteForce: false,
+    const phase: SearchPhase = {
+        label: label(firstList.fileName, secondList.fileName),
+        size: firstList.size * secondList.size,
+        candidate: (index) => format(entry(Math.floor(index / secondList.size)), entry(index % secondList.size)),
     };
+    return found([phase], (listPosition(first, firstList, unit) - 1) * secondList.size + listPosition(second, secondList, (unit * 7.31) % 1));
 }
 
 function bruteForcePlan(alphabet: keyof typeof alphabets, length: number, unit: number, format = page): SearchPlan {
@@ -253,7 +254,7 @@ function bruteForcePlan(alphabet: keyof typeof alphabets, length: number, unit: 
     const size = characters.length ** length;
     return {
         phases: [{ label: fill(searchText.bruteForce, { alphabet, length }), size, candidate: (index) => format(bruteForceCandidate(index, characters, length)) }],
-        hitAt: Math.max(1, Math.ceil(size * (0.25 + unit * 0.5))),
+        hitAt: position(0.25 + unit * 0.5, size),
         blockedBy: null,
         bruteForce: true,
     };
@@ -271,6 +272,14 @@ function bruteForceCandidate(index: number, characters: string, length: number):
         remaining = Math.floor(remaining / characters.length);
     }
     return candidate;
+}
+
+function found(phases: readonly SearchPhase[], hitAt: number): SearchPlan {
+    return { phases, hitAt, blockedBy: null, bruteForce: false };
+}
+
+function position(share: number, size: number): number {
+    return Math.max(1, Math.ceil(share * size));
 }
 
 function blocked(reason: BlockReason): SearchPlan {

@@ -1,5 +1,4 @@
 const containers = new Set(['head', 'body', 'center', 'table', 'tr', 'td', 'th', 'ul', 'ol', 'map', 'div', 'form']);
-const lineElements = new Set(['title', 'p', 'li', 'h1', 'h2', 'h3', 'script', 'address', 'small']);
 const standalone = new Set(['meta', 'link', 'hr', 'area', 'base']);
 const inline = new Set(['a', 'font', 'b', 'i', 'u', 'span', 'img', 'br', 'embed', 'input', 'button', 'strong', 'em', 'big', 'label']);
 
@@ -37,7 +36,7 @@ export function formatSource(html: string): string {
         } else if (standalone.has(tag)) {
             finish();
             output.push(`${indent()}${token}`);
-        } else if (lineElements.has(tag) || !inline.has(tag)) {
+        } else if (!inline.has(tag)) {
             if (!closing) finish();
             append(token);
             if (closing) finish();

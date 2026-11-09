@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { actOneContent } from '../src/content/act-one/index.ts';
 import { entrance, levelPage, urlOfLevel } from '../src/content/act-one/levels.ts';
 import { createInitialState } from '../src/core/state.ts';
+import { escapeAttribute, escapeHtml } from './shared.ts';
 
 const [first = 1, last = 60] = (process.argv[2] ?? '1-60').split('-').map(Number);
 const state = createInitialState(actOneContent, 1);
@@ -13,7 +14,7 @@ for (let level = first; level <= last; level++) {
     const next = entrance(level + 1);
     const notes = [`next: ${next.kind}`, next.url.replace(/^https?:\/\/[^/]+/, ''), ...details.comments.map((comment) => `<!-- ${comment} -->`),
         ...(details.hiddenText === null ? [] : [`hidden: ${details.hiddenText}`]), ...(details.imageName === `${level}.jpg` ? [] : [`image: ${details.imageName}`])];
-    cards.push(`<figure><iframe srcdoc="${escapeAttribute(page.html)}" title="Level ${level}"></iframe><figcaption><b>${escapeText(page.title ?? '')}</b><br>${notes.map(escapeText).join('<br>')}</figcaption></figure>`);
+    cards.push(`<figure><iframe srcdoc="${escapeAttribute(page.html)}" title="Level ${level}"></iframe><figcaption><b>${escapeHtml(page.title ?? '')}</b><br>${notes.map(escapeHtml).join('<br>')}</figcaption></figure>`);
 }
 
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Levels ${first}–${last}</title><style>
@@ -26,11 +27,3 @@ figcaption{padding:6px 2px;line-height:1.6;white-space:nowrap;overflow:hidden;te
 await mkdir(new URL('../logs/', import.meta.url), { recursive: true });
 await writeFile(new URL('../logs/level-gallery.html', import.meta.url), html, 'utf8');
 console.log(`Wrote levels ${first}–${last} to logs/level-gallery.html. With the dev server running, open http://127.0.0.1:5173/logs/level-gallery.html`);
-
-function escapeText(text: string): string {
-    return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-}
-
-function escapeAttribute(text: string): string {
-    return escapeText(text).replaceAll('"', '&quot;');
-}

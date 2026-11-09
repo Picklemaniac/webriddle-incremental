@@ -15,6 +15,7 @@ export interface Upgrade extends PurchasableDefinition {
 
 const multiply = (statId: string, value: number): Modifier => ({ statId, operation: 'multiply', value });
 const add = (statId: string, value: number): Modifier => ({ statId, operation: 'add', value });
+const requiredFindings: Partial<Record<UpgradeId, string>> = { crackHtpasswd: 'htpasswd' };
 const kilobytes = 1024;
 const megabytes = 1024 ** 2;
 
@@ -24,7 +25,7 @@ function upgrade(id: UpgradeId, price: ResourceAmounts, level: number,
         id, ...upgradeText[id], price, level, requires, fixes, maximumCount: 1,
         cost: () => price,
         modifiers: () => modifiers,
-        isAvailable: (state) => state.flags.automated === true && state.currentLevel >= level && requires.every((required) => owns(state, required)),
+        isAvailable: (state) => state.flags.automated === true && state.currentLevel >= level && requires.every((required) => owns(state, required)) && hasRequiredFinding(state, id),
     };
 }
 
@@ -95,12 +96,23 @@ export const upgrades: readonly Upgrade[] = [
     upgrade('gigabit', { money: 100000 }, 920, ['fiber'], [multiply('requestsPerThread', 2)]),
 ];
 
+export const connectionTiers: readonly UpgradeId[] = ['isdn', 'adsl', 'cable', 'fiber', 'gigabit'];
+export const toolTiers: readonly UpgradeId[] = ['dirb', 'gobuster', 'ffuf', 'customFuzzer'];
+
+export function ownedTier(state: GameState, tiers: readonly UpgradeId[]): number {
+    return tiers.filter((id) => owns(state, id)).length;
+}
+
 export function offeredUpgrades(state: GameState): readonly Upgrade[] {
     const blocker = state.flags.automated ? planSearch(state.currentLevel + 1, searchCapabilities(state)).blockedBy : null;
     return upgrades.filter((item) => {
         if (owns(state, item.id) || !item.isAvailable(state)) return false;
-        if (item.id === 'crackHtpasswd' && !state.findings.htpasswd) return false;
         return state.flags[`seen:${item.id}`] === true || item.fixes === blocker ||
             Object.entries(item.price).every(([resource, cost]) => (state.resources[resource] ?? 0) >= cost * 0.3);
     });
+}
+
+function hasRequiredFinding(state: GameState, id: UpgradeId): boolean {
+    const finding = requiredFindings[id];
+    return finding === undefined || (state.findings[finding] ?? 0) > 0;
 }

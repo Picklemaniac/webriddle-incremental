@@ -1,6 +1,6 @@
 import type { MilestoneDefinition } from '../core/content.ts';
 import { formatDuration, formatNumber } from '../format.ts';
-import type { SimulationReport } from './simulation.ts';
+import { milestoneTiming, type SimulationReport } from './simulation.ts';
 
 export function formatReports(reports: readonly SimulationReport[], milestones: readonly MilestoneDefinition[]): string {
     const perReport = (describe: (report: SimulationReport) => string): string[] => reports.map(describe);
@@ -21,7 +21,7 @@ export function formatReports(reports: readonly SimulationReport[], milestones: 
 }
 
 function describeMilestoneTiming(report: SimulationReport, milestoneId: string): string {
-    const timing = report.milestoneTimings.find((candidate) => candidate.milestoneId === milestoneId);
+    const timing = milestoneTiming(report, milestoneId);
     if (timing === undefined) {
         return 'not reached';
     }

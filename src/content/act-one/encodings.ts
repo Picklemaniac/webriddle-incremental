@@ -1,3 +1,5 @@
+import { fraction } from './riddle.ts';
+
 export type Encoding = 'reversed' | 'a1z26' | 'rot13' | 'caesar' | 'shift' | 'atbash' | 'keyboard' | 'morse' | 'nato' | 'phone' | 'braille'
     | 'tap' | 'bacon' | 'polybius' | 'adfgvx' | 'binary' | 'octal' | 'hex' | 'ascii' | 'roman' | 'arithmetic' | 'url' | 'entities'
     | 'base64' | 'dna' | 'codepoints' | 'pollux' | 'rot47' | 'railFence' | 'upsideDown' | 'dvorak' | 'base36' | 'keyboardGrid' | 'utf16';
@@ -215,10 +217,6 @@ function pollux(morse: string, unit: number): string {
         const choices = digits[symbol] ?? '0369';
         return choices[Math.floor(fraction(unit * 31 + index * 0.618) * choices.length)]!;
     }).join('');
-}
-
-function fraction(value: number): number {
-    return value - Math.floor(value);
 }
 
 export function toRomanNumerals(value: number): string {

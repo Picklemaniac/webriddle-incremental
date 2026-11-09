@@ -51,7 +51,7 @@ strong { font-weight: 600; }
 .browser-window { width: 100%; max-width: 900px; justify-self: center; position: relative; background: #c0c0c0; padding: 3px; border: 2px solid; border-color: #fff #444 #444 #fff; color: #000; font: 12px Tahoma, Arial, sans-serif; color-scheme: light; box-shadow: 1px 1px 0 #000; }
 .title-bar { display: flex; align-items: center; min-width: 0; height: 23px; gap: 5px; padding: 2px 3px 2px 4px; background: linear-gradient(90deg, #000080, #1084c8); color: #fff; font: bold 12px Tahoma, Arial, sans-serif; user-select: none; }
 .title-bar strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-.browser-icon { color: #063f89; background: white; width: 16px; height: 16px; text-align: center; font: bold italic 16px Georgia, serif; }
+.browser-icon { width: 16px; height: 16px; }
 .window-buttons { display: flex; flex: none; margin-left: auto; }
 .window-button { position: relative; width: 16px; height: 14px; background: #c0c0c0; box-shadow: inset -1px -1px #000, inset 1px 1px #fff, inset -2px -2px #808080, inset 2px 2px #dfdfdf; }
 .window-button.close { margin-left: 2px; }
@@ -80,7 +80,7 @@ strong { font-weight: 600; }
 .tool-button:disabled { color: #858585; text-shadow: 1px 1px white; }
 .tool-icon { font-size: 17px; line-height: 17px; }
 .toolbar-divider { border-left: 1px solid #888; border-right: 1px solid #eee; height: 25px; margin: 0 6px; }
-.throbber { margin-left: auto; padding: 0 7px; color: #17639b; font: bold italic 32px Georgia, serif; line-height: 28px; text-shadow: 1px 1px #effaff; }
+.throbber { margin-left: auto; }
 .throbber.loading { animation: throb 0.6s infinite alternate; }
 .address-bar { display: flex; align-items: center; gap: 6px; height: 31px; padding: 4px 2px; }
 .address-bar label { flex: 0 0 auto; }
@@ -185,7 +185,6 @@ strong { font-weight: 600; }
 .options-buttons { display: flex; justify-content: flex-end; gap: 6px; }
 .source-document { color: #111; background: #fff; border: 2px inset #eee; padding: 10px; overflow: auto; font: 13px/1.6 'Courier New', monospace; max-height: 55vh; margin: 0; white-space: pre; tab-size: 4; }
 .save-text { width: 100%; font: 11px/1.6 'IBM Plex Mono', monospace; background: white; color: black; border: 2px inset white; }
-.checkbox-label { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; }
 .login-field { display: grid; grid-template-columns: 100px 1fr; gap: 8px; align-items: center; margin: 10px 0; }
 .window-dialog input { padding: 2px 4px; line-height: normal; background: white; color: black; border: 2px inset white; }
 .login-field input { width: 100%; }
@@ -217,16 +216,12 @@ strong { font-weight: 600; }
 @keyframes throb { to { opacity: .35; } }
 @media (max-width: 1150px) {
     .game-screen { padding: 30px 22px 60px; }
-    .dashboard { gap: 22px; grid-template-columns: minmax(320px, 1fr) minmax(370px, 1.15fr); }
-    .dashboard > .panel:last-child { grid-column: 1 / -1; max-width: 420px; width: 100%; }
 }
 @media (max-width: 900px) {
     .automated .workspace { grid-template-columns: minmax(0, 1fr); gap: 20px; }
     .terminal-slot { display: none; }
     .automated .terminal-slot { display: block; }
     .terminal-window { min-width: 0; height: 300px; }
-    .dashboard { grid-template-columns: 1fr; gap: 4px; }
-    .dashboard > .panel:last-child { max-width: none; }
 }
 @media (max-width: 500px) {
     .game-screen { padding: 18px 10px 50px; }

@@ -3,7 +3,8 @@ import { formatDuration } from '../src/format.ts';
 import { assessActOnePacing } from '../src/simulation/pacing.ts';
 import { continuousActiveProfile, playerProfiles, puristProfile } from '../src/simulation/profiles.ts';
 import { formatReports } from '../src/simulation/report.ts';
-import { simulatePlayer } from '../src/simulation/simulation.ts';
+import { milestoneTiming, simulatePlayer } from '../src/simulation/simulation.ts';
+import { readArgument } from './shared.ts';
 
 const days = positiveInteger('--days', 14);
 const seeds = (readArgument('--seeds') ?? readArgument('--seed') ?? '1').split(',').map((value) => {
@@ -27,7 +28,7 @@ const allReports = seeds.flatMap((seed) => {
 const continuousRuns = allReports.filter(({ report }) => report.profileName === continuousActiveProfile.name);
 if (continuousRuns.length > 0) {
     const reached = continuousRuns.flatMap(({ seed, report }) => {
-        const timing = report.milestoneTimings.find((item) => item.milestoneId === 'level1000');
+        const timing = milestoneTiming(report, 'level1000');
         return timing === undefined ? [] : [{ seed, seconds: timing.activeSeconds }];
     }).sort((first, second) => first.seconds - second.seconds);
     if (reached.length > 0) {
@@ -49,14 +50,6 @@ console.log('\nIdle stretch = no robot input. Progress gap = no solve, unlock, f
 console.log('Unlocks are distinct upgrade cards observed in the first real hour. Offline milestone times are when they occur, not when the player returns.');
 console.log('Robot play is a balancing model, not a human playtest. Manual solving uses estimated delays; the robot knows the solution after that delay.');
 console.log(`Simulated up to ${days} days for ${profiles.length} profiles × ${seeds.length} seeds in ${Math.round(performance.now() - startedAt)} ms.`);
-
-function readArgument(name: string): string | undefined {
-    const index = process.argv.indexOf(name);
-    if (index === -1) return undefined;
-    const value = process.argv[index + 1];
-    if (value === undefined || value.startsWith('--')) throw new Error(`Missing value for ${name}.`);
-    return value;
-}
 
 function positiveInteger(name: string, fallback: number): number {
     const argument = readArgument(name);

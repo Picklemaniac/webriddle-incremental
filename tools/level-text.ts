@@ -1,4 +1,4 @@
-import { entrance, levelPage, type LevelPage } from '../src/content/act-one/levels.ts';
+import { entrance, firstGeneratedLevel, levelPage, type LevelPage } from '../src/content/act-one/levels.ts';
 import type { Clue } from '../src/content/act-one/methods.ts';
 import { alternateFiles, clueLines, handcraftedText, linkedFiles, pageText, puzzleHints, riddleHomeText } from '../src/content/act-one/text.ts';
 import { table } from './markdown.ts';
@@ -16,7 +16,7 @@ interface Survey {
     readonly texts: ReadonlyMap<string, string>;
 }
 
-const lastLevel = 1400;
+export const lastLevel = 1400;
 
 export const puzzleNames: Readonly<Record<string, string>> = {
     reversed: 'Reversed text', a1z26: 'Letter numbers (A = 1)', rot13: 'ROT13', alternate: 'Same name as the picture as .gif, .txt, .json or .css',
@@ -95,7 +95,7 @@ export function levelTextDocument(): string {
     const methods = new Map<string, Survey[]>();
     for (const survey of surveys) {
         const method = survey.clue.method;
-        if (survey.level >= 11 && method !== undefined) methods.set(method, [...(methods.get(method) ?? []), survey]);
+        if (survey.level >= firstGeneratedLevel && method !== undefined) methods.set(method, [...(methods.get(method) ?? []), survey]);
     }
     const placeGroups = new Set<string>(Object.values(placeHints));
     const variants = (group: string, where?: string): string[] => (puzzleHints[group as keyof typeof puzzleHints] ?? []).map((_, index) => numbered(`puzzleHints.${group}.${index}`, where));
@@ -112,14 +112,14 @@ export function levelTextDocument(): string {
 
     const places = new Map<string, Survey[]>();
     for (const survey of surveys) {
-        if (survey.level < 11) continue;
+        if (survey.level < firstGeneratedLevel) continue;
         for (const place of placesOf(survey)) places.set(place, [...(places.get(place) ?? []), survey]);
     }
     const placeRows = [...places].map(([place, list]) => [place, String(list[0]!.level), String(list.length),
         lines(placeHints[place] === undefined ? [] : variants(placeHints[place]!, 'Line under the picture'))]);
 
     const answerRows = answerTypes.map(({ name, hints, matches }) => {
-        const first = surveys.find((survey) => survey.level >= 11 && matches(survey));
+        const first = surveys.find((survey) => survey.level >= firstGeneratedLevel && matches(survey));
         return [name, first === undefined ? '—' : String(first.level), lines(hints.map((key) => numbered(key))), first === undefined ? '—' : `Level ${first.level}: the next page is ${entrance(first.level + 1).path}`];
     });
 

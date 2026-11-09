@@ -1,14 +1,16 @@
+import type { Action } from '../../core/actions.ts';
 import type { Drawing } from './drawings.ts';
 import { encode, toLeet } from './encodings.ts';
 import { imageWithWord, levelImageCount } from './images.ts';
 import { encodedClue, leetEncodingFor, textEncodingFor, wordClue, yearClue, type Clue } from './methods.ts';
-import { pickByUnit, ramp, riddleOrigin, salts, startUrl, unitHash } from './riddle.ts';
+import { firstYear, pickByUnit, ramp, riddleOrigin, salts, startUrl, unitHash, yearCount } from './riddle.ts';
 import type { Sound } from './sounds.ts';
 import { alternateFiles, clueLines, fill, handcraftedText, linkedFiles, pageText, riddleName } from './text.ts';
 import { rankOfWord, vocabularySize, wordAtRank } from './vocabulary.ts';
 import { answerNames, folderNames } from './word-lists.ts';
 
 export type EntranceKind = 'fixed' | 'word' | 'extension' | 'name' | 'leet' | 'number' | 'credentials' | 'twoWords' | 'phrase';
+type GeneratedKind = Exclude<EntranceKind, 'fixed'>;
 
 interface Credentials {
     readonly username: string;
@@ -74,7 +76,7 @@ interface HandcraftedEntrance {
     readonly positionUnit?: number;
 }
 
-const firstGeneratedLevel = 11;
+export const firstGeneratedLevel = 11;
 export const userAgentBlockLevel = 45;
 const firstFolderLevel = 100;
 const commonWordShare = 0.25;
@@ -124,6 +126,10 @@ export function entrance(level: number): Entrance {
     const created = level < firstGeneratedLevel ? handcraftedEntrance(level) : uniqueGeneratedEntrance(level);
     entranceCache.set(level, created);
     return created;
+}
+
+export function entranceAction(target: Entrance): Action {
+    return target.credentials === null ? { type: 'navigate', url: target.url } : { type: 'submitCredentials', url: target.url, ...target.credentials };
 }
 
 export function urlOfLevel(level: number): string {
@@ -213,10 +219,10 @@ function defaultTitle(level: number): string {
 function handcraftedEntrance(level: number): Entrance {
     const definition = handcraftedEntrances[level];
     if (definition === undefined) {
-        return buildEntrance(level, 'fixed', `level${level}`, 'htm', [], null, {}, null);
+        return buildEntrance(level, { kind: 'fixed', answer: `level${level}`, words: [], clue: {}, folder: null });
     }
     const words = definition.kind === 'fixed' ? [] : [definition.answer];
-    const target = buildEntrance(level, definition.kind, definition.answer, 'htm', words, null, definition.clue, null);
+    const target = buildEntrance(level, { kind: definition.kind, answer: definition.answer, words, clue: definition.clue, folder: null });
     return { ...target, positionUnit: definition.positionUnit ?? target.positionUnit };
 }
 
@@ -233,7 +239,7 @@ function uniqueGeneratedEntrance(level: number): Entrance {
     throw new Error(`Could not generate a unique entrance for level ${level}.`);
 }
 
-function generatedEntrance(level: number, attempt = 0): Entrance {
+function generatedEntrance(level: number, attempt: number): Entrance {
     const kind = chooseKind(level);
     const unit = (salt: number): number => unitHash(level, salt + attempt * 97);
     const folder = folderFor(level);
@@ -241,7 +247,7 @@ function generatedEntrance(level: number, attempt = 0): Entrance {
     switch (kind) {
         case 'word': {
             const word = unit(salts.common) < commonWordShare ? sampleCommonWord(unit(salts.rank), commonWordRanks, 10) : sampleWord(level, unit(salts.rank));
-            return buildEntrance(level, kind, word, 'htm', [word], null, wordClue(level, word, wordPageName, true, recent), folder);
+            return buildEntrance(level, { kind, answer: word, clue: wordClue(level, word, wordPageName, true, recent), folder });
         }
         case 'extension': {
             const word = sampleWord(level, unit(salts.rank));
@@ -249,22 +255,22 @@ function generatedEntrance(level: number, attempt = 0): Entrance {
             const wordHint = wordClue(level, word, wordPageName, false, recent);
             const ending = showsLine(level, firstExtensionLevel) ? [pickByUnit(clueLines.extension, unit(salts.ending))] : [];
             const clue: Clue = { ...wordHint, imageName: `${wordHint.imageName?.replace(/\.jpg$/, '') ?? level}.${extension}.jpg`, lines: [...(wordHint.lines ?? []), ...ending] };
-            return buildEntrance(level, kind, word, extension, [word], null, clue, folder);
+            return buildEntrance(level, { kind, answer: word, extension, clue, folder });
         }
         case 'name': {
             const name = pickByUnit(unlistedNames.filter((candidate) => candidate.length <= (level < longNameLevel ? 4 : 5)), unit(salts.rank));
-            return buildEntrance(level, kind, name, 'htm', [name], null, wordClue(level, name, wordPageName, true, recent), folder);
+            return buildEntrance(level, { kind, answer: name, clue: wordClue(level, name, wordPageName, true, recent), folder });
         }
         case 'leet': {
             const word = sampleWord(level, unit(salts.rank));
             const answer = toLeet(word, unit(salts.leet));
             const clue = encodedClue(answer, leetEncodingFor(unit(salts.encoding), recent), level, unit(salts.clue));
-            return buildEntrance(level, kind, answer, 'htm', [word], null, clue, folder);
+            return buildEntrance(level, { kind, answer, words: [word], clue, folder });
         }
         case 'number': {
-            const year = 1000 + Math.floor(unit(salts.year) * 1100);
+            const year = firstYear + Math.floor(unit(salts.year) * yearCount);
             const clue = yearClue(year, level, unit(salts.clue), recent);
-            return buildEntrance(level, kind, String(year), 'htm', [], null, clue, folder);
+            return buildEntrance(level, { kind, answer: String(year), words: [], clue, folder });
         }
         case 'credentials': {
             const door = sampleCommonWord(unit(salts.door), 400, 9);
@@ -273,36 +279,35 @@ function generatedEntrance(level: number, attempt = 0): Entrance {
             const encoding = textEncodingFor(level, unit(salts.encoding), recent);
             const lines = showsLine(level, firstCredentialsLevel) ? [pickByUnit(clueLines.credentials, unit(salts.ending))] : [];
             const clue: Clue = { method: encoding, imageLink: true, lines, comment: encode(`${username} ${password}`, encoding) };
-            return buildEntrance(level, kind, door, '', [door, username, password], { username, password }, clue, folder);
+            return buildEntrance(level, { kind, answer: door, extension: '', words: [door, username, password], credentials: { username, password }, clue, folder });
         }
         case 'twoWords': {
             const first = sampleCommonWord(unit(salts.rank), 300, 7);
             const second = sampleCommonWord(unit(salts.secondWord), pairRank(level, 700), 7, first);
             const clue = encodedClue(`${first} ${second}`, textEncodingFor(level, unit(salts.encoding), recent), level, unit(salts.clue));
-            return buildEntrance(level, kind, `${first}${second}`, 'htm', [first, second], null, clue, folder);
+            return buildEntrance(level, { kind, answer: `${first}${second}`, words: [first, second], clue, folder });
         }
         case 'phrase': {
             const wordCount = 3 + Math.floor(unit(salts.phraseLength) * 2);
             const phraseSalts = [salts.rank, salts.secondWord, salts.thirdWord, salts.fourthWord];
             const words = phraseSalts.slice(0, wordCount).map((salt) => sampleCommonWord(unit(salt), 600, 7));
             const clue = encodedClue(words.join(' '), textEncodingFor(level, unit(salts.encoding), recent), level, unit(salts.clue));
-            return buildEntrance(level, kind, words.join(''), 'htm', words, null, clue, folder);
+            return buildEntrance(level, { kind, answer: words.join(''), words, clue, folder });
         }
-        case 'fixed':
-            return handcraftedEntrance(level);
     }
 }
 
-function buildEntrance(
-    level: number,
-    kind: EntranceKind,
-    answer: string,
-    extension: string,
-    words: readonly string[],
-    credentials: Credentials | null,
-    clue: Clue,
-    folder: string | null,
-): Entrance {
+interface EntranceParts {
+    readonly kind: EntranceKind;
+    readonly answer: string;
+    readonly clue: Clue;
+    readonly folder: string | null;
+    readonly extension?: string;
+    readonly words?: readonly string[];
+    readonly credentials?: Credentials | null;
+}
+
+function buildEntrance(level: number, { kind, answer, clue, folder, extension = 'htm', words = [answer], credentials = null }: EntranceParts): Entrance {
     const folderPath = folder === null ? '/' : `/${folder}/`;
     const path = kind === 'credentials' ? `${folderPath}${answer}/` : `${folderPath}${answer}.${extension}`;
     return {
@@ -340,8 +345,8 @@ function wordPageName(level: number): string | null {
     return named.kind === 'word' ? named.answer : null;
 }
 
-function chooseKind(level: number): EntranceKind {
-    const weights: readonly (readonly [EntranceKind, number])[] = [
+function chooseKind(level: number): GeneratedKind {
+    const weights: readonly (readonly [GeneratedKind, number])[] = [
         ['extension', ramp(level, 150, 400, 0.08, 0.2)],
         ['name', ramp(level, 250, 1000, 0.015, 0.03)],
         ['leet', ramp(level, 300, 600, 0.06, 0.16)],

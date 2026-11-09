@@ -5,15 +5,28 @@ import { dirbustingScripts } from '../content/act-one/economy.ts';
 import { findingFile, findings } from '../content/act-one/findings.ts';
 import { entrance, urlOfLevel } from '../content/act-one/levels.ts';
 import { effectiveRate, isBanned, requestedRate } from '../content/act-one/network.ts';
-import { automationBootSeconds, automationElapsed, owns } from '../content/act-one/progress.ts';
+import { automationBootSeconds, automationElapsed } from '../content/act-one/progress.ts';
 import { riddleOrigin } from '../content/act-one/riddle.ts';
-import { automationText, fill, notices, terminalText, uiText, type NoticeId } from '../content/act-one/text.ts';
+import { currentPhase, starterWordlistName, type BlockReason, type SearchPhase, type SearchPlan } from '../content/act-one/search.ts';
+import { automationText, fill, notices, terminalText, toolCommands, uiText, type NoticeId } from '../content/act-one/text.ts';
+import { ownedTier, toolTiers } from '../content/act-one/upgrades.ts';
 import { wordAtRank } from '../content/act-one/vocabulary.ts';
 import { formatDuration, formatNumber } from '../format.ts';
 import { createElement, createTitleBar, setText } from './dom.ts';
 import type { Panel } from './panel.ts';
 
 const warningNotices: ReadonlySet<NoticeId> = new Set<NoticeId>(['firstRateLimit', 'bruteForce', 'firstBan', 'firstProxyDeath']);
+const blockedResponses: Readonly<Partial<Record<BlockReason, number>>> = { credentials: 401, userAgent: 403, wildcard: 200 };
+const missResponse = 404;
+const commandTemplates = [terminalText.curlCommand, terminalText.toolCommand, terminalText.gobusterCommand, terminalText.toolCommand, terminalText.toolCommand];
+const earlyLineMilliseconds = 1500;
+const laterLineMilliseconds = 700;
+const earlyAutomationSeconds = 600;
+const queuedLineLimit = 12;
+const shownLineLimit = 150;
+const scrolledToBottomPixels = 40;
+const idleSampleSpread = 47;
+const idleSampleWords = 1200;
 
 export class TerminalPanel implements Panel {
     readonly element = createElement('section', { className: 'terminal-window', attributes: { 'aria-label': automationText.program } });
@@ -47,62 +60,75 @@ export class TerminalPanel implements Panel {
         this.element.classList.toggle('booting', booting);
         this.command.hidden = booting;
         if (booting) {
-            setText(this.rate, '');
-            setText(this.footer, terminalText.booting);
-            setText(this.live, '');
-            this.footer.classList.remove('warning');
-            this.progress.style.width = '0%';
-            this.lastLineAt = performance.now();
+            this.renderBooting();
             return;
         }
         const plan = currentSearch(game);
-        let spent = game.state.search.requestsSpent;
-        let phase = plan.phases[0];
-        for (const candidate of plan.phases) {
-            phase = candidate;
-            const boundary = candidate.requestsUntilNext ?? candidate.size;
-            if (spent < boundary) break;
-            spent -= boundary;
-        }
+        const { phase, spent } = currentPhase(plan, game.state.search.requestsSpent);
         const rate = effectiveRate(game);
         setText(this.rate, `${formatNumber(rate)} ${uiText.requests}`);
-        const tool = owns(game.state, 'customFuzzer') ? './fuzz' : owns(game.state, 'ffuf') ? 'ffuf' : owns(game.state, 'gobuster') ? 'gobuster' : owns(game.state, 'dirb') ? 'dirb' : 'curl';
-        const list = phase?.label ?? 'words.txt';
         const folder = new URL(urlOfLevel(game.state.currentLevel)).pathname.replace(/[^/]*$/, '');
-        const command = fill(tool === 'curl' ? terminalText.curlCommand : tool === 'gobuster' ? terminalText.gobusterCommand : terminalText.toolCommand,
-            { tool, folder: `${riddleOrigin}${folder}`, list, threads: game.stat('threadsPerScript') });
+        const command = this.commandText(phase, folder);
         setText(this.command, command);
         this.command.title = command;
-        let footer = uiText.waiting as string;
-        if (isBanned(game)) footer = fill(terminalText.banned, { time: formatDuration(game.state.network.bannedUntil - game.state.elapsedSeconds) });
-        else if (dirbustingScripts(game) === 0) footer = uiText.paused;
-        else if (plan.blockedBy) footer = terminalText.blocks[plan.blockedBy];
-        else if (phase) footer = fill(terminalText.progress, { list: phase.label, tried: formatNumber(spent), total: formatNumber(phase.size),
-            time: formatDuration((phase.size - spent) / Math.max(0.001, rate * game.stat('searchEfficiency'))) });
+        const footer = this.footerText(plan, phase, spent, rate);
         setText(this.footer, footer);
         this.footer.title = footer;
         this.footer.classList.toggle('warning', isBanned(game) || plan.blockedBy !== null);
         this.progress.style.width = `${phase ? Math.min(100, spent / phase.size * 100) : 0}%`;
-        const target = entrance(game.state.currentLevel + 1);
-        const targetFolder = target.folder === null ? '/' : `/${target.folder}/`;
         const searched = phase !== undefined && plan.blockedBy === null && !isBanned(game) && dirbustingScripts(game) > 0 && rate > 0 ? phase : null;
-        const request = (index: number): string => {
-            const candidate = searched ? searched.candidate(Math.floor(index)) : `${wordAtRank(1 + this.sampleIndex * 47 % 1200)}.htm`;
-            return candidate.startsWith('/') ? candidate : `${searched ? targetFolder : folder}${candidate}`;
-        };
+        const request = (index: number): string => this.requestAddress(searched, index, folder);
         setText(this.live, searched ? `${terminalText.testing} ${request(spent)}` : '');
+        this.emitLine(plan, rate, seconds, () => request(Math.max(0, spent - 1)));
+    }
+
+    private renderBooting(): void {
+        setText(this.rate, '');
+        setText(this.footer, terminalText.booting);
+        setText(this.live, '');
+        this.footer.classList.remove('warning');
+        this.progress.style.width = '0%';
+        this.lastLineAt = performance.now();
+    }
+
+    private commandText(phase: SearchPhase | undefined, folder: string): string {
+        const tier = ownedTier(this.game.state, toolTiers);
+        return fill(commandTemplates[tier]!, { tool: toolCommands[tier]!, folder: `${riddleOrigin}${folder}`, list: phase?.label ?? starterWordlistName, threads: this.game.stat('threadsPerScript') });
+    }
+
+    private footerText(plan: SearchPlan, phase: SearchPhase | undefined, spent: number, rate: number): string {
+        const game = this.game;
+        if (isBanned(game)) return fill(terminalText.banned, { time: formatDuration(game.state.network.bannedUntil - game.state.elapsedSeconds) });
+        if (dirbustingScripts(game) === 0) return uiText.paused;
+        if (plan.blockedBy) return terminalText.blocks[plan.blockedBy];
+        if (phase === undefined) return uiText.waiting;
+        const time = formatDuration((phase.size - spent) / Math.max(0.001, rate * game.stat('searchEfficiency')));
+        return fill(terminalText.progress, { list: phase.label, tried: formatNumber(spent), total: formatNumber(phase.size), time });
+    }
+
+    private requestAddress(searched: SearchPhase | null, index: number, folder: string): string {
+        const target = entrance(this.game.state.currentLevel + 1);
+        const targetFolder = target.folder === null ? '/' : `/${target.folder}/`;
+        const candidate = searched ? searched.candidate(Math.floor(index)) : `${wordAtRank(1 + this.sampleIndex * idleSampleSpread % idleSampleWords)}.htm`;
+        return candidate.startsWith('/') ? candidate : `${searched ? targetFolder : folder}${candidate}`;
+    }
+
+    private emitLine(plan: SearchPlan, rate: number, seconds: number, sampledRequest: () => string): void {
+        const game = this.game;
         const now = performance.now();
         const nextLine = this.pendingLines[0];
-        if (nextLine && now - this.lastLineAt >= (seconds < 600 ? 1500 : 700)) {
+        if (nextLine && now - this.lastLineAt >= (seconds < earlyAutomationSeconds ? earlyLineMilliseconds : laterLineMilliseconds)) {
             this.pendingLines.shift();
             this.line(nextLine.text, nextLine.style);
-        } else if (!nextLine && requestedRate(game) > 0 && now - this.lastLineAt >= sampleInterval(rate) &&
-            (game.state.statistics.requestsSent ?? 0) > this.lastSampledRequests && !isBanned(game)) {
-            this.lastSampledRequests = game.state.statistics.requestsSent ?? 0;
-            this.sampleIndex++;
-            const code = plan.blockedBy === 'credentials' ? 401 : plan.blockedBy === 'userAgent' ? 403 : plan.blockedBy === 'wildcard' ? 200 : 404;
-            this.line(`${String(code)}  ${request(Math.max(0, spent - 1))}${plan.blockedBy === 'wildcard' ? `  ${terminalText.identicalResponse}` : ''}`, code === 404 ? 'miss' : 'warning');
+            return;
         }
+        const requestsSent = game.state.statistics.requestsSent ?? 0;
+        if (nextLine || requestedRate(game) === 0 || now - this.lastLineAt < sampleInterval(rate) || requestsSent <= this.lastSampledRequests || isBanned(game)) return;
+        this.lastSampledRequests = requestsSent;
+        this.sampleIndex++;
+        const code = (plan.blockedBy === null ? undefined : blockedResponses[plan.blockedBy]) ?? missResponse;
+        const note = plan.blockedBy === 'wildcard' ? `  ${terminalText.identicalResponse}` : '';
+        this.line(`${String(code)}  ${sampledRequest()}${note}`, code === missResponse ? 'miss' : 'warning');
     }
 
     private onEvent(event: GameEvent): void {
@@ -138,14 +164,14 @@ export class TerminalPanel implements Panel {
         const previous = this.pendingLines.at(-1);
         if (style === 'hit' && previous?.style === 'hit') previous.text = text;
         else this.pendingLines.push({ text, style });
-        if (this.pendingLines.length > 12) this.pendingLines.shift();
+        if (this.pendingLines.length > queuedLineLimit) this.pendingLines.shift();
     }
 
     private line(text: string, style: string): void {
         this.lastLineAt = performance.now();
-        const nearBottom = this.lines.scrollHeight - this.lines.scrollTop - this.lines.clientHeight < 40;
+        const nearBottom = this.lines.scrollHeight - this.lines.scrollTop - this.lines.clientHeight < scrolledToBottomPixels;
         this.lines.append(createElement('div', { className: `terminal-line ${style}`, text, attributes: { title: text } }));
-        while (this.lines.childElementCount > 150) this.lines.firstElementChild?.remove();
+        while (this.lines.childElementCount > shownLineLimit) this.lines.firstElementChild?.remove();
         if (nearBottom) this.lines.scrollTop = this.lines.scrollHeight;
     }
 }

@@ -2,29 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { Game } from '../core/game.ts';
 import { createInitialState } from '../core/state.ts';
 import { MemoryStorage } from '../testing/memory-storage.ts';
-import { saveMigrations } from './migrations.ts';
 import { testContent } from '../testing/test-content.ts';
 import {
     currentSaveVersion,
     decodeExport,
     encodeExport,
     mergeWithDefaults,
-    migrateSave,
     parseSave,
     SaveError,
     serializeSave,
-    type RawSave,
 } from './save.ts';
 import { SaveSlots } from './save-slots.ts';
 
 const defaults = createInitialState(testContent, 1);
-
-function appendMigrationStep(step: string): (save: RawSave) => RawSave {
-    return (save) => {
-        const { steps = [] } = save.state as { steps?: string[] };
-        return { ...save, state: { steps: [...steps, step] } };
-    };
-}
 
 describe('save format', () => {
     it('round-trips a game state', () => {
@@ -44,48 +34,14 @@ describe('save format', () => {
         expect(() => decodeExport(exported.slice(0, -10))).toThrow(SaveError);
     });
 
-    it('moves stored addresses from the placeholder domains to Notfinite and Enigma Web', () => {
-        const save = { version: 2, savedAt: 0, state: {
-            browserUrl: 'http://riddle.example/level2.htm',
-            visitedLevels: { 'http://riddle.example/level2.htm': 2 },
-            favorites: ['http://home.enigmaweb.example/'],
-        } };
-        expect(migrateSave(save, saveMigrations, 3).state).toEqual({
-            browserUrl: 'http://www.notfinite.net/level2.htm',
-            visitedLevels: { 'http://www.notfinite.net/level2.htm': 2 },
-            favorites: ['http://www.enigmaweb.net/'],
-        });
-    });
-
-    it('turns words into bytes of data and drops the old click cooldowns', () => {
-        const save = { version: 3, savedAt: 0, state: {
-            resources: { insight: 4, words: 1000 },
-            flags: { insightRevealed: true, wordsRevealed: true },
-            cooldowns: { work: 12 },
-        } };
-        expect(migrateSave(save, saveMigrations, 4).state).toEqual({
-            resources: { insight: 4, data: 150_000 },
-            flags: { insightRevealed: true, dataRevealed: true },
-        });
-    });
-
-    it('keeps only the word of an old image or checkbox captcha', () => {
-        const save = { version: 4, savedAt: 0, state: { captcha: { kind: 'images', stage: 'checkbox', subject: 'bridge', imageIds: [1], correctTiles: [0], word: 'apple' } } };
-        expect(migrateSave(save, saveMigrations, 5).state).toEqual({ captcha: { word: 'apple' } });
-    });
-
     it('rejects saves from a newer version', () => {
         const futureSave = JSON.stringify({ version: currentSaveVersion + 1, savedAt: 0, state: defaults });
         expect(() => parseSave(futureSave, defaults)).toThrow(SaveError);
     });
 
-    it('applies migrations in order', () => {
-        const migrations = [
-            { fromVersion: 2, migrate: appendMigrationStep('two to three') },
-            { fromVersion: 1, migrate: appendMigrationStep('one to two') },
-        ];
-        const migrated = migrateSave({ version: 1, savedAt: 0, state: {} }, migrations, 3);
-        expect(migrated).toEqual({ version: 3, savedAt: 0, state: { steps: ['one to two', 'two to three'] } });
+    it('rejects saves from an older version', () => {
+        const oldSave = JSON.stringify({ version: currentSaveVersion - 1, savedAt: 0, state: defaults });
+        expect(() => parseSave(oldSave, defaults)).toThrow(SaveError);
     });
 
     it('fills in fields that older saves lack', () => {
@@ -109,11 +65,6 @@ describe('save format', () => {
             network: { ...defaults.network, heat: 10 },
         });
         expect(state.pendingTickSeconds).toBe(0);
-    });
-
-    it('migrates obsolete sandbox saves before validating the new state', () => {
-        const save = JSON.stringify({ version: 1, savedAt: 0, state: { currentLevel: 'obsolete', network: null } });
-        expect(parseSave(save, defaults).state).toEqual(defaults);
     });
 
     it.each([
@@ -146,7 +97,7 @@ describe('save format', () => {
     });
 
     it('rejects overflowing numeric values in JSON', () => {
-        const save = '{"version":2,"savedAt":0,"state":{"resources":{"points":1e309}}}';
+        const save = `{"version":${currentSaveVersion},"savedAt":0,"state":{"resources":{"points":1e309}}}`;
         expect(() => parseSave(save, defaults)).toThrow(SaveError);
     });
 

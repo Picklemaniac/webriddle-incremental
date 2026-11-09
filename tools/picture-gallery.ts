@@ -3,9 +3,11 @@ import { drawPicture, type DrawingKind } from '../src/content/act-one/drawings.t
 import { characterColors } from '../src/content/act-one/encodings.ts';
 import { levelPage } from '../src/content/act-one/levels.ts';
 import { soundData, type Sound } from '../src/content/act-one/sounds.ts';
-import { puzzleNames } from './level-text.ts';
+import { lastLevel, puzzleNames } from './level-text.ts';
+import { escapeHtml } from './shared.ts';
 
 interface Item {
+    readonly key: string;
     readonly title: string;
     readonly usedBy: string;
     readonly note?: string;
@@ -14,7 +16,6 @@ interface Item {
 
 const sampleWord = 'bridge';
 const alphabet = 'abcdefghijklmnopqrstuvwxyz';
-const lastLevel = 1400;
 const alphabetKinds = new Set<DrawingKind>(['semaphore', 'clocks', 'pigpen', 'flags', 'braille']);
 const notes: Partial<Record<DrawingKind, string>> = {
     dark: 'Nearly black on purpose. You need to brighten it to read it.',
@@ -44,6 +45,7 @@ for (let level = 1; level <= lastLevel; level++) {
 
 const items: Item[] = [
     ...kinds.map((kind) => ({
+        key: kind,
         title: `${kind[0]!.toUpperCase()}${kind.slice(1)} picture`,
         usedBy: kind === 'gift' ? `${puzzleNames.alternate}` : kind === 'plain' ? `${puzzleNames.squashedPicture}, ${puzzleNames.renamed}` : puzzleNames[`${kind}Picture`] ?? kind,
         note: notes[kind],
@@ -53,14 +55,13 @@ const items: Item[] = [
     sound('Phone tones', puzzleNames.phoneTones!, { kind: 'tones', text: '1066' }),
     sound('Spectrogram sound', puzzleNames.spectrogram!, { kind: 'spectrogram', text: sampleWord }, 'Open it in a program that shows a spectrogram, such as Audacity.'),
     {
-        title: 'Colour swatches', usedBy: puzzleNames.swatches!, body: `<div class="swatches">${characterColors(sampleWord).map((color) => `<span style="background:${color}"></span>`).join('')}</div>`,
+        key: 'swatches', title: 'Colour swatches', usedBy: puzzleNames.swatches!, body: `<div class="swatches">${characterColors(sampleWord).map((color) => `<span style="background:${color}"></span>`).join('')}</div>`,
     },
-    { title: 'Letter grid', usedBy: puzzleNames.letterGrid!, note: 'Search the page for the letter that draws the word.', body: `<pre>${escapeHtml(firstGrid.join('\n'))}</pre>` },
+    { key: 'grid', title: 'Letter grid', usedBy: puzzleNames.letterGrid!, note: 'Search the page for the letter that draws the word.', body: `<pre>${escapeHtml(firstGrid.join('\n'))}</pre>` },
 ];
 
-const firstLevelOf = (item: Item, index: number): string => {
-    const key = index < kinds.length ? kinds[index]! : { 'Morse sound': 'morse', 'Phone tones': 'tones', 'Spectrogram sound': 'spectrogram', 'Colour swatches': 'swatches', 'Letter grid': 'grid' }[item.title];
-    const level = key === undefined ? undefined : firstLevels.get(key);
+const firstLevelOf = (item: Item): string => {
+    const level = firstLevels.get(item.key);
     return level === undefined ? 'not used yet' : `first on level ${level}`;
 };
 
@@ -76,7 +77,7 @@ pre{margin:0;font:13px/1.05 "Courier New",monospace;color:#bbb}
 </style></head><body>
 <h1>Pictures, sounds and other visual clues</h1>
 <p class="intro">Every picture a generated level can show, numbered so you can refer to it. Each one shows the word "${sampleWord}", and the symbol alphabets also show a to z. Animated pictures run live. Regenerate this page with <code>npm run pictures</code>.</p>
-${items.map((item, index) => `<section><h2>${index + 1}. ${escapeHtml(item.title)}</h2><p class="meta">${escapeHtml(item.usedBy)}, ${firstLevelOf(item, index)}</p>${item.note === undefined ? '' : `<p class="note">${escapeHtml(item.note)}</p>`}${item.body}</section>`).join('\n')}
+${items.map((item, index) => `<section><h2>${index + 1}. ${escapeHtml(item.title)}</h2><p class="meta">${escapeHtml(item.usedBy)}, ${firstLevelOf(item)}</p>${item.note === undefined ? '' : `<p class="note">${escapeHtml(item.note)}</p>`}${item.body}</section>`).join('\n')}
 </body></html>`;
 
 await mkdir(new URL('../docs/', import.meta.url), { recursive: true });
@@ -89,9 +90,5 @@ function image(kind: DrawingKind, text: string): string {
 }
 
 function sound(title: string, usedBy: string, recording: Sound, note?: string): Item {
-    return { title, usedBy, note, body: `<audio controls src="${soundData(recording)}"></audio>` };
-}
-
-function escapeHtml(text: string): string {
-    return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+    return { key: recording.kind, title, usedBy, note, body: `<audio controls src="${soundData(recording)}"></audio>` };
 }

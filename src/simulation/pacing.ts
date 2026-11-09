@@ -1,4 +1,4 @@
-import type { SimulationReport } from './simulation.ts';
+import { milestoneTiming, type SimulationReport } from './simulation.ts';
 
 export interface PacingCheck {
     readonly name: string;
@@ -9,7 +9,7 @@ export interface PacingCheck {
 }
 
 export function assessActOnePacing(report: SimulationReport): readonly PacingCheck[] {
-    const timeOf = (id: string): number | undefined => report.milestoneTimings.find((timing) => timing.milestoneId === id)?.activeSeconds;
+    const timeOf = (id: string): number | undefined => milestoneTiming(report, id)?.activeSeconds;
     const automation = timeOf('automated');
     const firstUpgrade = timeOf('firstUpgrade');
     const upgradeDelay = automation !== undefined && firstUpgrade !== undefined ? firstUpgrade - automation : undefined;

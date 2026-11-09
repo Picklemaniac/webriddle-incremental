@@ -1,4 +1,4 @@
-import { glyphRows } from './drawings.ts';
+import { glyphHeight, glyphPixel, glyphWidth } from './drawings.ts';
 import { morseCode } from './encodings.ts';
 
 export interface Sound {
@@ -56,9 +56,8 @@ function tones(digits: string): number[] {
 function spectrogram(text: string): number[] {
     const samples = silence(0.4);
     for (const character of text) {
-        const rows = glyphRows(character);
-        for (let x = 0; x < 6; x++) {
-            const frequencies = rows.flatMap((bits, y) => (x < 5 && (bits >> (4 - x)) & 1 ? [3000 - y * 300] : []));
+        for (let x = 0; x <= glyphWidth; x++) {
+            const frequencies = Array.from({ length: glyphHeight }, (_, y) => y).flatMap((y) => (x < glyphWidth && glyphPixel(character, x, y) ? [3000 - y * 300] : []));
             samples.push(...(frequencies.length === 0 ? silence(0.12) : tone(frequencies, 0.12)));
         }
     }

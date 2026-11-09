@@ -1,6 +1,7 @@
 import type { Page } from '../../core/content.ts';
 import { contentType, doctype, formatSource } from './html-source.ts';
 import { imagePath, imageWithWord } from './images.ts';
+import { pictureStyle, scrollbarStyle } from './page-styles.ts';
 import { enigmaticsUrl, hallOfFameUrl, hintsUrl, homeUrl, nordinhoUrl, riddleHomeUrl, rulesUrl, startUrl, toolUrls } from './riddle.ts';
 import { browserName, fill, riddleHomeText, riddleName, startPageText } from './text.ts';
 
@@ -49,7 +50,7 @@ const sites: Readonly<Record<string, Site>> = {
     ]),
 };
 
-export function startPage(address: string, scrollbarStyle: string, pictureStyle: string): Page | null {
+export function startPage(address: string): Page | null {
     const site = sites[address === `${riddleHomeUrl}index.htm` ? riddleHomeUrl : address];
     if (site === undefined) return null;
     const page = (rendered: boolean): string => [

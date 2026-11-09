@@ -1,15 +1,18 @@
 import type { Game } from '../core/game.ts';
 import type { Page } from '../core/content.ts';
-import { createInitialState } from '../core/state.ts';
 import { canonicalUrl } from '../content/act-one/pages.ts';
 import { urlOfLevel } from '../content/act-one/levels.ts';
-import { browserName, dialogText, fileTypes, fill, menuText, uiText } from '../content/act-one/text.ts';
-import { decodeExport, encodeExport, parseSave, serializeSave } from '../persistence/save.ts';
-import { createButton, createElement, createTitleBar, setText } from './dom.ts';
+import { browserName, dialogText, menuText, uiText } from '../content/act-one/text.ts';
+import { BrowserDialogs, withoutProtocol } from './browser-dialogs.ts';
 import { GameDialog } from './dialog.ts';
+import { createButton, createElement, createTitleBar, isTextField, setText } from './dom.ts';
 import type { Panel } from './panel.ts';
 
 const viewSourcePrefix = 'view-source:';
+const historyLimit = 200;
+const fastestLoadMilliseconds = 100;
+const slowestLoadMilliseconds = 550;
+const devPanelKey = '\\';
 
 interface MenuCommand {
     readonly label: string;
@@ -17,6 +20,17 @@ interface MenuCommand {
 }
 
 type MenuItem = MenuCommand | null;
+
+interface NavigationOptions {
+    readonly record?: boolean;
+    readonly historyIndex?: number;
+    readonly followCurrentLevel?: boolean;
+}
+
+interface Link {
+    readonly url: string;
+    readonly newWindow: boolean;
+}
 
 export class BrowserPanel implements Panel {
     readonly element: HTMLElement;
@@ -26,7 +40,8 @@ export class BrowserPanel implements Panel {
     private readonly title = createElement('strong');
     private readonly status = createElement('span', { className: 'status-cell' });
     private readonly throbber = createElement('img', { className: 'throbber', attributes: { src: 'branding/enigma-web.png', alt: '', 'aria-hidden': 'true' } });
-    private readonly dialog = new GameDialog();
+    private readonly loginDialog = new GameDialog();
+    private readonly dialogs: BrowserDialogs;
     private readonly sourceDocument = createElement('pre', { className: 'source-document', attributes: { tabindex: '0', 'aria-label': uiText.pageSource } });
     private readonly sourcePane = createElement('section', { className: 'source-pane', attributes: { 'aria-label': uiText.pageSource, id: 'page-source' } });
     private readonly content = createElement('div', { className: 'browser-content' });
@@ -52,17 +67,16 @@ export class BrowserPanel implements Panel {
 
     constructor(game: Game) {
         this.game = game;
+        this.dialogs = new BrowserDialogs(game, { navigate: (url) => this.navigate(url), currentUrl: () => this.viewedUrl });
         this.history = [game.state.browserUrl];
         this.back = this.tool('◀', menuText.back, () => this.moveHistory(-1));
-        this.forward = this.tool('▶', menuText.forward, () => this.moveHistory(1));
-        this.stop = this.tool('×', menuText.stop, () => this.stopLoading());
+        this.forward = this.tool('▶', menuText.forward, () => this.moveHistory(1), 'navigation-icon');
+        this.stop = this.tool('×', menuText.stop, () => this.stopLoading(), 'navigation-icon');
         this.follow = createButton(uiText.follow, () => {
             this.sourceOpen = false;
             this.updateSourceVisibility();
-            this.navigate(urlOfLevel(game.state.currentLevel));
-            this.followOnArrival = true;
-        });
-        this.follow.className = 'follow-current';
+            this.navigate(urlOfLevel(game.state.currentLevel), { followCurrentLevel: true });
+        }, 'follow-current');
         this.sourceButton = this.tool('≡', uiText.source, () => this.showSource());
         this.sourceButton.setAttribute('aria-controls', 'page-source');
         const sourceClose = createButton('×', () => this.closeSource());
@@ -72,13 +86,13 @@ export class BrowserPanel implements Panel {
         this.updateSourceVisibility();
         const titleBar = createTitleBar([createElement('img', { className: 'browser-icon', attributes: { src: 'branding/enigma-web.png', alt: '' } }), this.title]);
         const toolbar = createElement('div', { className: 'browser-toolbar' }, [this.back, this.forward, this.stop,
-            this.tool('↻', menuText.refresh, () => this.refresh()),
-            this.tool('⌂', menuText.home, () => this.goHome()),
+            this.tool('↻', menuText.refresh, () => this.refresh(), 'navigation-icon'),
+            this.tool('⌂', menuText.home, () => this.goHome(), 'navigation-icon'),
             createElement('span', { className: 'toolbar-divider' }),
             this.sourceButton,
             createElement('span', { className: 'toolbar-divider' }),
-            this.tool('★', menuText.favorites, () => this.showFavorites(), true),
-            this.tool('◷', uiText.history, () => this.showHistory(), true),
+            this.tool('★', menuText.favorites, () => this.dialogs.showFavorites(), 'secondary'),
+            this.tool('◷', uiText.history, () => this.dialogs.showHistory(), 'secondary'),
             this.throbber]);
         this.contextMenu.hidden = true;
         this.sourceDocument.addEventListener('contextmenu', (event) => {
@@ -109,7 +123,7 @@ export class BrowserPanel implements Panel {
                 this.updateSourceVisibility();
                 this.addressEdited = false;
                 this.address.value = game.state.browserUrl;
-                if (this.dialog.element.querySelector('input[type="password"]')) this.dialog.close();
+                this.loginDialog.close();
             }
         });
     }
@@ -132,21 +146,34 @@ export class BrowserPanel implements Panel {
         }
         if (!this.pendingNavigation) {
             setText(this.status, this.hoveredLink !== null ? `${menuText.statusShortcut} ${this.hoveredLink}`
-                : `${menuText.statusDone}${this.page.statusCode === 200 ? '' : ` (${this.page.statusCode || 'DNS'})`}`);
+                : `${menuText.statusDone}${this.page.statusCode === 200 ? '' : ` (${this.page.statusCode || menuText.statusDns})`}`);
         }
-        this.back.disabled = this.historyIndex <= 0;
-        this.forward.disabled = this.historyIndex >= this.history.length - 1;
+        this.back.disabled = !this.canGoBack();
+        this.forward.disabled = !this.canGoForward();
         this.stop.disabled = !this.pendingNavigation;
         this.follow.hidden = canonicalUrl(browserUrl) === urlOfLevel(this.game.state.currentLevel) || (this.game.state.currentLevel === 1 && this.game.state.flags.entered !== true);
-        if (this.dialog.element.open && this.dialog.element.querySelector('input[type="password"]') &&
-            (this.loginAddress !== browserUrl || !this.page.loginRealm)) this.dialog.close();
+        if (this.loginDialog.element.open && (this.loginAddress !== browserUrl || !this.page.loginRealm)) this.loginDialog.close();
         if (this.page.loginRealm && this.loginAddress !== browserUrl) {
             this.loginAddress = browserUrl;
             this.showLogin(browserUrl, this.page.loginRealm);
         }
     }
 
-    navigate(rawAddress: string, record = true, historyIndex?: number): void {
+    navigate(rawAddress: string, { record = true, historyIndex, followCurrentLevel = false }: NavigationOptions = {}): void {
+        const address = this.resolveAddress(rawAddress);
+        this.pinPage();
+        this.stopLoading();
+        this.followOnArrival = followCurrentLevel;
+        this.addressEdited = false;
+        this.address.value = this.shownAddress(address);
+        this.throbber.classList.add('loading');
+        setText(this.status, `${menuText.statusOpening}…`);
+        const delay = Math.max(fastestLoadMilliseconds, slowestLoadMilliseconds / Math.sqrt(Math.max(1, this.game.stat('requestsPerThread') / 2)));
+        this.pendingNavigation = setTimeout(() => this.arrive(address, record, historyIndex), delay);
+        this.stop.disabled = false;
+    }
+
+    private resolveAddress(rawAddress: string): string {
         let address = rawAddress.trim();
         if (address.toLowerCase().startsWith(viewSourcePrefix)) {
             address = address.slice(viewSourcePrefix.length).trim();
@@ -155,72 +182,64 @@ export class BrowserPanel implements Panel {
         }
         try {
             if (/^[\w-]+\.[\w-]+\//.test(address) && !address.includes('://')) address = `${new URL(this.game.content.startUrl).protocol}//${address}`;
-            address = new URL(address, this.viewedUrl).href;
-        } catch { /* Invalid addresses are rendered as a failed navigation. */ }
-        this.pinPage();
-        this.stopLoading();
-        this.addressEdited = false;
-        this.address.value = this.shownAddress(address);
-        this.throbber.classList.add('loading');
-        setText(this.status, `${menuText.statusOpening}…`);
-        const delay = Math.max(100, 550 / Math.sqrt(Math.max(1, this.game.stat('requestsPerThread') / 2)));
-        this.pendingNavigation = setTimeout(() => {
-            this.pendingNavigation = undefined;
-            this.stop.disabled = true;
-            this.throbber.classList.remove('loading');
-            this.loginAddress = '';
-            this.game.dispatch({ type: 'navigate', url: this.followOnArrival ? urlOfLevel(this.game.state.currentLevel) : address });
-            this.followOnArrival = false;
-            this.pinnedUrl = this.sourceOpen || this.addressEdited || document.activeElement === this.address ? this.game.state.browserUrl : null;
-            if (historyIndex !== undefined) this.historyIndex = historyIndex;
-            if (record) this.recordHistory(this.game.state.browserUrl);
-            this.lastUrl = this.game.state.browserUrl;
-            this.render();
-        }, delay);
-        this.stop.disabled = false;
+            return new URL(address, this.viewedUrl).href;
+        } catch {
+            return address;
+        }
     }
 
-    private tool(icon: string, label: string, click: () => void, secondary = false): HTMLButtonElement {
-        const button = createButton('', click);
-        button.className = 'tool-button';
-        if ([menuText.forward, menuText.stop, menuText.refresh, menuText.home].includes(label as typeof menuText.forward)) button.classList.add('navigation-icon');
-        button.classList.toggle('secondary', secondary);
+    private arrive(address: string, record: boolean, historyIndex: number | undefined): void {
+        this.pendingNavigation = undefined;
+        this.stop.disabled = true;
+        this.throbber.classList.remove('loading');
+        this.loginAddress = '';
+        this.game.dispatch({ type: 'navigate', url: this.followOnArrival ? urlOfLevel(this.game.state.currentLevel) : address });
+        this.followOnArrival = false;
+        this.pinnedUrl = this.sourceOpen || this.addressEdited || document.activeElement === this.address ? this.game.state.browserUrl : null;
+        if (historyIndex !== undefined) this.historyIndex = historyIndex;
+        if (record) this.recordHistory(this.game.state.browserUrl);
+        this.lastUrl = this.game.state.browserUrl;
+        this.render();
+    }
+
+    private tool(icon: string, label: string, click: () => void, style?: 'navigation-icon' | 'secondary'): HTMLButtonElement {
+        const button = createButton('', click, style === undefined ? 'tool-button' : `tool-button ${style}`);
         button.title = label;
         button.setAttribute('aria-label', label);
         button.append(createElement('span', { className: 'tool-icon', text: icon }), createElement('span', { text: label }));
         return button;
     }
 
-    private pageMenu(target: Element, doc: Document): MenuItem[] {
-        const copy = this.copyCommand(doc.getSelection()?.toString() ?? '');
-        const anchor = target.closest('a[href]');
-        const link = anchor === null ? null : { url: this.absolute(anchor.getAttribute('href')!), newWindow: anchor.getAttribute('target') === '_blank' };
+    private pageMenu(target: Element): MenuItem[] {
+        const copy = this.copyCommand(this.selectedText());
+        const found = linkAt(target);
+        const link = found === null ? null : { ...found, url: this.absolute(found.url) };
         const pictureAddress = target.closest('img[data-address]')?.getAttribute('data-address');
         if (pictureAddress) {
             const picture = this.absolute(pictureAddress);
             return [
-                ...(link === null ? [] : [{ label: menuText.openLink, action: () => this.openLink(link.url, link.newWindow) }]),
+                ...(link === null ? [] : [{ label: menuText.openLink, action: () => this.openLink(link) }]),
                 { label: menuText.showPicture, action: () => this.navigate(picture) },
                 null,
                 { label: menuText.copyShortcut, action: () => this.copyText(link?.url ?? picture) },
                 null,
-                { label: menuText.properties, action: () => this.showProperties(picture) },
+                { label: menuText.properties, action: () => this.dialogs.showProperties(picture) },
             ];
         }
         if (link !== null) {
             return [
-                { label: menuText.open, action: () => this.openLink(link.url, link.newWindow) },
+                { label: menuText.open, action: () => this.openLink(link) },
                 null,
                 copy,
                 { label: menuText.copyShortcut, action: () => this.copyText(link.url) },
                 null,
                 { label: menuText.addFavorite, action: () => this.addFavorite(link.url) },
-                { label: menuText.properties, action: () => this.showProperties(link.url) },
+                { label: menuText.properties, action: () => this.dialogs.showProperties(link.url) },
             ];
         }
         return [
-            { label: menuText.back, action: this.historyIndex > 0 ? () => this.moveHistory(-1) : undefined },
-            { label: menuText.forward, action: this.historyIndex < this.history.length - 1 ? () => this.moveHistory(1) : undefined },
+            { label: menuText.back, action: this.canGoBack() ? () => this.moveHistory(-1) : undefined },
+            { label: menuText.forward, action: this.canGoForward() ? () => this.moveHistory(1) : undefined },
             null,
             copy,
             { label: menuText.selectAll, action: () => this.selectAll() },
@@ -229,7 +248,7 @@ export class BrowserPanel implements Panel {
             { label: menuText.refresh, action: () => this.refresh() },
             null,
             { label: menuText.addFavorite, action: () => this.addFavorite() },
-            { label: menuText.properties, action: () => this.showProperties(this.viewedUrl, this.page.title) },
+            { label: menuText.properties, action: () => this.dialogs.showProperties(this.viewedUrl, this.page.title) },
         ];
     }
 
@@ -238,7 +257,7 @@ export class BrowserPanel implements Panel {
         const link = href ? this.absolute(href) : null;
         return [
             ...(link === null ? [] : [{ label: menuText.open, action: () => this.navigate(link) }, { label: menuText.copyShortcut, action: () => this.copyText(link) }, null]),
-            this.copyCommand(document.getSelection()?.toString() ?? ''),
+            this.copyCommand(this.selectedText()),
             { label: menuText.selectAll, action: () => this.selectAll() },
             null,
             { label: menuText.closeSource, action: () => this.closeSource() },
@@ -250,20 +269,11 @@ export class BrowserPanel implements Panel {
     }
 
     private openContextMenu(items: readonly MenuItem[], x: number, y: number): void {
-        this.contextMenu.replaceChildren(...this.menuElements(items, () => this.hideContextMenu()));
+        this.contextMenu.replaceChildren(...menuElements(items, () => this.hideContextMenu()));
         this.contextMenu.hidden = false;
         const bounds = this.element.getBoundingClientRect();
         this.contextMenu.style.left = `${Math.max(0, Math.min(x - bounds.left, bounds.width - this.contextMenu.offsetWidth - 4))}px`;
         this.contextMenu.style.top = `${Math.max(0, Math.min(y - bounds.top, bounds.height - this.contextMenu.offsetHeight - 4))}px`;
-    }
-
-    private menuElements(items: readonly MenuItem[], close: () => void): HTMLElement[] {
-        return items.map((item) => {
-            if (item === null) return createElement('div', { className: 'menu-separator' });
-            const button = createButton(item.label, () => { close(); item.action?.(); });
-            button.disabled = item.action === undefined;
-            return button;
-        });
     }
 
     private hideContextMenu(): void { this.contextMenu.hidden = true; }
@@ -286,7 +296,7 @@ export class BrowserPanel implements Panel {
         const control = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey;
         const alt = event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
         const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
-        const typing = (event.target as Element).matches?.('input, textarea') === true;
+        const typing = isTextField(event.target as Element);
         if (alt && key === 'arrowleft') return () => this.moveHistory(-1);
         if (alt && key === 'arrowright') return () => this.moveHistory(1);
         if (alt && key === 'home') return () => this.goHome();
@@ -297,34 +307,34 @@ export class BrowserPanel implements Panel {
         if (key === 'u') return () => this.showSource();
         if (key === 'a' && !typing) return () => this.selectAll();
         if (key === 'd') return () => this.addFavorite();
-        if (key === 'i') return () => this.showFavorites();
-        if (key === 'h') return () => this.showHistory();
+        if (key === 'i') return () => this.dialogs.showFavorites();
+        if (key === 'h') return () => this.dialogs.showHistory();
         return undefined;
     }
 
     private addFavorite(url = this.viewedUrl): void {
         this.game.dispatch({ type: 'addFavorite', url });
-        this.showFavorites();
+        this.dialogs.showFavorites();
     }
 
     private createMenus(): HTMLElement {
         const definitions: readonly (readonly [string, () => readonly MenuItem[]])[] = [
-            [menuText.file, () => [{ label: menuText.importExport, action: () => this.showSave() }]],
+            [menuText.file, () => [{ label: menuText.importExport, action: () => this.dialogs.showSave() }]],
             [menuText.edit, () => [this.copyCommand(this.selectedText()), { label: menuText.selectAll, action: () => this.selectAll() }]],
-            [menuText.view, () => [{ label: menuText.source, action: () => this.showSource() }, { label: uiText.history, action: () => this.showHistory() }, { label: menuText.refresh, action: () => this.refresh() }]],
+            [menuText.view, () => [{ label: menuText.source, action: () => this.showSource() }, { label: uiText.history, action: () => this.dialogs.showHistory() }, { label: menuText.refresh, action: () => this.refresh() }]],
             [menuText.favorites, () => [
                 { label: menuText.addFavorite, action: () => this.addFavorite() },
-                { label: menuText.organizeFavorites, action: () => this.showFavorites() },
-                ...(this.game.state.favorites.length === 0 ? [] : [null, ...this.game.state.favorites.map((url) => ({ label: url.replace(/^https?:\/\//, ''), action: () => this.navigate(url) }))]),
+                { label: menuText.organizeFavorites, action: () => this.dialogs.showFavorites() },
+                ...(this.game.state.favorites.length === 0 ? [] : [null, ...this.game.state.favorites.map((url) => ({ label: withoutProtocol(url), action: () => this.navigate(url) }))]),
             ]],
-            [menuText.tools, () => [{ label: menuText.internetOptions, action: () => this.showOptions() }]],
-            [menuText.help, () => [{ label: menuText.about, action: () => this.showAbout() }]],
+            [menuText.tools, () => [{ label: menuText.internetOptions, action: () => this.dialogs.showOptions() }]],
+            [menuText.help, () => [{ label: menuText.about, action: () => this.dialogs.showAbout() }]],
         ];
         const bar = createElement('nav', { className: 'menu-bar' });
         for (const [label, commands] of definitions) {
             const details = createElement('details', { className: 'browser-menu' });
             const popup = createElement('div', { className: 'menu-popup' });
-            const populate = (): void => popup.replaceChildren(...this.menuElements(commands(), () => { details.open = false; }));
+            const populate = (): void => popup.replaceChildren(...menuElements(commands(), () => { details.open = false; }));
             populate();
             details.append(createElement('summary', { text: label }), popup);
             details.addEventListener('toggle', () => {
@@ -351,15 +361,19 @@ export class BrowserPanel implements Panel {
         if (this.history[this.historyIndex] === url) return;
         this.history = this.history.slice(0, this.historyIndex + 1);
         this.history.push(url);
-        if (this.history.length > 200) this.history.shift();
+        if (this.history.length > historyLimit) this.history.shift();
         this.historyIndex = this.history.length - 1;
     }
+
+    private canGoBack(): boolean { return this.historyIndex > 0; }
+
+    private canGoForward(): boolean { return this.historyIndex < this.history.length - 1; }
 
     private moveHistory(direction: number): void {
         const index = this.historyIndex + direction;
         const url = this.history[index];
         if (url === undefined) return;
-        this.navigate(url, false, index);
+        this.navigate(url, { record: false, historyIndex: index });
     }
 
     private showSource(): void {
@@ -388,7 +402,6 @@ export class BrowserPanel implements Panel {
     private updateSourceVisibility(): void {
         this.viewport.hidden = this.sourceOpen;
         this.sourcePane.hidden = !this.sourceOpen;
-        this.content.classList.toggle('source-open', this.sourceOpen);
         this.sourceButton.setAttribute('aria-expanded', String(this.sourceOpen));
     }
 
@@ -403,10 +416,9 @@ export class BrowserPanel implements Panel {
                 const link = /(?:src|href)="([^"]+)"/.exec(token);
                 if (link?.[1]) {
                     const target = link[1];
-                    const newWindow = token.includes('target="_blank"');
                     const offset = token.indexOf(target, link.index);
                     const anchor = createElement('a', { text: target, attributes: { href: target } });
-                    anchor.addEventListener('click', (event) => { event.preventDefault(); this.openLink(target, newWindow); });
+                    anchor.addEventListener('click', (event) => { event.preventDefault(); this.openLink({ url: target, newWindow: token.includes('target="_blank"') }); });
                     span.replaceChildren(token.slice(0, offset), anchor, token.slice(offset + target.length));
                 }
             }
@@ -414,9 +426,13 @@ export class BrowserPanel implements Panel {
         }
     }
 
+    private activeDocument(): Document | null {
+        return this.sourceOpen ? document : this.viewport.contentDocument;
+    }
+
     private selectAll(): void {
         this.pinPage();
-        const doc = this.sourceOpen ? document : this.viewport.contentDocument;
+        const doc = this.activeDocument();
         const target = this.sourceOpen ? this.sourceDocument : doc?.body;
         if (!doc || !target) return;
         const range = doc.createRange();
@@ -427,134 +443,25 @@ export class BrowserPanel implements Panel {
         (this.sourceOpen ? this.sourceDocument : this.viewport).focus({ preventScroll: true });
     }
 
-    private showFavorites(): void {
-        const favorites = this.game.state.favorites;
-        this.dialog.show(menuText.favorites, favorites.length ? favorites.map((url) => {
-            const link = this.dialogLink(url);
-            const remove = createButton(menuText.deleteFavorite, () => {
-                this.game.dispatch({ type: 'removeFavorite', url });
-                this.showFavorites();
-            });
-            remove.setAttribute('aria-label', fill(uiText.deleteFavorite, { address: url }));
-            return createElement('div', { className: 'favorite-row' }, [link, remove]);
-        }) : [createElement('p', { text: uiText.none })]);
-    }
-
-    private showHistory(): void {
-        const current = this.game.state.currentLevel;
-        const levelInput = createElement('input', { attributes: { id: 'history-level', type: 'number', min: '1', max: String(current), autocomplete: 'off' } });
-        levelInput.value = String(current);
-        const goToLevel = (): void => {
-            const level = Math.round(Number(levelInput.value));
-            if (!(level >= 1 && level <= current)) return;
-            this.dialog.close();
-            this.navigate(urlOfLevel(level));
-        };
-        levelInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') goToLevel(); });
-        const recent = [...this.game.state.history].reverse();
-        this.dialog.show(uiText.history, [
-            createElement('h3', { text: uiText.historyLevels }),
-            createElement('div', { className: 'history-go' }, [createElement('label', { text: uiText.historyGoTo, attributes: { for: 'history-level' } }), levelInput, createButton(menuText.go, goToLevel)]),
-            createElement('div', { className: 'history-list' }, Array.from({ length: current }, (_, index) => this.historyEntry(urlOfLevel(current - index), current - index))),
-            createElement('h3', { text: uiText.historyRecent }),
-            recent.length === 0 ? createElement('p', { text: uiText.none }) : createElement('div', { className: 'history-list' }, recent.map((url) => this.historyEntry(url))),
-        ]);
-        levelInput.focus();
-        levelInput.select();
-    }
-
-    private historyEntry(url: string, level?: number): HTMLButtonElement {
-        const button = createButton('', () => { this.dialog.close(); this.navigate(url); });
-        button.className = 'history-entry';
-        button.title = url;
-        const address = level === undefined ? url.replace(/^https?:\/\//, '') : new URL(url).pathname;
-        button.append(...(level === undefined ? [] : [createElement('span', { className: 'history-level', text: fill(uiText.levelNumber, { level }) })]),
-            createElement('span', { className: 'history-address', text: address }));
-        return button;
-    }
-
-    private dialogLink(url: string): HTMLButtonElement {
-        const button = createButton(url, () => { this.dialog.close(); this.navigate(url); });
-        button.className = 'dialog-link';
-        return button;
-    }
-
-    private showOptions(): void {
-        const home = createElement('input', { attributes: { spellcheck: 'false', autocomplete: 'off' } });
-        home.value = this.game.state.homePage;
-        const clear = createButton(dialogText.clearHistory, () => {
-            this.game.dispatch({ type: 'clearHistory' });
-            clear.disabled = true;
-        });
-        clear.disabled = this.game.state.history.length === 0;
-        const group = (heading: string, body: string, ...controls: HTMLElement[]): HTMLElement =>
-            createElement('fieldset', { className: 'options-group' }, [createElement('legend', { text: heading }), createElement('p', { text: body }), ...controls]);
-        const buttons = (...children: HTMLElement[]): HTMLElement => createElement('div', { className: 'options-buttons' }, children);
-        this.dialog.show(dialogText.optionsTitle, [
-            group(dialogText.homePageHeading, dialogText.homePageBody, createElement('label', { className: 'login-field' }, [menuText.address, home]),
-                buttons(createButton(dialogText.useCurrent, () => { home.value = this.viewedUrl; }), createButton(dialogText.useDefault, () => { home.value = this.game.content.homeUrl; }))),
-            group(dialogText.historyHeading, dialogText.historyBody, buttons(clear)),
-            group(dialogText.progressHeading, dialogText.optionsSaving, buttons(createButton(dialogText.startOver, () => this.startOver()))),
-        ], [createButton(dialogText.ok, () => {
-            this.game.dispatch({ type: 'setHomePage', url: home.value });
-            this.dialog.close();
-        })], false, dialogText.cancel);
-    }
-
-    private startOver(): void {
-        if (!confirm(dialogText.startOverConfirm)) return;
-        this.dialog.close();
-        this.game.replaceState(createInitialState(this.game.content, Math.floor(Math.random() * 2 ** 32)));
-    }
-
-    private showProperties(url: string, title?: string): void {
-        const rows: (readonly [string, string])[] = [...(title ? [[dialogText.propertiesName, title] as const] : []), [dialogText.propertiesType, fileType(url)], [dialogText.propertiesAddress, url]];
-        this.dialog.show(dialogText.propertiesTitle, [createElement('dl', { className: 'properties' }, rows.flatMap(([label, value]) => [createElement('dt', { text: label }), createElement('dd', { text: value })]))]);
-    }
-
-    private showAbout(): void {
-        this.dialog.show(dialogText.aboutTitle, [createElement('pre', { text: dialogText.aboutBody.join('\n') })]);
+    private selectedText(): string {
+        return this.activeDocument()?.getSelection()?.toString() ?? '';
     }
 
     private copyText(text: string): void {
         void navigator.clipboard?.writeText(text).catch(() => undefined);
     }
 
-    private selectedText(): string {
-        const doc = this.sourceOpen ? document : this.viewport.contentDocument;
-        return doc?.getSelection()?.toString() ?? '';
-    }
-
     private absolute(address: string): string {
         try { return new URL(address, this.viewedUrl).href; } catch { return address; }
     }
 
-    private refresh(): void { this.navigate(this.viewedUrl, false); }
+    private refresh(): void { this.navigate(this.viewedUrl, { record: false }); }
 
     private goHome(): void { this.navigate(this.game.state.homePage); }
 
     private focusAddress(): void {
         this.address.focus();
         this.address.select();
-    }
-
-    private showSave(): void {
-        const input = createElement('textarea', { className: 'save-text', attributes: { rows: '7', 'aria-label': uiText.saveString, spellcheck: 'false' } });
-        const message = createElement('p', { className: 'dialog-message', attributes: { role: 'status' } });
-        const exportButton = createButton(dialogText.exportButton, () => {
-            input.value = encodeExport(serializeSave(this.game.state, Date.now()));
-            input.select();
-            message.textContent = uiText.copied;
-        });
-        const importButton = createButton(dialogText.importButton, () => {
-            try {
-                const save = parseSave(decodeExport(input.value), createInitialState(this.game.content, this.game.state.randomState));
-                if (!confirm(dialogText.importConfirm)) return;
-                this.game.replaceState(save.state);
-                message.textContent = uiText.imported;
-            } catch (error) { message.textContent = error instanceof Error ? error.message : String(error); }
-        });
-        this.dialog.show(dialogText.exportTitle, [createElement('p', { text: dialogText.exportBody }), input, message], [exportButton, importButton], true);
     }
 
     private showLogin(url: string, realm: string): void {
@@ -564,17 +471,28 @@ export class BrowserPanel implements Panel {
         const message = createElement('p', { className: 'dialog-message', attributes: { role: 'status' } });
         const submit = (): void => {
             const accepted = this.game.dispatch({ type: 'submitCredentials', url, username: username.value, password: password.value });
-            if (accepted) { this.dialog.close(); this.render(); } else message.textContent = uiText.wrongCredentials;
+            if (accepted) {
+                this.loginDialog.close();
+                this.render();
+            } else {
+                message.textContent = uiText.wrongCredentials;
+            }
         };
         for (const field of [username, password]) field.addEventListener('keydown', (event) => { if (event.key === 'Enter') submit(); });
-        this.dialog.show(dialogText.loginTitle, [createElement('p', { text: dialogText.loginPrompt }), createElement('p', { text: `${dialogText.loginSite}: ${new URL(url).host}` }), createElement('p', { text: `${dialogText.loginRealm}: ${realm}` }),
-            createElement('label', { className: 'login-field' }, [dialogText.loginUser, username]), createElement('label', { className: 'login-field' }, [dialogText.loginPassword, password]), message], [createButton(dialogText.ok, submit)]);
+        this.loginDialog.show(dialogText.loginTitle, [
+            createElement('p', { text: dialogText.loginPrompt }),
+            createElement('p', { text: `${dialogText.loginSite}: ${new URL(url).host}` }),
+            createElement('p', { text: `${dialogText.loginRealm}: ${realm}` }),
+            createElement('label', { className: 'login-field' }, [dialogText.loginUser, username]),
+            createElement('label', { className: 'login-field' }, [dialogText.loginPassword, password]),
+            message,
+        ], { actions: [createButton(dialogText.ok, submit)] });
         username.focus();
     }
 
-    private openLink(address: string, newWindow: boolean): void {
-        if (newWindow) window.open(address, '_blank', 'noopener');
-        else this.navigate(address);
+    private openLink({ url, newWindow }: Link): void {
+        if (newWindow) window.open(url, '_blank', 'noopener');
+        else this.navigate(url);
     }
 
     private submitCaptcha(doc: Document): void {
@@ -586,45 +504,47 @@ export class BrowserPanel implements Panel {
         const doc = this.viewport.contentDocument;
         this.hoveredLink = null;
         if (!doc) return;
-        doc.addEventListener('mouseover', (event) => {
-            this.hoveredLink = (event.target as Element).closest('a[href]')?.getAttribute('href') ?? null;
-        });
+        doc.addEventListener('mouseover', (event) => { this.hoveredLink = linkAt(event.target as Element)?.url ?? null; });
         doc.addEventListener('mouseout', (event) => { if (event.relatedTarget === null) this.hoveredLink = null; });
         doc.addEventListener('contextmenu', (event) => {
             const target = event.target as Element;
-            if (target.matches('input, textarea')) return;
+            if (isTextField(target)) return;
             event.preventDefault();
             const frame = this.viewport.getBoundingClientRect();
-            this.openContextMenu(this.pageMenu(target, doc), frame.left + event.clientX, frame.top + event.clientY);
+            this.openContextMenu(this.pageMenu(target), frame.left + event.clientX, frame.top + event.clientY);
         });
         doc.addEventListener('click', (event) => {
             this.hideContextMenu();
             const target = event.target as Element;
-            const link = target.closest('a[href]');
+            const link = linkAt(target);
             if (link) {
                 event.preventDefault();
-                this.openLink(link.getAttribute('href')!, link.getAttribute('target') === '_blank');
+                this.openLink(link);
             }
             if (target.closest('[data-captcha-refresh]')) this.game.dispatch({ type: 'answerCaptcha', answer: '' });
             if (target.closest('[data-captcha-submit]')) this.submitCaptcha(doc);
         });
         doc.addEventListener('keydown', (event) => {
             this.handleShortcut(event);
-            if (event.key === 'Enter' && (event.target as Element).matches('[data-captcha-input]')) this.submitCaptcha(doc);
-            if (event.key === '\\' && !(event.target as Element).matches('input, textarea')) {
-                document.dispatchEvent(new KeyboardEvent('keydown', { key: '\\', bubbles: true }));
-            }
+            const target = event.target as Element;
+            if (event.key === 'Enter' && target.matches('[data-captcha-input]')) this.submitCaptcha(doc);
+            if (event.key === devPanelKey && !isTextField(target)) document.dispatchEvent(new KeyboardEvent('keydown', { key: devPanelKey, bubbles: true }));
         });
         const captchaInput = doc.querySelector<HTMLInputElement>('[data-captcha-input]');
-        const typingElsewhere = document.activeElement?.matches('input, textarea') === true;
-        if (captchaInput && !typingElsewhere) captchaInput.focus();
+        if (captchaInput && !isTextField(document.activeElement)) captchaInput.focus();
     }
 }
 
-function fileType(url: string): string {
-    try {
-        const path = new URL(url).pathname;
-        const extension = path.endsWith('/') ? 'htm' : /\.(\w+)$/.exec(path)?.[1]?.toLowerCase() ?? '';
-        return fileTypes[extension] ?? dialogText.unknownFileType;
-    } catch { return dialogText.unknownFileType; }
+function linkAt(target: Element): Link | null {
+    const anchor = target.closest('a[href]');
+    return anchor === null ? null : { url: anchor.getAttribute('href')!, newWindow: anchor.getAttribute('target') === '_blank' };
+}
+
+function menuElements(items: readonly MenuItem[], close: () => void): HTMLElement[] {
+    return items.map((item) => {
+        if (item === null) return createElement('div', { className: 'menu-separator' });
+        const button = createButton(item.label, () => { close(); item.action?.(); });
+        button.disabled = item.action === undefined;
+        return button;
+    });
 }

@@ -1,5 +1,6 @@
 import { brailleDots, characterColors } from './encodings.ts';
 import { clockFace, presentPhoto, semaphoreFigure, semaphoreFigures } from './generated/props.ts';
+import { nextSeed, textSeed } from './riddle.ts';
 
 export type DrawingKind = 'gift' | 'semaphore' | 'clocks' | 'pigpen' | 'flags' | 'braille' | 'plain' | 'mirror' | 'rotated' | 'dark' | 'transparent' | 'flash' | 'delayed'
     | 'pixels' | 'bits' | 'shares' | 'spacer';
@@ -33,6 +34,13 @@ const glyphs: Readonly<Record<string, string>> = {
     6: '0e 10 10 1e 11 11 0e', 7: '1f 01 02 04 08 08 08', 8: '0e 11 11 0e 11 11 0e', 9: '0e 11 11 0f 01 01 0e',
 };
 
+export const glyphWidth = 5;
+export const glyphHeight = 7;
+const glyphAdvance = glyphWidth + 1;
+const textMargin = 4;
+const textHeight = glyphHeight + textMargin * 2;
+const letterScale = 4;
+
 const semaphorePositions = '01 02 03 04 05 06 07 12 13 46 14 15 16 17 23 24 25 26 27 34 35 47 56 57 36 67'.split(' ');
 
 const flagColors = { red: '#d52b1e', blue: '#1d4f91', yellow: '#f6c700', white: '#f7f7f2', black: '#111111' } as const;
@@ -64,14 +72,14 @@ function gift(word: string): Picture {
 
 function semaphore(text: string): Picture {
     const { width, height } = semaphoreFigure;
-    return symbolRow(text, width, height, 6, null, (character) => {
+    return symbolRow(text, width, height, 6, (character) => {
         const figure = semaphoreFigures[character];
         return figure === undefined ? '' : `<image href="${figure}" width="${width}" height="${height}"/>`;
     });
 }
 
 function clocks(text: string): Picture {
-    return symbolRow(text, 44, 44, 10, null, (character) => {
+    return symbolRow(text, 44, 44, 10, (character) => {
         const pair = semaphorePositions[character.charCodeAt(0) - 97];
         if (pair === undefined) return '';
         const angle = (position: string): string => String((180 + Number(position) * 45) % 360);
@@ -81,7 +89,7 @@ function clocks(text: string): Picture {
 }
 
 function pigpen(text: string): Picture {
-    return symbolRow(text, 28, 28, 10, null, (character) => {
+    return symbolRow(text, 28, 28, 10, (character) => {
         const index = character.charCodeAt(0) - 97;
         if (index < 0 || index > 25) return '';
         const dotted = (index >= 9 && index < 18) || index >= 22;
@@ -104,7 +112,7 @@ function pigpen(text: string): Picture {
 
 function flags(text: string): Picture {
     const outline = ' stroke="#333" stroke-width="0.6"';
-    return symbolRow(text, 36, 26, 6, null, (character) => {
+    return symbolRow(text, 36, 26, 6, (character) => {
         const design = flagDesign(character);
         if (design === '') return '';
         const edge = character === 'a' || character === 'b' ? swallowtail('none', outline) : `<rect width="30" height="20" fill="none"${outline}/>`;
@@ -162,7 +170,7 @@ function swallowtail(color: string, extra = ''): string {
 }
 
 function braille(text: string): Picture {
-    return symbolRow(text, 16, 22, 12, null, (character) => {
+    return symbolRow(text, 16, 22, 12, (character) => {
         const dots = brailleDots(character);
         return [[5, 5], [5, 11], [5, 17], [11, 5], [11, 11], [11, 17]].map(([x, y], index) => (dots >> index) & 1
             ? `<circle cx="${x}" cy="${y}" r="2.4" fill="#eeeeee"/>`
@@ -171,27 +179,23 @@ function braille(text: string): Picture {
 }
 
 function plain(text: string): Picture {
-    const width = text.length * 6 + 7;
-    return svgPicture(width, 15, `${box(0, 0, width, 15, '#101010')}${pixelText(text, 4, 4, '#e8e8e8')}`, 4, true);
+    return letterPicture(text, (width) => `${box(0, 0, width, textHeight, '#101010')}${pixelText(text, '#e8e8e8')}`);
 }
 
 function transparent(text: string): Picture {
-    return svgPicture(text.length * 6 + 7, 15, pixelText(text, 4, 4, '#000000'), 4, true);
+    return letterPicture(text, () => pixelText(text, '#000000'));
 }
 
 function rotated(text: string): Picture {
-    const width = text.length * 6 + 7;
-    return svgPicture(width, 15, `${box(0, 0, width, 15, '#e8e8e8')}<g transform="rotate(180 ${width / 2} 7.5)">${pixelText(text, 4, 4, '#1a1a1a')}</g>`, 4, true);
+    return letterPicture(text, (width) => `${box(0, 0, width, textHeight, '#e8e8e8')}<g transform="rotate(180 ${width / 2} ${textHeight / 2})">${pixelText(text, '#1a1a1a')}</g>`);
 }
 
 function mirror(text: string): Picture {
-    const width = text.length * 6 + 7;
-    return svgPicture(width, 15, `${box(0, 0, width, 15, '#e8e8e8')}<g transform="translate(${width} 0) scale(-1 1)">${pixelText(text, 4, 4, '#1a1a1a')}</g>`, 4, true);
+    return letterPicture(text, (width) => `${box(0, 0, width, textHeight, '#e8e8e8')}<g transform="translate(${width} 0) scale(-1 1)">${pixelText(text, '#1a1a1a')}</g>`);
 }
 
 function dark(text: string): Picture {
-    const width = text.length * 6 + 7;
-    return svgPicture(width, 15, `${box(0, 0, width, 15, '#000000')}${pixelText(text, 4, 4, '#050505')}`, 4, true);
+    return letterPicture(text, (width) => `${box(0, 0, width, textHeight, '#000000')}${pixelText(text, '#050505')}`);
 }
 
 function flash(text: string): Picture {
@@ -203,9 +207,8 @@ function delayed(text: string): Picture {
 }
 
 function flashing(text: string, seconds: number, hiddenShare: number): Picture {
-    const width = text.length * 6 + 7;
     const animate = `<animate attributeName="opacity" calcMode="discrete" dur="${seconds}s" repeatCount="indefinite" keyTimes="0;${hiddenShare}" values="0;1"/>`;
-    return svgPicture(width, 15, `${box(0, 0, width, 15, '#101010')}<g opacity="0">${animate}${pixelText(text, 4, 4, '#e8e8e8')}</g>`, 4, true);
+    return letterPicture(text, (width) => `${box(0, 0, width, textHeight, '#101010')}<g opacity="0">${animate}${pixelText(text, '#e8e8e8')}</g>`);
 }
 
 function pixels(text: string): Picture {
@@ -220,36 +223,38 @@ function bits(text: string): Picture {
 }
 
 function shares(text: string): Picture {
-    const width = text.length * 6 + 7;
+    const width = textWidth(text);
     const lit = new Set<string>();
-    [...text].forEach((character, index) => glyphRows(character).forEach((bits, y) => {
-        for (let x = 0; x < 5; x++) if ((bits >> (4 - x)) & 1) lit.add(`${4 + index * 6 + x},${4 + y}`);
-    }));
-    let seed = [...text].reduce((hash, character) => Math.imul(hash ^ character.charCodeAt(0), 16777619), 2166136261) >>> 0;
+    [...text].forEach((character, index) => {
+        for (let y = 0; y < glyphHeight; y++) {
+            for (let x = 0; x < glyphWidth; x++) if (glyphPixel(character, x, y)) lit.add(`${textMargin + index * glyphAdvance + x},${textMargin + y}`);
+        }
+    });
+    let seed = textSeed(text);
     const left: string[] = [];
     const right: string[] = [];
-    for (let y = 0; y < 15; y++) {
+    for (let y = 0; y < textHeight; y++) {
         for (let x = 0; x < width; x++) {
-            seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
+            seed = nextSeed(seed);
             const noise = seed >>> 31 === 1;
             if (noise) left.push(`M${x} ${y}h1v1h-1z`);
             if (noise !== lit.has(`${x},${y}`)) right.push(`M${width + 2 + x} ${y}h1v1h-1z`);
         }
     }
-    return svgPicture(width * 2 + 2, 15, `${box(0, 0, width * 2 + 2, 15, '#000000')}<path d="${left.join('')}${right.join('')}" fill="#ffffff"/>`, 4, true);
+    return svgPicture(width * 2 + 2, textHeight, `${box(0, 0, width * 2 + 2, textHeight, '#000000')}<path d="${left.join('')}${right.join('')}" fill="#ffffff"/>`, letterScale, true);
 }
 
 function spacer(): Picture {
     return svgPicture(1, 1, '', 1);
 }
 
-function symbolRow(text: string, cellWidth: number, cellHeight: number, perRow: number, background: string | null, symbol: (character: string) => string, scale = 1, definitions = ''): Picture {
+function symbolRow(text: string, cellWidth: number, cellHeight: number, perRow: number, symbol: (character: string) => string, scale = 1, definitions = ''): Picture {
     const characters = [...text];
     const columns = Math.min(perRow, characters.length);
     const rows = Math.ceil(characters.length / perRow);
     const cells: Cell[] = characters.map((character, index) => ({ character, x: (index % perRow) * cellWidth, y: Math.floor(index / perRow) * cellHeight }));
     const content = cells.filter((cell) => cell.character !== ' ').map((cell) => `<g transform="translate(${cell.x} ${cell.y})">${symbol(cell.character)}</g>`).join('');
-    return svgPicture(columns * cellWidth, rows * cellHeight, `${definitions}${background === null ? '' : box(0, 0, columns * cellWidth, rows * cellHeight, background)}${content}`, scale);
+    return svgPicture(columns * cellWidth, rows * cellHeight, `${definitions}${content}`, scale);
 }
 
 function svgPicture(width: number, height: number, content: string, scale: number, crisp = false): Picture {
@@ -266,11 +271,22 @@ export function glyphRows(character: string): number[] {
     return (glyphs[character] ?? '00 00 00 00 00 00 00').split(' ').map((row) => Number.parseInt(row, 16));
 }
 
-function pixelText(text: string, left: number, top: number, color: string): string {
-    return [...text.toLowerCase()].flatMap((character, index) => {
-        const rows = glyphRows(character);
-        return rows.flatMap((row, y) => Array.from({ length: 5 }, (_, x) => x)
-            .filter((x) => (row >> (4 - x)) & 1)
-            .map((x) => box(left + index * 6 + x, top + y, 1, 1, color)));
-    }).join('');
+export function glyphPixel(character: string, x: number, y: number): boolean {
+    return (((glyphRows(character)[y] ?? 0) >> (glyphWidth - 1 - x)) & 1) === 1;
+}
+
+function textWidth(text: string): number {
+    return text.length * glyphAdvance + textMargin * 2 - 1;
+}
+
+function letterPicture(text: string, content: (width: number) => string): Picture {
+    const width = textWidth(text);
+    return svgPicture(width, textHeight, content(width), letterScale, true);
+}
+
+function pixelText(text: string, color: string): string {
+    return [...text.toLowerCase()].flatMap((character, index) => Array.from({ length: glyphHeight }, (_, y) => y).flatMap((y) =>
+        Array.from({ length: glyphWidth }, (_, x) => x)
+            .filter((x) => glyphPixel(character, x, y))
+            .map((x) => box(textMargin + index * glyphAdvance + x, textMargin + y, 1, 1, color)))).join('');
 }

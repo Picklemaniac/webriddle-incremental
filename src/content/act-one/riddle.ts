@@ -39,7 +39,30 @@ export const salts = {
     hint: 26,
     method: 27,
     hintShown: 28,
+    shuffle: 1000,
+    firstLetterFiller: 2000,
+    capitalFiller: 2100,
+    lastLetterFiller: 2200,
+    earlierAnswer: 2300,
+    gridLetter: 2400,
+    gridFiller: 2500,
+    boldFiller: 2600,
 } as const;
+
+export const firstYear = 1000;
+export const yearCount = 1100;
+
+export function textSeed(text: string): number {
+    return [...text].reduce((hash, character) => Math.imul(hash ^ character.charCodeAt(0), 16777619), 2166136261) >>> 0;
+}
+
+export function nextSeed(seed: number): number {
+    return (Math.imul(seed, 1103515245) + 12345) >>> 0;
+}
+
+export function fraction(value: number): number {
+    return value - Math.floor(value);
+}
 
 export function unitHash(level: number, salt: number): number {
     let value = Math.imul(level ^ riddleSeed, 0x9e3779b1) ^ Math.imul(salt + 0x632be5ab, 0x85ebca6b);

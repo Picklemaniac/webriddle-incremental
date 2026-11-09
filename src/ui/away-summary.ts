@@ -26,6 +26,6 @@ export class AwaySummary {
             ...(summary.levelsGained > 0 ? [fill(summary.levelsGained === 1 ? uiText.awayLevel : uiText.awayLevels, { levels: formatNumber(summary.levelsGained) })] : []),
             ...(gains.length > 0 ? [fill(uiText.awayEarned, { amounts: listFormat.format(gains) })] : []),
         ];
-        this.dialog.show(uiText.awayTitle, lines.map((text) => createElement('p', { text })), [], false, dialogText.ok);
+        this.dialog.show(uiText.awayTitle, lines.map((text) => createElement('p', { text })), { closeLabel: dialogText.ok });
     }
 }

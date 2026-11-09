@@ -1,7 +1,6 @@
 import type { KnipConfig } from 'knip';
 
 export default {
-    entry: ['tools/build-assets.ts'],
     project: ['src/**/*.{ts,css}', 'tools/**/*.{ts,mjs}'],
     vitest: {
         config: ['vite.config.ts'],

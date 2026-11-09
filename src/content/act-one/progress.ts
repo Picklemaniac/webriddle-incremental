@@ -4,12 +4,13 @@ import type { GameState } from '../../core/state.ts';
 import { urlOfLevel } from './levels.ts';
 import type { NoticeId } from './text.ts';
 
+export const automationLevel = 5;
 export const automationBootSeconds = 5;
 const handSolveInsight = 5;
 
 export function automationElapsed(state: GameState): number {
     if (!state.flags.automated) return 0;
-    return Math.max(0, state.elapsedSeconds - (state.statistics.automationStartedAt ?? state.statistics.automatedAt ?? 0));
+    return Math.max(0, state.elapsedSeconds - (state.statistics.automatedAt ?? 0));
 }
 
 export function isUpgradeRevealed(state: GameState, purchasableId: string): boolean {
@@ -20,10 +21,9 @@ export function solveLevel(game: Game, method: SolveMethod): void {
     const { state } = game;
     const previousUrl = urlOfLevel(state.currentLevel);
     state.currentLevel += 1;
-    state.search = { level: state.currentLevel, requestsSpent: 0, configuration: '' };
+    state.search = { requestsSpent: 0, configuration: '' };
     state.visitedLevels[urlOfLevel(state.currentLevel)] = state.currentLevel;
     state.statistics.lastSolveAt = state.elapsedSeconds;
-    state.levelProgress = 0;
     if (state.browserUrl === previousUrl) {
         state.browserUrl = urlOfLevel(state.currentLevel);
     }

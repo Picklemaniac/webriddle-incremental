@@ -1,6 +1,6 @@
-import { glyphRows, type Drawing, type DrawingKind } from './drawings.ts';
+import { glyphHeight, glyphPixel, glyphWidth, type Drawing, type DrawingKind } from './drawings.ts';
 import { atomicNumberSpelling, characterColors, encode, keyboardShift, toRomanNumerals, vigenere, type Encoding } from './encodings.ts';
-import { pickByUnit, ramp, salts, unitHash } from './riddle.ts';
+import { firstYear, fraction, pickByUnit, ramp, salts, unitHash } from './riddle.ts';
 import type { Sound } from './sounds.ts';
 import { puzzleHints } from './text.ts';
 import { vocabularySize, wordAtRank } from './vocabulary.ts';
@@ -179,11 +179,9 @@ const spots: readonly Spot[] = [
     { fromLevel: 320, weight: 1, fits: printable, place: (text, context) => withLine(variant('zipped', context.level), { zipped: text }) },
 ];
 
-const textEncodings: readonly (readonly [Encoding, number])[] = [
-    ['reversed', 11], ['a1z26', 12], ['rot13', 16], ['atbash', 24], ['morse', 28], ['nato', 32], ['shift', 50], ['binary', 55],
-    ['upsideDown', 58], ['phone', 65], ['polybius', 95], ['tap', 105], ['hex', 140], ['ascii', 155], ['bacon', 170], ['url', 200],
-    ['octal', 240], ['rot47', 270], ['base64', 280],
-];
+const textEncodingNames: ReadonlySet<Encoding> = new Set<Encoding>(['reversed', 'a1z26', 'rot13', 'atbash', 'morse', 'nato', 'shift', 'binary', 'upsideDown', 'phone',
+    'polybius', 'tap', 'hex', 'ascii', 'bacon', 'url', 'octal', 'rot47', 'base64']);
+const textEncodings = methods.flatMap((method) => (method.encoding !== undefined && textEncodingNames.has(method.encoding) ? [[method.encoding, method.fromLevel] as const] : []));
 
 export function wordClue(level: number, answer: string, pageName: (level: number) => string | null, withImage = true, recent: readonly string[] = []): Clue {
     const pool = methods.filter((method) => method.fromLevel <= level && (withImage || method.htmOnly !== true));
@@ -211,7 +209,7 @@ export function leetEncodingFor(unit: number, recent: readonly string[] = []): E
 }
 
 export function yearClue(year: number, level: number, unit: number, recent: readonly string[] = []): Clue {
-    const first = 1000 + Math.floor(fraction(unit * 7) * (year - 1000));
+    const first = firstYear + Math.floor(fraction(unit * 7) * (year - firstYear));
     const options: readonly (readonly [number, () => Clue])[] = [
         [0, () => ({ method: 'roman', lines: [toRomanNumerals(year)] })],
         [500, () => ({ method: 'phoneTones', sound: { kind: 'tones', text: String(year) } })],
@@ -333,7 +331,7 @@ function alternative(name: string, fromLevel: number, extensions: readonly Alter
 }
 
 function layered(context: ClueContext): Clue {
-    const inner = pickByUnit(['reversed', 'atbash', 'rot13', 'caesar'] as const, context.unit);
+    const inner = pickByUnit(innerLayers, context.unit);
     const outer = pickByUnit(['binary', 'hex', 'morse', 'ascii', 'base64', 'octal', 'a1z26', 'polybius'] as const, fraction(context.unit * 13));
     return placed(encode(encode(context.word, inner), outer), context);
 }
@@ -356,7 +354,7 @@ function earlierAnswers(context: ClueContext): Clue | null {
     const span = level - firstNamedLevel;
     if (pageName === undefined || span < 1) return null;
     const reference = (letter: string, index: number, initial: boolean): string | null => {
-        const start = Math.floor(unitHash(level, 2300 + index) * span);
+        const start = Math.floor(unitHash(level, salts.earlierAnswer + index) * span);
         for (let offset = 0; offset < span; offset++) {
             const candidate = firstNamedLevel + ((start + offset) % span);
             const name = pageName(candidate);
@@ -398,7 +396,7 @@ function emphasized(word: string, answer: string, level: number): { text: string
     let length = 0;
     [...word].forEach((letter, index) => {
         const options = fillerWords('any', letter, answer);
-        const filler = options.length === 0 ? letter : pickByUnit(options, unitHash(level, 2600 + index));
+        const filler = options.length === 0 ? letter : pickByUnit(options, unitHash(level, salts.boldFiller + index));
         const position = filler.indexOf(letter);
         if (length > 0 && length + filler.length + 1 > lineWidth) {
             lines.push([]);
@@ -412,7 +410,7 @@ function emphasized(word: string, answer: string, level: number): { text: string
 }
 
 function letterGrid(word: string, level: number): string[] {
-    const special = pickByUnit(['o', 'x', 'z', 'q', 'v', 'k'], unitHash(level, 2400));
+    const special = pickByUnit(['o', 'x', 'z', 'q', 'v', 'k'], unitHash(level, salts.gridLetter));
     const filler = [...'abcdefghijklmnopqrstuvwxyz'].filter((letter) => letter !== special);
     const perBand = 8;
     const columns = Math.min(word.length, perBand) * 6 + 1;
@@ -420,8 +418,8 @@ function letterGrid(word: string, level: number): string[] {
     return Array.from({ length: rows }, (_, row) => Array.from({ length: columns }, (_, column) => {
         const [x, y] = [(column - 1) % 6, (row - 1) % 8];
         const character = word[Math.floor((row - 1) / 8) * perBand + Math.floor((column - 1) / 6)];
-        const lit = row > 0 && column > 0 && x < 5 && y < 7 && character !== undefined && ((glyphRows(character)[y]! >> (4 - x)) & 1) === 1;
-        return lit ? special : pickByUnit(filler, unitHash(level * 977 + row, 2500 + column));
+        const lit = row > 0 && column > 0 && x < glyphWidth && y < glyphHeight && character !== undefined && glyphPixel(character, x, y);
+        return lit ? special : pickByUnit(filler, unitHash(level * 977 + row, salts.gridFiller + column));
     }).join(''));
 }
 
@@ -467,21 +465,21 @@ function groupFillerWords(): Record<'first' | 'last' | 'any', Map<string, string
 function acrostic(word: string, answer: string, level: number): string {
     return [...word].map((letter, index) => {
         const options = fillerWords('first', letter, answer);
-        return options.length === 0 ? letter.toUpperCase() : pickByUnit(options, unitHash(level, 2000 + index));
+        return options.length === 0 ? letter.toUpperCase() : pickByUnit(options, unitHash(level, salts.firstLetterFiller + index));
     }).join(' ');
 }
 
 function telestich(word: string, answer: string, level: number): string | null {
     const options = [...word].map((letter) => fillerWords('last', letter, answer));
     if (options.some((choices) => choices.length === 0)) return null;
-    return options.map((choices, index) => pickByUnit(choices, unitHash(level, 2200 + index))).join(' ');
+    return options.map((choices, index) => pickByUnit(choices, unitHash(level, salts.lastLetterFiller + index))).join(' ');
 }
 
 function capitalized(word: string, answer: string, level: number): string {
     return [...word].map((letter, index) => {
         const options = fillerWords('any', letter, answer);
         if (options.length === 0) return letter.toUpperCase();
-        const filler = pickByUnit(options, unitHash(level, 2100 + index));
+        const filler = pickByUnit(options, unitHash(level, salts.capitalFiller + index));
         const position = filler.indexOf(letter);
         return `${filler.slice(0, position)}${letter.toUpperCase()}${filler.slice(position + 1)}`;
     }).join(' ');
@@ -505,12 +503,8 @@ function lineUp(text: string): string[] {
 function shuffledIndices(count: number, seed: number): number[] {
     const order = Array.from({ length: count }, (_, index) => index);
     for (let index = count - 1; index > 0; index--) {
-        const swap = Math.floor(unitHash(seed, 1000 + index) * (index + 1));
+        const swap = Math.floor(unitHash(seed, salts.shuffle + index) * (index + 1));
         [order[index], order[swap]] = [order[swap]!, order[index]!];
     }
     return order;
-}
-
-function fraction(value: number): number {
-    return value - Math.floor(value);
 }

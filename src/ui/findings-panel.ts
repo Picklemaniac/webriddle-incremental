@@ -69,7 +69,7 @@ export class FindingsPanel implements Panel {
 
     private open(finding: Finding): void {
         this.select(finding);
-        this.notepad.show(fill(uiText.notepadTitle, { file: finding.path }), [createElement('pre', { className: 'notepad-text', text: findingFile(finding, this.game.state) })], [], true);
+        this.notepad.show(fill(uiText.notepadTitle, { file: finding.path }), [createElement('pre', { className: 'notepad-text', text: findingFile(finding, this.game.state) })], { wide: true });
     }
 
     private showOdds(): void {

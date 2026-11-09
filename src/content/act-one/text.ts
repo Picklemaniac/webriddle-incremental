@@ -455,6 +455,8 @@ export const connectionNames: readonly string[] = ['56k modem', 'ISDN', 'ADSL', 
 
 export const toolNames: readonly string[] = ['bash loop', 'dirb', 'gobuster', 'ffuf', 'fuzz'];
 
+export const toolCommands: readonly string[] = ['curl', 'dirb', 'gobuster', 'ffuf', './fuzz'];
+
 export const errorPages = {
     notFoundTitle: 'The page cannot be found',
     notFoundBody: 'The page you are looking for might have been removed, had its name changed, or is temporarily unavailable.',
@@ -556,6 +558,7 @@ export const menuText = {
     address: 'Address',
     go: 'Go',
     statusDone: 'Done',
+    statusDns: 'DNS',
     statusOpening: 'Opening page',
     statusShortcut: 'Shortcut to',
     zone: 'Internet',

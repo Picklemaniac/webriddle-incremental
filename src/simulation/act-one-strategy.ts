@@ -1,8 +1,11 @@
 import { currentSearch } from '../content/act-one/automation.ts';
-import { activities, activityRate, assignedScripts, dirbustingScripts, incomePerSecond, isJobUnlocked, isResourceRevealed, jobs, scriptSlots, type ActivityId, type JobId } from '../content/act-one/economy.ts';
-import { entrance } from '../content/act-one/levels.ts';
+import {
+    activities, activityRate, assignedScripts, dirbustingScripts, incomePerSecond, isJobUnlocked, isResourceRevealed, jobs, scriptSlots, type ActivityId, type JobId,
+} from '../content/act-one/economy.ts';
+import { entrance, entranceAction } from '../content/act-one/levels.ts';
 import { effectiveRate, isThrottled, networkCapacity, requestedRate } from '../content/act-one/network.ts';
-import { isUpgradeRevealed, owns } from '../content/act-one/progress.ts';
+import { automationLevel, isUpgradeRevealed, owns } from '../content/act-one/progress.ts';
+import { currentPhase } from '../content/act-one/search.ts';
 import { capacityUpgrades, offeredUpgrades, upgrades, type Upgrade } from '../content/act-one/upgrades.ts';
 import type { Game } from '../core/game.ts';
 import { canAfford } from '../core/purchasing.ts';
@@ -11,79 +14,92 @@ import type { Strategy } from './strategies.ts';
 interface DecisionMemory { level: number; handSeconds: number; captchaSeconds: number }
 
 const incomeStats: ReadonlySet<string> = new Set(['workRate', 'ticketBotRate', 'scourRate', 'scraperRate', 'riddleRate', 'riddleBotRate', 'scriptSlots']);
+const urgentPriority = 2;
+const incomePriority = 1;
 const savingSeconds = 900;
 const lookaheadLevels = 50;
+const captchaSeconds = 12;
+const openingSolveSeconds: readonly number[] = [45, 60, 75, 60];
+const baseSolveSeconds = 100;
+const solveSecondsPerRootLevel = 3;
+const stuckSearchSeconds = 180;
+const minimumIncomePerSecond = 0.001;
 
 export function actOneStrategy(decisionIntervalSeconds: number, purist = false): Strategy {
     const memories = new WeakMap<Game, DecisionMemory>();
     return {
         decisionIntervalSeconds,
         act(game) {
-            let memory = memories.get(game);
-            if (!memory) {
-                memory = { level: game.state.currentLevel, handSeconds: 0, captchaSeconds: 0 };
-                memories.set(game, memory);
-            }
-            if (memory.level !== game.state.currentLevel) {
-                memory.level = game.state.currentLevel;
-                memory.handSeconds = 0;
-            }
-            memory.handSeconds += decisionIntervalSeconds;
+            const memory = decisionMemory(memories, game, decisionIntervalSeconds);
             const { state } = game;
             if (state.captcha !== null) {
                 memory.captchaSeconds += decisionIntervalSeconds;
-                if (memory.captchaSeconds < 12) return false;
+                if (memory.captchaSeconds < captchaSeconds) return false;
                 memory.captchaSeconds = 0;
                 return game.dispatch({ type: 'answerCaptcha', answer: state.captcha.word });
             }
-            if (!purist && state.currentLevel >= 5 && !state.flags.automated) return game.dispatch({ type: 'automate' });
+            if (!purist && state.currentLevel >= automationLevel && !state.flags.automated) return game.dispatch({ type: 'automate' });
             let acted = false;
             if (state.flags.automated) {
-                const blocker = currentSearch(game).blockedBy;
-                const capped = requestedRate(game) >= networkCapacity(game);
-                const urgent = (item: Upgrade): boolean => item.fixes === blocker || (capped && capacityUpgrades.has(item.id));
-                const priority = (item: Upgrade): number => (urgent(item) ? 2 : (item.modifiers?.(1) ?? []).some((modifier) => incomeStats.has(modifier.statId)) ? 1 : 0);
-                const offered = offeredUpgrades(state).filter((item) => isUpgradeRevealed(state, item.id)).sort((first, second) => priority(second) - priority(first));
-                for (const item of offered) {
-                    if (canAfford(state, item.price)) acted = game.dispatch({ type: 'purchase', purchasableId: item.id }) || acted;
-                    else if (priority(item) > 1 || (priority(item) === 1 && secondsUntilAffordable(game, item) < savingSeconds)) break;
-                }
-                const activity = chooseActivity(game, offered.find((item) => !canAfford(state, item.price)));
+                const purchases = buyUpgrades(game);
+                acted = purchases.acted;
+                const activity = chooseActivity(game, purchases.offered.find((item) => !canAfford(state, item.price)));
                 if (activity !== undefined) acted = game.dispatch({ type: 'setActivity', activity }) || acted;
-                const slots = scriptSlots(game);
-                const scriptsToFill = networkCapacity(game) / (game.stat('threadsPerScript') * game.stat('requestsPerThread'));
-                const searchers = Math.min(Math.ceil(slots / 2), Math.max(1, isThrottled(game) ? Math.ceil(scriptsToFill) : Math.floor(scriptsToFill)));
-                const targets = jobTargets(game, slots - searchers);
-                for (const job of jobs) {
-                    if (!isJobUnlocked(game, job.id)) continue;
-                    if (assignedScripts(game, job.id) > targets[job.id]) acted = game.dispatch({ type: 'assignJob', jobId: job.id, change: -1 }) || acted;
-                    if (assignedScripts(game, job.id) < targets[job.id] && dirbustingScripts(game) > 1) acted = game.dispatch({ type: 'assignJob', jobId: job.id, change: 1 }) || acted;
-                }
-                for (const [index, proxy] of state.network.proxies.entries()) {
-                    if (proxy.diesAtSeconds <= state.elapsedSeconds) acted = game.dispatch({ type: 'replaceProxy', proxyIndex: index }) || acted;
-                }
+                acted = assignScripts(game) || acted;
+                acted = replaceDeadProxies(game) || acted;
             }
-            const plan = currentSearch(game);
-            let spent = state.search.requestsSpent;
-            let requestsLeft = 0;
-            for (const phase of plan.phases) {
-                const boundary = phase.requestsUntilNext ?? phase.size;
-                if (spent >= boundary) { spent -= boundary; continue; }
-                requestsLeft = Math.max(0, phase.size - spent);
-                if (requestsLeft > 0) break;
-            }
-            const stuck = plan.blockedBy !== null || requestsLeft / Math.max(1, effectiveRate(game) * game.stat('searchEfficiency')) > 180;
-            const manualDelay = state.currentLevel < 5 ? [45, 60, 75, 60][state.currentLevel - 1]! : 100 + Math.sqrt(state.currentLevel) * 3;
-            if ((purist || !state.flags.automated || stuck) && memory.handSeconds >= manualDelay) {
-                const target = entrance(state.currentLevel + 1);
+            if ((purist || !state.flags.automated || isStuck(game)) && memory.handSeconds >= handSolveSeconds(state.currentLevel)) {
                 memory.handSeconds = 0;
-                return target.credentials
-                    ? game.dispatch({ type: 'submitCredentials', url: target.url, ...target.credentials }) || acted
-                    : game.dispatch({ type: 'navigate', url: target.url }) || acted;
+                return solveByHand(game) || acted;
             }
             return acted;
         },
     };
+}
+
+function decisionMemory(memories: WeakMap<Game, DecisionMemory>, game: Game, decisionIntervalSeconds: number): DecisionMemory {
+    let memory = memories.get(game);
+    if (!memory) {
+        memory = { level: game.state.currentLevel, handSeconds: 0, captchaSeconds: 0 };
+        memories.set(game, memory);
+    }
+    if (memory.level !== game.state.currentLevel) {
+        memory.level = game.state.currentLevel;
+        memory.handSeconds = 0;
+    }
+    memory.handSeconds += decisionIntervalSeconds;
+    return memory;
+}
+
+function buyUpgrades(game: Game): { readonly acted: boolean; readonly offered: readonly Upgrade[] } {
+    const { state } = game;
+    const blocker = currentSearch(game).blockedBy;
+    const capped = requestedRate(game) >= networkCapacity(game);
+    const priority = (item: Upgrade): number => {
+        if (item.fixes === blocker || (capped && capacityUpgrades.has(item.id))) return urgentPriority;
+        return (item.modifiers?.(1) ?? []).some((modifier) => incomeStats.has(modifier.statId)) ? incomePriority : 0;
+    };
+    const offered = offeredUpgrades(state).filter((item) => isUpgradeRevealed(state, item.id)).sort((first, second) => priority(second) - priority(first));
+    let acted = false;
+    for (const item of offered) {
+        if (canAfford(state, item.price)) acted = game.dispatch({ type: 'purchase', purchasableId: item.id }) || acted;
+        else if (priority(item) === urgentPriority || (priority(item) === incomePriority && secondsUntilAffordable(game, item) < savingSeconds)) break;
+    }
+    return { acted, offered };
+}
+
+function assignScripts(game: Game): boolean {
+    const slots = scriptSlots(game);
+    const scriptsToFillLimit = networkCapacity(game) / (game.stat('threadsPerScript') * game.stat('requestsPerThread'));
+    const searchers = Math.min(Math.ceil(slots / 2), Math.max(1, isThrottled(game) ? Math.ceil(scriptsToFillLimit) : Math.floor(scriptsToFillLimit)));
+    const targets = jobTargets(game, slots - searchers);
+    let acted = false;
+    for (const job of jobs) {
+        if (!isJobUnlocked(game, job.id)) continue;
+        if (assignedScripts(game, job.id) > targets[job.id]) acted = game.dispatch({ type: 'assignJob', jobId: job.id, change: -1 }) || acted;
+        if (assignedScripts(game, job.id) < targets[job.id] && dirbustingScripts(game) > 1) acted = game.dispatch({ type: 'assignJob', jobId: job.id, change: 1 }) || acted;
+    }
+    return acted;
 }
 
 function jobTargets(game: Game, free: number): Record<JobId, number> {
@@ -92,7 +108,8 @@ function jobTargets(game: Game, free: number): Record<JobId, number> {
     const unlocked = jobs.filter((job) => isJobUnlocked(game, job.id));
     if (unlocked.length === 0 || free <= 0) return targets;
     const goals = upgrades.filter((item) => !owns(state, item.id) && item.level <= state.currentLevel + lookaheadLevels);
-    const waits = unlocked.map((job) => Math.max(0, goals.reduce((sum, item) => sum + (item.price[job.resource] ?? 0), 0) - (state.resources[job.resource] ?? 0)) / game.stat(job.rateStat));
+    const shortfall = (resource: string): number => Math.max(0, goals.reduce((sum, item) => sum + (item.price[resource] ?? 0), 0) - (state.resources[resource] ?? 0));
+    const waits = unlocked.map((job) => shortfall(job.resource) / game.stat(job.rateStat));
     const total = waits.reduce((sum, wait) => sum + wait, 0);
     if (total === 0) {
         targets[(unlocked.find((job) => job.resource === 'money') ?? unlocked[0]!).id] = free;
@@ -109,8 +126,18 @@ function jobTargets(game: Game, free: number): Record<JobId, number> {
     return targets;
 }
 
+function replaceDeadProxies(game: Game): boolean {
+    let acted = false;
+    for (const [index, proxy] of game.state.network.proxies.entries()) {
+        if (proxy.diesAtSeconds <= game.state.elapsedSeconds) acted = game.dispatch({ type: 'replaceProxy', proxyIndex: index }) || acted;
+    }
+    return acted;
+}
+
 function secondsUntilAffordable(game: Game, item: Upgrade): number {
-    return Math.max(0, ...Object.entries(item.price).map(([resource, amount]) => (amount - (game.state.resources[resource] ?? 0)) / Math.max(0.001, incomePerSecond(game, resource))));
+    const seconds = Object.entries(item.price).map(([resource, amount]) =>
+        (amount - (game.state.resources[resource] ?? 0)) / Math.max(minimumIncomePerSecond, incomePerSecond(game, resource)));
+    return Math.max(0, ...seconds);
 }
 
 function chooseActivity(game: Game, goal: Upgrade | undefined): ActivityId | undefined {
@@ -121,4 +148,20 @@ function chooseActivity(game: Game, goal: Upgrade | undefined): ActivityId | und
     }));
     const longest = waits.reduce<{ id: ActivityId; seconds: number } | undefined>((best, wait) => best === undefined || wait.seconds > best.seconds ? wait : best, undefined);
     return longest !== undefined && longest.seconds > 0 ? longest.id : undefined;
+}
+
+function isStuck(game: Game): boolean {
+    const plan = currentSearch(game);
+    if (plan.blockedBy !== null) return true;
+    const { phase, spent } = currentPhase(plan, game.state.search.requestsSpent);
+    const requestsLeft = phase === undefined ? 0 : phase.size - spent;
+    return requestsLeft / Math.max(1, effectiveRate(game) * game.stat('searchEfficiency')) > stuckSearchSeconds;
+}
+
+function handSolveSeconds(level: number): number {
+    return level <= openingSolveSeconds.length ? openingSolveSeconds[level - 1]! : baseSolveSeconds + Math.sqrt(level) * solveSecondsPerRootLevel;
+}
+
+function solveByHand(game: Game): boolean {
+    return game.dispatch(entranceAction(entrance(game.state.currentLevel + 1)));
 }

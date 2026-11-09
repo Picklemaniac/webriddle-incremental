@@ -1,45 +1,18 @@
 import type { Page } from '../../core/content.ts';
 import type { CaptchaChallenge, GameState } from '../../core/state.ts';
 import { findingFile, findings } from './findings.ts';
+import { captchaStyle, defaultReservedHeight, errorStyle, gifStyle, imageStyle, levelStyle, noteStyle, pictureHeight, pictureWidth, scrollbarStyle, soundStyle, textFileStyle } from './page-styles.ts';
 import { contentType, doctype, formatSource } from './html-source.ts';
 import { imagePath } from './images.ts';
 import { drawPicture, type Picture } from './drawings.ts';
 import { entrance, inWildcardFolder, levelPage, urlOfLevel, type LevelFile, type LevelPage } from './levels.ts';
-import { riddleOrigin } from './riddle.ts';
+import { nextSeed, riddleOrigin, textSeed } from './riddle.ts';
 import { soundData, type Sound } from './sounds.ts';
 import { startPage } from './start-pages.ts';
 import { captchaText, errorPages, fill, pageText } from './text.ts';
 
-const scrollbarStyle = "::-webkit-scrollbar { width: 16px; height: 16px; }::-webkit-scrollbar-track { background: repeating-conic-gradient(#c0c0c0 0% 25%, #fff 0% 50%) 0 0 / 2px 2px; }::-webkit-scrollbar-thumb { background: #c0c0c0; box-shadow: inset -1px -1px #000, inset 1px 1px #dfdfdf, inset -2px -2px #808080, inset 2px 2px #fff; }::-webkit-scrollbar-button:vertical:start:decrement, ::-webkit-scrollbar-button:vertical:end:increment, ::-webkit-scrollbar-button:horizontal:start:decrement, ::-webkit-scrollbar-button:horizontal:end:increment { display: block; width: 16px; height: 16px; background-color: #c0c0c0; background-repeat: no-repeat; background-position: center; box-shadow: inset -1px -1px #000, inset 1px 1px #dfdfdf, inset -2px -2px #808080, inset 2px 2px #fff; }::-webkit-scrollbar-button:vertical:start:decrement { background-image: url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='7' height='4' shape-rendering='crispEdges'><path d='M3 0h1v1h1v1h1v1h1v1H0V3h1V2h1V1h1z'/></svg>\"); }::-webkit-scrollbar-button:vertical:end:increment { background-image: url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='7' height='4' shape-rendering='crispEdges'><path d='M0 0h7v1H6v1H5v1H4v1H3V3H2V2H1V1H0z'/></svg>\"); }::-webkit-scrollbar-button:horizontal:start:decrement { background-image: url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='7' shape-rendering='crispEdges'><path d='M3 0h1v7H3V6H2V5H1V4H0V3h1V2h1V1h1z'/></svg>\"); }::-webkit-scrollbar-button:horizontal:end:increment { background-image: url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='7' shape-rendering='crispEdges'><path d='M0 0h1v1h1v1h1v1h1v1H3v1H2v1H1v1H0z'/></svg>\"); }::-webkit-scrollbar-button:active { box-shadow: inset 1px 1px #808080; }::-webkit-scrollbar-corner { background: #c0c0c0; }";
-
-const pictureWidth = 440;
-const pictureHeight = 294;
-
-const pictureStyle = '.picture{position:relative;display:block;border:2px solid #f2f2f2;box-shadow:0 0 0 1px #000,0 0 8px 1px rgba(255,255,255,.55),0 0 26px 6px rgba(255,255,255,.14)}' +
-    '.picture img{display:block;width:100%;height:auto;image-rendering:pixelated}' +
-    '.number{position:absolute;left:10px;top:7px;font:bold 28px/1 Verdana,Tahoma,sans-serif;color:#fff;text-shadow:-2px -2px 0 #000,2px -2px 0 #000,-2px 2px 0 #000,2px 2px 0 #000,0 -2px 0 #000,0 2px 0 #000,-2px 0 0 #000,2px 0 0 #000,0 0 12px rgba(255,255,255,.8)}';
-
-const levelStyle = '*{box-sizing:border-box}html,body{height:100%}' +
-    'body{margin:0;padding:12px 16px;background:#000;color:#ddd;font:18px "Times New Roman",Times,serif;text-align:center;display:flex;flex-direction:column;justify-content:safe center}' +
-    `.picture{width:max(240px,min(${pictureWidth + 4}px,100%,calc((100vh - var(--reserved,120px)) * 1.5)));margin:0 auto}${pictureStyle}` +
-    '.swatches{display:flex;justify-content:center;gap:8px;margin-top:16px}.swatches span{width:26px;height:26px;border:1px solid #555}p{margin:16px 0 0;white-space:nowrap}p+p{margin-top:6px}.hidden{color:#000}a{color:#fff}::selection{background:#3459b1;color:#fff}' +
-    '.drawing img{display:block;max-width:100%;height:auto;margin:0 auto;image-rendering:pixelated}.drawing img.squashed{height:3px}audio{display:block;width:300px;height:32px;margin:0 auto;color-scheme:dark}' +
-    '.picture .over{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;background:#000;opacity:0}.picture:hover .over{opacity:1}' +
-    '.far{position:absolute;left:0;right:0;top:300vh;padding-bottom:16px}.grid{margin:16px 0 0;font:13px/1.05 "Courier New",monospace;color:#bbb}.spot{position:absolute;display:block}';
-
-const imageStyle = `*{box-sizing:border-box}body{margin:8px;background:#000}img{display:block;width:${pictureWidth}px;image-rendering:pixelated}.picture{width:${pictureWidth + 4}px}${pictureStyle}`;
-
-const textFileStyle = 'body{margin:8px;background:#000;color:#ddd}pre{margin:0;font:13px "Courier New",monospace}';
-
-const gifStyle = 'body{margin:8px;background:#000}img{display:block;max-width:100%;height:auto;image-rendering:pixelated}';
-
-const noteStyle = 'body{margin:24px;background:#000;color:#ddd;font:18px "Times New Roman",Times,serif;text-align:center}p{word-break:break-all}';
-
-const soundStyle = 'html,body{height:100%}body{margin:0;background:#000;display:flex;align-items:center;justify-content:center}audio{width:300px;color-scheme:dark}';
-
-const captchaStyle = 'body{margin:16px 20px;background:#fff;color:#000;font:16px "Times New Roman",Times,serif}h1{margin:0 0 12px;font-size:28px}p{margin:10px 0}.captcha{display:block;max-width:100%;height:auto;border:1px solid #808080}.error{color:#c00000}input{font:15px "Courier New",monospace}button{font:13px Tahoma,Arial,sans-serif}.link{padding:0;border:0;background:none;color:#0000ee;text-decoration:underline;cursor:pointer;font:16px "Times New Roman",Times,serif}hr{border:0;border-top:1px solid #808080;margin:18px 0 8px}address{font-style:italic;font-size:14px}';
-
-const errorStyle = 'body{background:#111;color:#ccc;margin:36px;font:13px Verdana,sans-serif;line-height:1.8}h2{font-size:20px}hr{border:0;border-top:1px solid #444}';
+const hotspotWidthPercent = 8;
+const hotspotHeightPercent = 12;
 
 function escapeHtml(text: string): string {
     return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
@@ -67,11 +40,11 @@ function soundFilePage(name: string, sound: Sound): Page {
 }
 
 function binaryText(name: string, note: string | null = null, zipped: string | null = null): string {
-    let seed = [...name].reduce((hash, character) => Math.imul(hash ^ character.charCodeAt(0), 16777619), 2166136261);
+    let seed = textSeed(name);
     const noteAtEnd = (seed & 1) === 1;
     let text = name.endsWith('.gif') ? 'GIF89a' : name.endsWith('.wav') ? 'RIFF$ü  WAVEfmt        @   @     data ü ' : `ÿØÿà JFIF  H H  ${note === null || noteAtEnd ? '' : `ÿþ ${note} `}ÿÛ C `;
     for (let index = 0; index < 2400; index++) {
-        seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
+        seed = nextSeed(seed);
         const byte = seed >>> 24;
         text += byte === 10 ? '\n' : byte < 32 || (byte > 126 && byte < 161) || byte === 60 || byte === 62 ? ' ' : String.fromCharCode(byte);
     }
@@ -84,7 +57,7 @@ function picture(page: LevelPage, withExtras = false): string {
     const title = page.imageTitle === null ? '' : ` title="${escapeHtml(page.imageTitle)}"`;
     const target = page.files.find((file) => file.linked === 'hotspot');
     const spot = withExtras && target !== undefined && page.hotspot !== null
-        ? `<a class="spot" href="${target.name}" style="left:${(page.hotspot.x * 100).toFixed(1)}%;top:${(page.hotspot.y * 100).toFixed(1)}%;width:8%;height:12%"></a>` : '';
+        ? `<a class="spot" href="${target.name}" style="left:${(page.hotspot.x * 100).toFixed(1)}%;top:${(page.hotspot.y * 100).toFixed(1)}%;width:${hotspotWidthPercent}%;height:${hotspotHeightPercent}%"></a>` : '';
     const rollover = page.files.find((file) => file.display === 'rollover');
     const over = withExtras && rollover !== undefined && 'drawing' in rollover.content
         ? `<img class="over" src="${drawPicture(rollover.content.drawing).src}" alt="" data-address="${escapeHtml(rollover.name)}">` : '';
@@ -107,7 +80,7 @@ function relativeLink(from: string, to: string): string {
 function renderLevel(level: number): Page {
     const page = levelPage(level);
     const link = page.link === null ? page.files.find((file) => file.linked === 'pictureLink')?.name ?? null : relativeLink(page.url, page.link);
-    let reserved = 120 + (page.grid.length === 0 ? 0 : page.grid.length * 14 + 16) + (page.spans.length === 0 ? 0 : 40);
+    let reserved = defaultReservedHeight + (page.grid.length === 0 ? 0 : page.grid.length * 14 + 16) + (page.spans.length === 0 ? 0 : 40);
     const embedded = page.files.map((file) => {
         if (file.linked === 'image' && 'drawing' in file.content) {
             if (file.display === 'hidden' || file.display === 'rollover') return '';
@@ -137,7 +110,7 @@ function renderLevel(level: number): Page {
         page.hiddenText === null ? '' : `<p class="hidden">${escapeHtml(page.hiddenText)}</p>`,
         page.belowFold.length === 0 ? '' : `<div class="far">${page.belowFold.map((line) => `<p>${escapeHtml(line)}</p>`).join('')}</div>`,
     ].join('');
-    const style = reserved === 120 ? levelStyle : `:root{--reserved:${Math.min(reserved, 420)}px}${levelStyle}`;
+    const style = reserved === defaultReservedHeight ? levelStyle : `:root{--reserved:${Math.min(reserved, 420)}px}${levelStyle}`;
     return { ...documentPage(page.title, body, 200, style), source: levelSource(page, link) };
 }
 
@@ -149,7 +122,7 @@ function levelSource(page: LevelPage, link: string | null): string {
     const name = page.attribute === null ? '' : ` name="${escapeHtml(page.attribute)}"`;
     const image = `<img src="${page.imageName}" width="${pictureWidth}" height="${pictureHeight}" border="0"${name}${title}${hotspot === undefined ? '' : ' usemap="#map"'}${swap}>`;
     const area = hotspot === undefined || page.hotspot === null ? [] : [`<map name="map"><area shape="rect" coords="${[page.hotspot.x * pictureWidth, page.hotspot.y * pictureHeight,
-        (page.hotspot.x + 0.08) * pictureWidth, (page.hotspot.y + 0.12) * pictureHeight].map(Math.round).join(',')}" href="${hotspot.name}"></map>`];
+        (page.hotspot.x + hotspotWidthPercent / 100) * pictureWidth, (page.hotspot.y + hotspotHeightPercent / 100) * pictureHeight].map(Math.round).join(',')}" href="${hotspot.name}"></map>`];
     const font = (line: string): string => `<p><font face="Times New Roman" size="4">${lineHtml(line, (part) => `<font color="#000000">${part}</font>`)}</font></p>`;
     const linked = (kind: LevelFile['linked'], tag: (file: LevelFile) => string): string[] => page.files.filter((file) => file.linked === kind).map(tag);
     const source = formatSource([
@@ -201,7 +174,7 @@ export function resolvePage(url: string, state: GameState): Page {
     const address = canonicalUrl(url);
     const banned = state.captcha !== null && state.network.bannedUntil > state.elapsedSeconds;
     if (banned && address.startsWith(`${riddleOrigin}/`)) return captchaPage(state.captcha!, state.flags.captchaRejected === true);
-    const start = startPage(address, scrollbarStyle, pictureStyle);
+    const start = startPage(address);
     if (start !== null) return start;
     if (!address.startsWith(`${riddleOrigin}/`)) return errorPage('unavailable');
     if (address === `${riddleOrigin}/present.gif`) return imageFilePage('present.gif', pictureTag(drawPicture({ kind: 'gift', text: entrance(7).answer }), 'present.gif'), gifStyle);
@@ -267,9 +240,9 @@ function captchaPage(challenge: CaptchaChallenge, rejected: boolean): Page {
 }
 
 function captchaPicture(word: string): string {
-    let seed = [...word].reduce((hash, character) => Math.imul(hash ^ character.charCodeAt(0), 16777619), 2166136261) >>> 0;
+    let seed = textSeed(word);
     const random = (): number => {
-        seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
+        seed = nextSeed(seed);
         return seed / 4294967296;
     };
     const fonts = ['Georgia', 'Times New Roman', 'Courier New', 'Verdana'];

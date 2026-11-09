@@ -1,12 +1,13 @@
 import type { GameLoop } from '../app/game-loop.ts';
 import type { Game } from '../core/game.ts';
-import { createInitialState, type GameState } from '../core/state.ts';
+import { createInitialState, randomSeed, type GameState } from '../core/state.ts';
 import { formatDuration } from '../format.ts';
 import { autosaveSlotName, type SaveSlots } from '../persistence/save-slots.ts';
-import { decodeExport, encodeExport, parseSave, serializeSave } from '../persistence/save.ts';
+import { exportSave, importSave } from '../persistence/save.ts';
 import { AutoPlayer } from '../simulation/auto-player.ts';
 import { actOneStrategy } from '../simulation/act-one-strategy.ts';
 import { urlOfLevel } from '../content/act-one/levels.ts';
+import { isTextField } from '../ui/dom.ts';
 import type { GameScreen } from '../ui/game-screen.ts';
 import { DevPanel, type DevCommands } from './dev-panel.ts';
 import { SessionLog } from './session-log.ts';
@@ -35,7 +36,7 @@ export function startDevTools(context: DevToolsContext): void {
     const panel = new DevPanel(game.content, createCommands(context, log));
     document.body.append(panel.element);
     addEventListener('keydown', (event) => {
-        if (event.key === '\\' && !isTypingIn(event.target)) {
+        if (event.key === '\\' && !isTextField(event.target)) {
             event.preventDefault();
             panel.toggle();
         }
@@ -76,7 +77,7 @@ function createCommands({ game, loop, saveSlots, screen }: DevToolsContext, log:
             game.state.currentLevel = level;
             game.state.browserUrl = urlOfLevel(level);
             game.state.visitedLevels[game.state.browserUrl] = level;
-            game.state.search = { level, requestsSpent: 0, configuration: '' };
+            game.state.search = { requestsSpent: 0, configuration: '' };
             game.state.captcha = null;
             game.state.network.bannedUntil = 0;
             game.state.network.heat = 0;
@@ -95,14 +96,14 @@ function createCommands({ game, loop, saveSlots, screen }: DevToolsContext, log:
             record('devLoadSlot', { slotName });
         },
         slotNames: () => saveSlots.slotNames(),
-        exportSave: () => encodeExport(serializeSave(game.state, Date.now())),
+        exportSave: () => exportSave(game.state),
         importSave(exported) {
-            game.replaceState(parseSave(decodeExport(exported), defaults()).state);
+            game.replaceState(importSave(exported, defaults()));
             record('devImport');
         },
         resetGame() {
             saveSlots.remove(autosaveSlotName);
-            game.replaceState(createInitialState(game.content, Math.floor(Math.random() * 2 ** 32)));
+            game.replaceState(createInitialState(game.content, randomSeed()));
             record('devReset');
         },
     };
@@ -111,8 +112,4 @@ function createCommands({ game, loop, saveSlots, screen }: DevToolsContext, log:
 function recordSnapshot(game: Game, log: SessionLog): void {
     const { currentLevel, levelProgress, resources, purchases, jobs, network, findings, statistics } = game.state;
     log.record('snapshot', game.state.elapsedSeconds, { currentLevel, levelProgress, resources, purchases, jobs, network, findings, statistics });
-}
-
-function isTypingIn(target: EventTarget | null): boolean {
-    return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
 }

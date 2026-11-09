@@ -6,8 +6,7 @@ import { isUpgradeRevealed } from '../content/act-one/progress.ts';
 import { fill, labels, statText, uiText } from '../content/act-one/text.ts';
 import { formatBytes, formatNumber } from '../format.ts';
 import { formatAmount } from './amounts.ts';
-import { createButton, createElement } from './dom.ts';
-import { section } from './status-panel.ts';
+import { createButton, createElement, section } from './dom.ts';
 import type { Panel } from './panel.ts';
 
 const statLabels: Readonly<Record<string, { readonly label: string; readonly value: string }>> = statText;
@@ -31,8 +30,7 @@ export class PurchasesPanel implements Panel {
         this.game = game;
         const list = createElement('div', { className: 'upgrade-list' });
         for (const item of upgrades) {
-            const card = createButton('', () => this.purchase(item));
-            card.className = 'upgrade-card';
+            const card = createButton('', () => this.purchase(item), 'upgrade-card');
             card.dataset.upgrade = item.id;
             const cost = Object.entries(item.price).map(([id, amount]) => formatAmount(id, amount)).join(', ');
             card.append(createElement('div', { className: 'upgrade-heading' }, [createElement('strong', { text: item.name }), createElement('span', { className: 'upgrade-cost', text: cost })]),

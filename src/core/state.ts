@@ -11,7 +11,6 @@ export interface CaptchaChallenge {
 }
 
 interface SearchState {
-    level: number;
     requestsSpent: number;
     configuration: string;
 }
@@ -46,6 +45,10 @@ export interface GameState {
     visitedLevels: Record<string, number>;
 }
 
+export function randomSeed(): number {
+    return Math.floor(Math.random() * 2 ** 32);
+}
+
 export function createInitialState(content: GameContent, seed: number): GameState {
     return {
         elapsedSeconds: 0,
@@ -62,7 +65,7 @@ export function createInitialState(content: GameContent, seed: number): GameStat
         jobs: {},
         findings: {},
         activity: '',
-        search: { level: 1, requestsSpent: 0, configuration: '' },
+        search: { requestsSpent: 0, configuration: '' },
         network: { heat: 0, bannedUntil: 0, proxies: [] },
         captcha: null,
         favorites: [],

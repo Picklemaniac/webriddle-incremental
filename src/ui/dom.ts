@@ -23,10 +23,18 @@ export function createElement<TagName extends keyof HTMLElementTagNameMap>(
     return element;
 }
 
-export function createButton(label: string, onClick: () => void): HTMLButtonElement {
-    const button = createElement('button', { text: label, attributes: { type: 'button' } });
+export function createButton(label: string, onClick: () => void, className?: string): HTMLButtonElement {
+    const button = createElement('button', { className, text: label, attributes: { type: 'button' } });
     button.addEventListener('click', onClick);
     return button;
+}
+
+export function section(title: string): HTMLElement {
+    return createElement('section', { className: 'panel' }, [createElement('h2', { text: title })]);
+}
+
+export function isTextField(target: EventTarget | null): boolean {
+    return (target as Element | null)?.matches?.('input, textarea') === true;
 }
 
 export function setText(element: Element, text: string): void {

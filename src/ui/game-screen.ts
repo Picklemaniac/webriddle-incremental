@@ -1,5 +1,6 @@
 import type { Game } from '../core/game.ts';
 import type { OfflineSummary } from '../core/offline.ts';
+import { automationLevel } from '../content/act-one/progress.ts';
 import { labels } from '../content/act-one/text.ts';
 import { AwaySummary } from './away-summary.ts';
 import { BrowserPanel } from './browser-panel.ts';
@@ -35,8 +36,7 @@ export class GameScreen {
         this.panels = [browser, terminal, status, purchases, findings];
         this.setupWindows = new SetupWindows(game);
         this.awaySummary = new AwaySummary(game.content);
-        this.automate = createButton(labels.automate, () => this.wizard.open(() => game.dispatch({ type: 'automate' })));
-        this.automate.className = 'automate-offer';
+        this.automate = createButton(labels.automate, () => this.wizard.open(() => game.dispatch({ type: 'automate' })), 'automate-offer');
         this.prompt = createElement('div', { className: 'prompt-area' }, [this.automate]);
         const browserColumn = createElement('div', { className: 'browser-column' }, [browser.element, this.prompt]);
         const terminalSlot = createElement('div', { className: 'terminal-slot' }, [terminal.element]);
@@ -51,7 +51,7 @@ export class GameScreen {
     render(): void {
         const { state } = this.game;
         const automated = state.flags.automated === true;
-        const offered = state.currentLevel > 5 || (state.currentLevel === 5 && state.elapsedSeconds - (state.statistics.lastSolveAt ?? 0) >= automationOfferDelaySeconds);
+        const offered = state.currentLevel > automationLevel || (state.currentLevel === automationLevel && state.elapsedSeconds - (state.statistics.lastSolveAt ?? 0) >= automationOfferDelaySeconds);
         this.element.classList.toggle('automated', automated);
         this.prompt.hidden = automated;
         this.automate.hidden = !offered;

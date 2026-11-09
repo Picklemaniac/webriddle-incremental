@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sandboxContent } from '../content/sandbox.ts';
+import { sandboxContent } from '../testing/sandbox.ts';
 import { actOneContent } from '../content/act-one/index.ts';
 import { upgrades } from '../content/act-one/upgrades.ts';
 import { testContent } from '../testing/test-content.ts';

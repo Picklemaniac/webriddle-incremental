@@ -5,7 +5,8 @@ import { parseSave, serializeSave } from '../../persistence/save.ts';
 import { actOneContent } from './index.ts';
 import { glyphRows } from './drawings.ts';
 import { encode } from './encodings.ts';
-import { entrance, levelPage, urlOfLevel } from './levels.ts';
+import { entrance, entranceAction, firstGeneratedLevel, levelPage, urlOfLevel } from './levels.ts';
+import { handcraftedAnswerWords } from './word-lists.ts';
 import { canonicalUrl } from './pages.ts';
 import { hallOfFameUrl, hintsUrl, riddleHomeUrl, rulesUrl } from './riddle.ts';
 import { createCaptcha } from './captchas.ts';
@@ -15,9 +16,14 @@ import { actOneStrategy } from '../../simulation/act-one-strategy.ts';
 import { AutoPlayer } from '../../simulation/auto-player.ts';
 
 function newGame(seed = 1): Game { return new Game(actOneContent, createInitialState(actOneContent, seed)); }
+const lastTestedLevel = 1400;
+
 function handSolve(game: Game): boolean {
-    const target = entrance(game.state.currentLevel + 1);
-    return target.credentials ? game.dispatch({ type: 'submitCredentials', url: target.url, ...target.credentials }) : game.dispatch({ type: 'navigate', url: target.url });
+    return game.dispatch(entranceAction(entrance(game.state.currentLevel + 1)));
+}
+
+function generatedLevels(from = firstGeneratedLevel): number[] {
+    return Array.from({ length: lastTestedLevel - from + 1 }, (_, index) => from + index);
 }
 
 describe('Act I', () => {
@@ -55,7 +61,7 @@ describe('Act I', () => {
         const game = newGame();
         const urls = new Set<string>([`${riddleHomeUrl}index.htm`, rulesUrl, hintsUrl, hallOfFameUrl]);
         for (const url of urls) expect(game.content.resolvePage(url, game.state).statusCode).toBe(200);
-        for (let level = 1; level <= 1400; level++) {
+        for (let level = 1; level <= lastTestedLevel; level++) {
             const url = urlOfLevel(level);
             expect(urls.has(url), `duplicate at ${level}: ${url}`).toBe(false);
             urls.add(url);
@@ -69,7 +75,7 @@ describe('Act I', () => {
 
     it('never shows an answer in plain form and serves every file a page refers to', () => {
         const game = newGame();
-        for (let level = 11; level <= 1400; level++) {
+        for (const level of generatedLevels()) {
             const page = levelPage(level);
             const answer = entrance(level + 1).answer;
             const texts = [page.title, ...page.lines, page.lines.join(''), ...page.comments, page.farComment, page.hiddenText, page.imageTitle, page.imageName.replace(/\.jpg$/, ''),
@@ -82,7 +88,7 @@ describe('Act I', () => {
 
     it('makes every password script lead to the next level', () => {
         let checked = 0;
-        for (let level = 11; level <= 1400; level++) {
+        for (const level of generatedLevels()) {
             const page = levelPage(level);
             const script = page.files.find((file) => file.linked === 'script');
             if (script === undefined || !('text' in script.content)) continue;
@@ -97,7 +103,7 @@ describe('Act I', () => {
 
     it('spells answers from letters of earlier page names', () => {
         let checked = 0;
-        for (let level = 11; level <= 1400; level++) {
+        for (const level of generatedLevels()) {
             const next = entrance(level + 1);
             if (next.clue.method !== 'earlierAnswers') continue;
             const page = levelPage(level);
@@ -115,7 +121,7 @@ describe('Act I', () => {
     it('draws letter grids and orders shuffled letters so they can be read back', () => {
         let grids = 0;
         let spans = 0;
-        for (let level = 11; level <= 1400; level++) {
+        for (const level of generatedLevels()) {
             const next = entrance(level + 1);
             const page = levelPage(level);
             const readings = layerReadings(next.answer);
@@ -134,7 +140,7 @@ describe('Act I', () => {
 
     it('reads back spacer widths, fake tags, bold letters, interleaved lines and caseless base64', () => {
         const seen = new Set<string>();
-        for (let level = 11; level <= 1400; level++) {
+        for (const level of generatedLevels()) {
             const next = entrance(level + 1);
             const page = levelPage(level);
             const method = next.clue.method ?? '';
@@ -164,6 +170,11 @@ describe('Act I', () => {
         expect(game.state.history).toEqual([]);
     });
 
+    it('lists every handcrafted answer for the vocabulary build', () => {
+        const answers = Array.from({ length: firstGeneratedLevel - 1 }, (_, index) => entrance(index + 1)).filter((target) => target.kind !== 'fixed').map((target) => target.answer);
+        expect([...handcraftedAnswerWords].sort()).toEqual([...new Set(answers)].sort());
+    });
+
     it('adds and removes favorites', () => {
         const game = newGame();
         expect(game.dispatch({ type: 'addFavorite', url: riddleHomeUrl })).toBe(true);
@@ -175,7 +186,7 @@ describe('Act I', () => {
 
     it('does not repeat a puzzle method within fifteen levels once enough methods are unlocked', () => {
         const lastSeen = new Map<string, number>();
-        for (let level = 200; level <= 1400; level++) {
+        for (const level of generatedLevels(200)) {
             const target = entrance(level);
             const method = target.clue.method;
             if (!['word', 'extension', 'name'].includes(target.kind) || method === undefined) continue;
@@ -188,7 +199,7 @@ describe('Act I', () => {
     it('draws encoded text instead of the answer in letter pictures', () => {
         const letterPictures = new Set(['plain', 'mirror', 'rotated', 'dark', 'transparent', 'flash', 'delayed']);
         let pictures = 0;
-        for (let level = 11; level <= 1400; level++) {
+        for (const level of generatedLevels()) {
             const { clue, answer } = entrance(level);
             const text = clue.renamed ?? (clue.drawing !== undefined && letterPictures.has(clue.drawing.kind) ? clue.drawing.text : undefined);
             if (text === undefined) continue;
