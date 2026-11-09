@@ -434,5 +434,8 @@ export class BrowserPanel implements Panel {
                 document.dispatchEvent(new KeyboardEvent('keydown', { key: '\\', bubbles: true }));
             }
         });
+        const captchaInput = doc.querySelector<HTMLInputElement>('[data-captcha-input]');
+        const typingElsewhere = document.activeElement?.matches('input, textarea') === true;
+        if (captchaInput && !typingElsewhere) captchaInput.focus();
     }
 }

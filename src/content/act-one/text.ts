@@ -126,8 +126,8 @@ export const linkedFiles = {
 } as const;
 
 export const clueLines = {
-    credentials: 'members only.',
-    extension: ['it\'s all in the ending.'],
+    credentials: ['members only.', 'staff only.', 'authorised personnel only.'],
+    extension: ['it\'s all in the ending.', 'what\'s your type?', 'the end justifies the means.'],
 } as const;
 
 export const riddleName = 'Notfinite';
@@ -200,7 +200,7 @@ export const upgradeText = {
     rssFeeds: { name: 'RSS feeds', description: 'News feeds that double the data you collect.' },
     dirb: { name: 'dirb', description: 'A tool for finding hidden pages. Unlike your script, it also searches inside folders.' },
     freeProxies: { name: 'Free proxy list', description: 'Three free proxies to send requests from. They stop working after a few minutes.' },
-    threads8: { name: 'Eight threads', description: 'Your script sends twice as many requests at a time.' },
+    threads8: { name: 'Eight threads', description: 'Your script sends eight requests at a time instead of four.' },
     adsl: { name: 'ADSL', description: 'Broadband over your phone line, three times as fast as ISDN.' },
     secondPc: { name: 'Second PC', description: 'Another computer that runs three more scripts.' },
     extensionList: { name: 'Extension list', description: 'DirBuster also tries .html, .php, .asp and .txt pages.' },
@@ -217,17 +217,34 @@ export const upgradeText = {
     rockyou: { name: 'rockyou.txt', description: 'A list of 14,344,391 leaked passwords. Many are words written with digits.' },
     server: { name: 'Server', description: 'A server under your desk that runs four more scripts.' },
     scrabble: { name: 'scrabble.txt', description: 'Every word allowed in Scrabble, 279,496 in total.' },
-    threads32: { name: 'Thirty-two threads', description: 'Your script sends four times as many requests at a time.' },
+    threads16: { name: 'Sixteen threads', description: 'Your script sends sixteen requests at a time instead of eight.' },
     numberRanges: { name: 'Number ranges', description: 'DirBuster tries the years 1000 to 2099 first.' },
     rentedAddresses: { name: 'Rented IP addresses', description: 'Sixteen IP addresses that you pay for. They never stop working.' },
     ffuf: { name: 'ffuf', description: 'A tool that is faster than gobuster. It also ignores pages that all look the same.' },
     clusterBomb: { name: 'Cluster bomb', description: 'DirBuster tries every user name with every password.' },
     crackHtpasswd: { name: 'Crack .htpasswd', description: 'Cracks the passwords in the .htpasswd file you found.' },
     fiber: { name: 'Fiber', description: 'A fiber connection, three times as fast as cable.' },
-    addressBlock: { name: 'Address block', description: 'A block of 128 IP addresses that you rent.' },
+    addressBlock: { name: 'Address block', description: 'A block of 64 IP addresses that you rent.' },
     combinator: { name: 'Combinator', description: 'DirBuster also tries two common words joined together.' },
     indexCache: { name: 'Cached search results', description: 'Old copies of search results that list more levels.' },
     leavePcOn: { name: 'Leave the PC on', description: 'Your computer keeps working for up to 24 hours while you are away, instead of 12.' },
+    riddleForum: { name: 'Riddle forum membership', description: 'A paid forum membership with twice as many riddles to solve.' },
+    namesList: { name: 'names.txt', description: 'A list of 8,000 names of gods, heroes and stars.' },
+    teamLead: { name: 'Team lead', description: 'A promotion to team lead that doubles your pay again.' },
+    webCrawler: { name: 'Web crawler', description: 'A crawler that follows links on its own and doubles the data you collect again.' },
+    secondAddressBlock: { name: 'Second address block', description: 'Another 128 IP addresses that you rent.' },
+    dedicatedServer: { name: 'Dedicated server', description: 'A rented server in a data center that runs four more scripts.' },
+    moreLeaks: { name: 'More leaked passwords', description: 'Another leak with millions of passwords. Many are words written with digits.' },
+    leasedRange: { name: 'Leased address range', description: '256 IP addresses that you lease for a year.' },
+    threads32: { name: 'Thirty-two threads', description: 'Your script sends thirty-two requests at a time instead of sixteen.' },
+    helpdeskManager: { name: 'Help desk manager', description: 'Another promotion that doubles your pay again.' },
+    customFuzzer: { name: 'Your own fuzzer', description: 'A fuzzer you wrote yourself. It is faster than ffuf.' },
+    forumModerator: { name: 'Forum moderator', description: 'A moderator account on the riddle forum that doubles your insight again.' },
+    gigabit: { name: 'Gigabit line', description: 'A gigabit connection, twice as fast as fiber.' },
+    dataCenterRange: { name: 'Data center range', description: '512 IP addresses from a data center.' },
+    serverRack: { name: 'Server rack', description: 'A rack of servers that runs six more scripts.' },
+    distributedFuzzing: { name: 'Distributed fuzzing', description: 'Your fuzzer splits each wordlist between all of your scripts.' },
+    searchAlerts: { name: 'Search alerts', description: 'Alerts that tell you when a search engine finds a new level.' },
 } as const satisfies Record<string, { readonly name: string; readonly description: string; readonly effect?: string }>;
 
 export type UpgradeId = keyof typeof upgradeText;
@@ -243,6 +260,8 @@ export const statText = {
     proxySlots: { label: 'Free proxies', value: '{value}' },
     extraAddresses: { label: 'Rented IP addresses', value: '{value}' },
     dorkChance: { label: 'Levels found through search engines', value: '{value}%' },
+    riddleRate: { label: 'Insight while you solve riddles', value: '{value}/s' },
+    riddleBotRate: { label: 'Insight per riddle script', value: '{value}/s' },
 } as const satisfies Record<string, { readonly label: string; readonly value: string }>;
 
 export const amountText = {
@@ -351,7 +370,12 @@ export const uiText = {
     proxyCount: '{working} working, {dead} dead',
     on: 'On',
     off: 'Off',
-    individualProxies: 'Proxy list',
+    individualProxies: 'IP list',
+    ownAddress: 'you',
+    blockSize: '{count} IPs',
+    ipBreakdown: 'Your own: 1\nFree proxies: {proxies}\nRented: {rented}',
+    limitBreakdown: '{ips} IP addresses × {perAddress} requests per second',
+    requestedRate: 'Your scripts ask for {rate}/s',
     replacement: 'Replacing a proxy is free.',
     threads: 'Threads per script',
     slots: 'Script slots',
@@ -418,13 +442,13 @@ export const searchText = {
     allNumbers: '0000-9999',
     cracked: '.htpasswd (cracked)',
     credentialPairs: 'usernames × passwords',
-    wordPairs: '{list} × {list}',
+    wordPairs: '{first} × {second}',
     bruteForce: 'brute force, {alphabet}, {length} characters',
 } as const;
 
-export const connectionNames: readonly string[] = ['56k modem', 'ISDN', 'ADSL', 'Cable', 'Fiber'];
+export const connectionNames: readonly string[] = ['56k modem', 'ISDN', 'ADSL', 'Cable', 'Fiber', 'Gigabit'];
 
-export const toolNames: readonly string[] = ['bash loop', 'dirb', 'gobuster', 'ffuf'];
+export const toolNames: readonly string[] = ['bash loop', 'dirb', 'gobuster', 'ffuf', 'fuzz'];
 
 export const errorPages = {
     notFoundTitle: 'The page cannot be found',

@@ -1,6 +1,6 @@
 import type { Game } from '../core/game.ts';
 import { activities, activityRate, assignedScripts, dirbustingScripts, incomePerSecond, isJobUnlocked, isResourceRevealed, scriptSlots, type ActivityId, type JobId } from '../content/act-one/economy.ts';
-import { effectiveRate, isBanned, isThrottled, liveProxies, networkCapacity } from '../content/act-one/network.ts';
+import { addressCount, effectiveRate, isBanned, isThrottled, liveProxies, networkCapacity, ownAddress, rentedBlocks, requestedRate, requestsPerAddress } from '../content/act-one/network.ts';
 import { owns } from '../content/act-one/progress.ts';
 import { activityText, connectionNames, fill, labels, toolNames, uiText } from '../content/act-one/text.ts';
 import { formatDuration, formatNumber } from '../format.ts';
@@ -10,6 +10,7 @@ import type { Panel } from './panel.ts';
 
 interface ResourceRow { element: HTMLElement; value: HTMLElement; rate: HTMLElement; button: HTMLButtonElement; yield: HTMLElement; activity: ActivityId }
 interface WorkerRow { element: HTMLElement; count: HTMLElement; minus: HTMLButtonElement; plus: HTMLButtonElement }
+interface AddressRow { element: HTMLElement; address: HTMLElement; detail: HTMLElement }
 
 export class StatusPanel implements Panel {
     readonly element = createElement('div', { className: 'status-panels' });
@@ -26,8 +27,12 @@ export class StatusPanel implements Panel {
     private readonly proxyRows: { element: HTMLElement; address: HTMLElement; lifetime: HTMLElement; replace: HTMLButtonElement }[] = [];
     private readonly heat = createElement('div', { className: 'heat-fill' });
     private readonly proxySummary = createElement('span', { className: 'proxy-summary' });
-    private readonly proxyList = createElement('div', { className: 'proxy-list' });
+    private readonly proxyList = createElement('div');
+    private readonly blockList = createElement('div');
+    private readonly blockRows: AddressRow[] = [];
+    private readonly proxySummaryRow: HTMLElement;
     private readonly proxies = createElement('div', { className: 'proxy-controls' });
+    private permanentAddresses: number | undefined;
     private readonly throttle: HTMLButtonElement;
     private readonly throttleRow: HTMLElement;
 
@@ -58,10 +63,14 @@ export class StatusPanel implements Panel {
         }
         for (const [id, label] of [['connection', labels.connection], ['tool', labels.tool], ['slots', uiText.slots], ['threads', uiText.threads], ['efficiency', uiText.efficiency]]) this.machineValues.set(id!, this.addStat(this.machineElement, label!));
         for (const [id, label] of [['sending', labels.sending], ['allowed', labels.rateLimit], ['ips', labels.ips], ['status', labels.heat]]) this.networkValues.set(id!, this.addStat(this.networkElement, label!));
-        this.proxies.append(
-            createElement('div', { className: 'stat-row' }, [createElement('span', { text: uiText.proxies }), this.proxySummary]),
-            createElement('details', { className: 'proxy-details' }, [createElement('summary', { text: uiText.individualProxies }), this.proxyList]),
-        );
+        this.proxySummaryRow = createElement('div', { className: 'stat-row' }, [createElement('span', { text: uiText.proxies }), this.proxySummary]);
+        const ownRow = addressRow();
+        setText(ownRow.address, ownAddress);
+        setText(ownRow.detail, uiText.ownAddress);
+        this.proxies.append(this.proxySummaryRow, createElement('details', { className: 'proxy-details' }, [
+            createElement('summary', { text: uiText.individualProxies }),
+            createElement('div', { className: 'proxy-list' }, [ownRow.element, this.proxyList, this.blockList]),
+        ]));
         this.networkElement.classList.add('network-panel');
         this.throttle = createButton('', () => game.dispatch({ type: 'setThrottle', enabled: !isThrottled(game) }));
         this.throttle.className = 'throttle-switch';
@@ -91,19 +100,26 @@ export class StatusPanel implements Panel {
             row.minus.disabled = count === 0;
             row.plus.disabled = dirbustingScripts(game) === 0;
         }
-        const connection = owns(game.state, 'fiber') ? 4 : owns(game.state, 'cable') ? 3 : owns(game.state, 'adsl') ? 2 : owns(game.state, 'isdn') ? 1 : 0;
-        const tool = toolNames[owns(game.state, 'ffuf') ? 3 : owns(game.state, 'gobuster') ? 2 : owns(game.state, 'dirb') ? 1 : 0]!;
-        for (const [id, value] of Object.entries({ connection: connectionNames[connection]!, tool, slots: String(scriptSlots(game)), threads: String(game.stat('threadsPerScript')), efficiency: `${game.stat('searchEfficiency').toFixed(1)}×` })) setText(this.machineValues.get(id)!, value);
+        const connection = ['isdn', 'adsl', 'cable', 'fiber', 'gigabit'].filter((id) => owns(game.state, id)).length;
+        const tool = ['dirb', 'gobuster', 'ffuf', 'customFuzzer'].filter((id) => owns(game.state, id)).length;
+        for (const [id, value] of Object.entries({ connection: connectionNames[connection]!, tool: toolNames[tool]!, slots: String(scriptSlots(game)), threads: String(game.stat('threadsPerScript')), efficiency: `${game.stat('searchEfficiency').toFixed(1)}×` })) setText(this.machineValues.get(id)!, value);
         this.machineElement.hidden = !game.state.flags.machineRevealed;
         this.networkElement.hidden = !game.state.flags.networkRevealed;
-        for (const [id, value] of Object.entries({ sending: `${formatNumber(effectiveRate(game))}/s`, allowed: `${formatNumber(networkCapacity(game))}/s`, ips: `${1 + liveProxies(game) + game.stat('extraAddresses')}`, status: isBanned(game) ? fill(labels.banned, { time: formatDuration(game.state.network.bannedUntil - game.state.elapsedSeconds) }) : `${Math.round(game.state.network.heat)}%` })) setText(this.networkValues.get(id)!, value);
+        for (const [id, value] of Object.entries({ sending: `${formatNumber(effectiveRate(game))}/s`, allowed: `${formatNumber(networkCapacity(game))}/s`, ips: String(addressCount(game)), status: isBanned(game) ? fill(labels.banned, { time: formatDuration(game.state.network.bannedUntil - game.state.elapsedSeconds) }) : `${Math.round(game.state.network.heat)}%` })) setText(this.networkValues.get(id)!, value);
+        const requested = requestedRate(game);
+        this.setRowTitle('sending', requested > effectiveRate(game) ? fill(uiText.requestedRate, { rate: formatNumber(requested) }) : '');
+        this.setRowTitle('allowed', fill(uiText.limitBreakdown, { ips: formatNumber(addressCount(game)), perAddress: requestsPerAddress }));
+        this.setRowTitle('ips', fill(uiText.ipBreakdown, { proxies: liveProxies(game), rented: formatNumber(game.stat('extraAddresses')) }));
+        const permanentAddresses = game.stat('extraAddresses') + game.stat('proxySlots');
+        if (this.permanentAddresses !== undefined && permanentAddresses > this.permanentAddresses) for (const id of ['ips', 'allowed']) flash(this.networkValues.get(id)!);
+        this.permanentAddresses = permanentAddresses;
         this.heat.style.width = `${game.state.network.heat}%`;
         this.throttleRow.hidden = !owns(game.state, 'throttle');
         setText(this.throttle, isThrottled(game) ? uiText.on : uiText.off);
         this.throttle.setAttribute('aria-pressed', String(isThrottled(game)));
         const aliveCount = liveProxies(game);
         const deadCount = game.state.network.proxies.length - aliveCount;
-        this.proxies.hidden = game.state.network.proxies.length === 0;
+        this.proxySummaryRow.hidden = game.state.network.proxies.length === 0;
         this.proxySummary.classList.toggle('has-dead-proxies', deadCount > 0);
         setText(this.proxySummary, fill(uiText.proxyCount, { working: aliveCount, dead: deadCount }));
         game.state.network.proxies.forEach((proxy, index) => {
@@ -127,6 +143,21 @@ export class StatusPanel implements Panel {
             row.replace.disabled = alive;
         });
         for (let index = game.state.network.proxies.length; index < this.proxyRows.length; index++) this.proxyRows[index]!.element.hidden = true;
+        rentedBlocks(game).forEach((block, index) => {
+            let row = this.blockRows[index];
+            if (!row) {
+                row = addressRow();
+                this.blockRows.push(row);
+                this.blockList.append(row.element);
+            }
+            setText(row.address, block.range);
+            setText(row.detail, fill(uiText.blockSize, { count: formatNumber(block.addresses) }));
+        });
+    }
+
+    private setRowTitle(id: string, title: string): void {
+        const row = this.networkValues.get(id)!.parentElement!;
+        if (row.title !== title) row.title = title;
     }
 
     private addStat(parent: HTMLElement, label: string): HTMLElement {
@@ -134,6 +165,18 @@ export class StatusPanel implements Panel {
         parent.append(createElement('div', { className: 'stat-row' }, [createElement('span', { text: label }), value]));
         return value;
     }
+}
+
+function addressRow(): AddressRow {
+    const address = createElement('span', { className: 'proxy-address' });
+    const detail = createElement('span', { className: 'muted' });
+    return { element: createElement('div', { className: 'proxy-row' }, [address, detail]), address, detail };
+}
+
+function flash(element: HTMLElement): void {
+    element.classList.remove('increased');
+    void element.offsetWidth;
+    element.classList.add('increased');
 }
 
 export function section(title: string): HTMLElement {

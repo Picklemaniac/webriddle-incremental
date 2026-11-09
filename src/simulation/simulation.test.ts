@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { sandboxContent } from '../content/sandbox.ts';
 import { actOneContent } from '../content/act-one/index.ts';
+import { upgrades } from '../content/act-one/upgrades.ts';
 import { testContent } from '../testing/test-content.ts';
 import type { GameState } from '../core/state.ts';
 import { continuousActiveProfile, playerProfiles, puristProfile, type PlayerProfile } from './profiles.ts';
@@ -79,18 +80,10 @@ describe('Act I pacing', () => {
         expect(simulatePlayer(continuousActiveProfile, actOneContent, options)).toEqual(simulatePlayer(continuousActiveProfile, actOneContent, options));
     });
 
-    it.each([1, 2, 7, 19])('meets the continuous active targets with seed %i', (seed) => {
+    it.each([1, 2, 3, 7, 19])('meets the continuous active targets and buys every upgrade with seed %i', (seed) => {
         const report = simulatePlayer(continuousActiveProfile, actOneContent, { days: 1, seed, stepSeconds: 1 });
         expect(assessActOnePacing(report).filter((check) => !check.passed)).toEqual([]);
-        expect(report.offlineProgressShare).toBe(0);
-    });
-
-    it('keeps the slower seed 3 opening paced and completes the wall without offline gains', () => {
-        const report = simulatePlayer(continuousActiveProfile, actOneContent, { days: 1, seed: 3, stepSeconds: 1 });
-        // This seed currently exceeds the 3-hour target. The CLI still reports that failure.
-        const openingChecks = assessActOnePacing(report).filter((check) => check.name !== 'Level 1000 in 3–4 active hours');
-        expect(openingChecks.filter((check) => !check.passed)).toEqual([]);
-        expect(report.milestoneTimings.some((timing) => timing.milestoneId === 'level1000')).toBe(true);
+        expect(report.upgradesPurchased).toBe(upgrades.filter((item) => item.id !== 'crackHtpasswd').length);
         expect(report.offlineProgressShare).toBe(0);
     });
 

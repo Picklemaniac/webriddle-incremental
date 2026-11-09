@@ -37,6 +37,8 @@ export const salts = {
     display: 24,
     hotspot: 25,
     hint: 26,
+    method: 27,
+    hintShown: 28,
 } as const;
 
 export function unitHash(level: number, salt: number): number {

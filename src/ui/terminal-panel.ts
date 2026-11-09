@@ -66,7 +66,7 @@ export class TerminalPanel implements Panel {
         }
         const rate = effectiveRate(game);
         setText(this.rate, `${formatNumber(rate)} ${uiText.requests}`);
-        const tool = owns(game.state, 'ffuf') ? 'ffuf' : owns(game.state, 'gobuster') ? 'gobuster' : owns(game.state, 'dirb') ? 'dirb' : 'curl';
+        const tool = owns(game.state, 'customFuzzer') ? './fuzz' : owns(game.state, 'ffuf') ? 'ffuf' : owns(game.state, 'gobuster') ? 'gobuster' : owns(game.state, 'dirb') ? 'dirb' : 'curl';
         const list = phase?.label ?? 'words.txt';
         const folder = new URL(urlOfLevel(game.state.currentLevel)).pathname.replace(/[^/]*$/, '');
         const command = fill(tool === 'curl' ? terminalText.curlCommand : tool === 'gobuster' ? terminalText.gobusterCommand : terminalText.toolCommand,

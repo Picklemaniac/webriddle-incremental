@@ -17,6 +17,9 @@ const chartDensity = 96;
 const figureBox = { width: 236, height: 174 };
 const figureScale = 0.42;
 const presentWidth = 320;
+const lineColour = 216;
+const clockFaceColour = '#161616';
+const clockLineColour = '#d8d8d8';
 
 const [semaphoreChart, clockSvg, presentJpeg] = await Promise.all([download(sources.semaphore), download(sources.clock), download(sources.present)]);
 const figures = await semaphoreFigures(semaphoreChart);
@@ -62,14 +65,29 @@ async function semaphoreFigures(chart: Buffer): Promise<{ width: number; height:
     const height = Math.round(figureBox.height * figureScale);
     const images: [string, string][] = [];
     for (const [index, label] of labels.slice(0, 26).entries()) {
-        const png = await sharp(flattened)
+        const figure = await sharp(flattened)
             .extract({ left: Math.round(label.center - figureBox.width / 2), top: label.top - figureBox.height - 4, width: figureBox.width, height: figureBox.height })
             .resize(width, height)
-            .png({ palette: true, colours: 32 })
+            .removeAlpha()
+            .raw()
             .toBuffer();
+        const png = await sharp(lightOnTransparent(figure), { raw: { width, height, channels: 4 } }).png({ palette: true, colours: 32 }).toBuffer();
         images.push([String.fromCharCode(97 + index), png.toString('base64')]);
     }
     return { width, height, images };
+}
+
+function lightOnTransparent(pixels: Buffer): Buffer {
+    const output = Buffer.alloc((pixels.length / 3) * 4);
+    for (let pixel = 0; pixel < pixels.length / 3; pixel++) {
+        const channels = [pixels[pixel * 3]!, pixels[pixel * 3 + 1]!, pixels[pixel * 3 + 2]!];
+        const alpha = Math.max(...channels.map((channel) => 255 - channel)) / 255;
+        if (alpha === 0) continue;
+        const colour = channels.map((channel) => Math.round((channel - 255 * (1 - alpha)) / alpha));
+        const isLine = Math.max(...colour) - Math.min(...colour) < 60;
+        output.set([...(isLine ? [lineColour, lineColour, lineColour] : colour), Math.round(alpha * 255)], pixel * 4);
+    }
+    return output;
 }
 
 function runs(length: number, included: (position: number) => boolean, gap = 1): number[][] {
@@ -92,7 +110,8 @@ function runs(length: number, included: (position: number) => boolean, gap = 1):
 function clockTemplate(svg: string): string {
     const template = svg
         .replace(/<\?xml[^>]*>\s*/, '')
-        .replace(/<svg[^>]*>/, (tag) => `${tag}<circle cx="0" cy="0" r="100" fill="#ffffff"/>`)
+        .replace(/<svg[^>]*>/, (tag) => `${tag}<circle cx="0" cy="0" r="98" fill="${clockFaceColour}" stroke="${clockLineColour}" stroke-width="3"/>`)
+        .replaceAll('"black"', `"${clockLineColour}"`)
         .replace('transform="rotate(6)"', 'transform="rotate({minute})"')
         .replace('transform="rotate(0.5)"', 'transform="rotate({hour})"')
         .replace(/\s+/g, ' ');

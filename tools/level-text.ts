@@ -54,11 +54,11 @@ const placeHints: Readonly<Record<string, keyof typeof puzzleHints>> = {
 };
 
 const answerTypes: readonly { readonly name: string; readonly hints: readonly string[]; readonly matches: (survey: Survey) => boolean }[] = [
-    { name: 'Another file extension than .htm', hints: ['clueLines.extension.0'], matches: (survey) => survey.kind === 'extension' },
+    { name: 'Another file extension than .htm', hints: ['clueLines.extension.0', 'clueLines.extension.1', 'clueLines.extension.2'], matches: (survey) => survey.kind === 'extension' },
     { name: 'A name that is in no wordlist', hints: [], matches: (survey) => survey.kind === 'name' },
     { name: 'A word with digits for some letters', hints: [], matches: (survey) => survey.kind === 'leet' },
     { name: 'A year', hints: [], matches: (survey) => survey.kind === 'number' },
-    { name: 'A user name and password', hints: ['clueLines.credentials'], matches: (survey) => survey.kind === 'credentials' },
+    { name: 'A user name and password', hints: ['clueLines.credentials.0', 'clueLines.credentials.1', 'clueLines.credentials.2'], matches: (survey) => survey.kind === 'credentials' },
     { name: 'Two words written together', hints: [], matches: (survey) => survey.kind === 'twoWords' },
     { name: 'A whole phrase', hints: [], matches: (survey) => survey.kind === 'phrase' },
     { name: 'The next level is in a new folder', hints: ['pageText.folderComment'], matches: (survey) => survey.texts.has('pageText.folderComment') },

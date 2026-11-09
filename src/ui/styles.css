@@ -143,6 +143,7 @@ strong { font-weight: 600; }
 .proxy-address { font-family: 'IBM Plex Mono', monospace; }
 .proxy-row button { --pad-y: 4px; --pad-x: 4px; width: 65px; }
 .proxy-row.dead .proxy-address { color: var(--problem); text-decoration: line-through; }
+.stat-row .increased { animation: increased 3s ease-out; }
 .findings-window { margin-bottom: 28px; padding: 3px; background: #c0c0c0; color: #000; border: 2px solid; border-color: #fff #444 #444 #fff; box-shadow: 1px 1px 0 #000; font: 11px Tahoma, Arial, sans-serif; color-scheme: light; animation: reveal .4s ease; }
 .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 8px 4px; align-content: start; min-height: 132px; margin-top: 3px; padding: 10px 6px; background: #fff; border: 2px solid; border-color: #777 #eee #eee #777; }
 .findings-window .file, .findings-window .file:active:not(:disabled) { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; padding: 2px; background: transparent; box-shadow: none; color: #000; text-shadow: none; cursor: default; }
@@ -197,6 +198,7 @@ strong { font-weight: 600; }
 .setup-body { padding: 10px 10px 12px; }
 .setup-body p { margin: 0 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @keyframes reveal { from { opacity: 0; } to { opacity: 1; } }
+@keyframes increased { from, 30% { color: var(--found); } }
 @keyframes progress { to { width: 100%; } }
 @keyframes throb { to { opacity: .35; } }
 @media (max-width: 1150px) {

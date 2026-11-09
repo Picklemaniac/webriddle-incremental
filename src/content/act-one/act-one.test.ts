@@ -9,7 +9,7 @@ import { entrance, levelPage, urlOfLevel } from './levels.ts';
 import { canonicalUrl } from './pages.ts';
 import { hallOfFameUrl, hintsUrl, riddleHomeUrl, rulesUrl } from './riddle.ts';
 import { createCaptcha } from './captchas.ts';
-import { effectiveRate, networkCapacity, requestedRate } from './network.ts';
+import { effectiveRate, networkCapacity, rentedBlocks, requestedRate } from './network.ts';
 import { planSearch, searchCapabilities } from './search.ts';
 import { actOneStrategy } from '../../simulation/act-one-strategy.ts';
 import { AutoPlayer } from '../../simulation/auto-player.ts';
@@ -118,7 +118,7 @@ describe('Act I', () => {
         for (let level = 11; level <= 1400; level++) {
             const next = entrance(level + 1);
             const page = levelPage(level);
-            const readings = [next.answer, ...(['reversed', 'atbash', 'rot13'] as const).map((layer) => encode(next.answer, layer))];
+            const readings = layerReadings(next.answer);
             if (page.spans.length > 0) {
                 expect(readings, `level ${level}`).toContain([...page.spans].sort((first, second) => first.order - second.order).map((span) => span.letter).join(''));
                 spans++;
@@ -138,7 +138,7 @@ describe('Act I', () => {
             const next = entrance(level + 1);
             const page = levelPage(level);
             const method = next.clue.method ?? '';
-            const readings = [next.answer, ...(['reversed', 'atbash', 'rot13'] as const).map((layer) => encode(next.answer, layer))];
+            const readings = layerReadings(next.answer);
             const capitals = new Set((page.comments[0] ?? '').split(' ').map(Number));
             const reading = {
                 spacers: () => page.spacers.map((width) => String.fromCharCode(96 + width)).join(''),
@@ -152,6 +152,64 @@ describe('Act I', () => {
             seen.add(method);
         }
         expect([...seen].sort()).toEqual(['boldLetters', 'caselessBase64', 'fakeTags', 'interleaved', 'spacers']);
+    });
+
+    it('does not repeat a puzzle method within fifteen levels once enough methods are unlocked', () => {
+        const lastSeen = new Map<string, number>();
+        for (let level = 200; level <= 1400; level++) {
+            const target = entrance(level);
+            const method = target.clue.method;
+            if (!['word', 'extension', 'name'].includes(target.kind) || method === undefined) continue;
+            const previous = lastSeen.get(method);
+            if (previous !== undefined) expect(level - previous, `${method} at levels ${previous} and ${level}`).toBeGreaterThan(15);
+            lastSeen.set(method, level);
+        }
+    });
+
+    it('draws encoded text instead of the answer in letter pictures', () => {
+        const letterPictures = new Set(['plain', 'mirror', 'rotated', 'dark', 'transparent', 'flash', 'delayed']);
+        let pictures = 0;
+        for (let level = 11; level <= 1400; level++) {
+            const { clue, answer } = entrance(level);
+            const text = clue.renamed ?? (clue.drawing !== undefined && letterPictures.has(clue.drawing.kind) ? clue.drawing.text : undefined);
+            if (text === undefined) continue;
+            expect(text, `level ${level}`).not.toBe(answer);
+            expect(layerReadings(answer).some((reading) => encode(reading, 'atbash') === text || encode(reading, 'rot13') === text || reading === text), `level ${level}`).toBe(true);
+            pictures++;
+        }
+        expect(pictures).toBeGreaterThan(20);
+    });
+
+    it('keeps unlisted names short until level 600 and finds most of them in names.txt', () => {
+        const state = newGame().state;
+        for (const id of ['namesList', 'fakeUserAgent', 'dirb', 'sizeFilter']) state.purchases[id] = 1;
+        let listed = 0;
+        for (let level = 11; level <= 1000; level++) {
+            const target = entrance(level);
+            if (target.kind !== 'name') continue;
+            expect(target.answer.length, `level ${level}`).toBeLessThanOrEqual(level < 600 ? 4 : 5);
+            const plan = planSearch(level, searchCapabilities(state));
+            if (plan.phases.at(-1)?.label === 'names.txt') listed++;
+        }
+        expect(listed).toBeGreaterThan(5);
+    });
+
+    it('searches word pairs in english-10k.txt once a word is too rare for words.txt', () => {
+        const state = newGame().state;
+        for (const id of ['english10k', 'sortByFrequency', 'combinator', 'fakeUserAgent', 'dirb', 'sizeFilter']) state.purchases[id] = 1;
+        const labels = new Set<string>();
+        for (let level = 700; level <= 1000; level++) {
+            if (entrance(level).kind === 'twoWords') labels.add(planSearch(level, searchCapabilities(state)).phases.at(-1)!.label);
+        }
+        expect([...labels].sort()).toEqual(['words.txt × english-10k.txt', 'words.txt × words.txt']);
+    });
+
+    it('lists rented addresses as address blocks', () => {
+        const game = newGame();
+        for (const id of ['rentedAddresses', 'addressBlock', 'secondAddressBlock', 'leasedRange', 'dataCenterRange']) game.state.purchases[id] = 1;
+        const blocks = rentedBlocks(game);
+        expect(blocks.map((block) => block.range)).toEqual(['198.18.0.0/28', '198.18.2.0/26', '198.18.4.0/25', '198.18.6.0/24', '198.18.8.0/23']);
+        expect(blocks.reduce((sum, block) => sum + block.addresses, 0)).toBe(16 + 64 + 128 + 256 + 512);
     });
 
     it('keeps all generated levels solvable by hand, including credentials', () => {
@@ -289,6 +347,11 @@ describe('Act I', () => {
         expect(plan.hitAt).toBeGreaterThan(1e9);
     });
 });
+
+function layerReadings(answer: string): string[] {
+    const shifts = Array.from({ length: 25 }, (_, index) => answer.replace(/[a-z]/g, (letter) => String.fromCharCode(97 + ((letter.charCodeAt(0) - 97 + index + 1) % 26))));
+    return [answer, ...(['reversed', 'atbash', 'rot13'] as const).map((layer) => encode(answer, layer)), ...shifts];
+}
 
 function readGrid(grid: readonly string[]): string {
     const counts = new Map<string, number>();

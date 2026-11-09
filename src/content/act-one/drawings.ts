@@ -64,7 +64,7 @@ function gift(word: string): Picture {
 
 function semaphore(text: string): Picture {
     const { width, height } = semaphoreFigure;
-    return symbolRow(text, width, height, 6, '#ffffff', (character) => {
+    return symbolRow(text, width, height, 6, null, (character) => {
         const figure = semaphoreFigures[character];
         return figure === undefined ? '' : `<image href="${figure}" width="${width}" height="${height}"/>`;
     });

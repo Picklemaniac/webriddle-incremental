@@ -18,7 +18,7 @@ interface ActivityDefinition {
     readonly rateStat: string;
 }
 
-const jobs: readonly JobDefinition[] = [
+export const jobs: readonly JobDefinition[] = [
     { id: 'scraping', unlockedBy: 'wgetMirror', resource: 'data', rateStat: 'scraperRate' },
     { id: 'ticketing', unlockedBy: 'autoReplyMacros', resource: 'money', rateStat: 'ticketBotRate' },
     { id: 'riddles', unlockedBy: 'otherRiddles', resource: 'insight', rateStat: 'riddleBotRate' },

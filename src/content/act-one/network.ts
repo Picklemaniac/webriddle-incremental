@@ -3,8 +3,10 @@ import type { Game } from '../../core/game.ts';
 import { createCaptcha } from './captchas.ts';
 import { dirbustingScripts } from './economy.ts';
 import { increment, noticeOnce, owns } from './progress.ts';
+import { upgrades } from './upgrades.ts';
 
-const requestsPerAddress = 10;
+export const requestsPerAddress = 10;
+export const ownAddress = '203.0.113.24';
 const banSeconds = 300;
 const heatPerExcessRatio = 3;
 
@@ -12,8 +14,18 @@ export function liveProxies(game: Game): number {
     return game.state.network.proxies.filter((proxy) => proxy.diesAtSeconds > game.state.elapsedSeconds).length;
 }
 
+export function addressCount(game: Game): number {
+    return 1 + liveProxies(game) + game.stat('extraAddresses');
+}
+
 export function networkCapacity(game: Game): number {
-    return requestsPerAddress * (1 + liveProxies(game) + game.stat('extraAddresses'));
+    return requestsPerAddress * addressCount(game);
+}
+
+export function rentedBlocks(game: Game): readonly { readonly range: string; readonly addresses: number }[] {
+    const sizes = upgrades.filter((item) => owns(game.state, item.id))
+        .flatMap((item) => (item.modifiers?.(1) ?? []).filter((modifier) => modifier.statId === 'extraAddresses').map((modifier) => modifier.value));
+    return sizes.map((addresses, index) => ({ range: `198.18.${index * 2}.0/${32 - Math.log2(addresses)}`, addresses }));
 }
 
 export function requestedRate(game: Game): number {
