@@ -51,7 +51,7 @@ export const handcraftedText = {
     level4: 'it\'s dark down here.',
     level5Title: 'bits and pieces',
     level6: 'i have a GIFT for you.',
-    level7Tooltip: 'hidden',
+    level7Tooltip: 'rise',
     level8Title: 'half moon',
     easterEgg404: 'this level could not be found. (it is right here.)',
     easterEgg418: 'i am a teapot.',

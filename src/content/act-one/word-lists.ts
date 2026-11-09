@@ -68,4 +68,4 @@ export const answerNames: readonly string[] = [
     'thoth', 'amun', 'bastet', 'freyr', 'njord', 'vidar', 'idun', 'bragi', 'avalon', 'thule', 'ophir',
 ];
 
-export const handcraftedAnswerWords: readonly string[] = ['beneath', 'lighthouse', 'midnight', 'bridge', 'moon', 'mirror', 'dusk'];
+export const handcraftedAnswerWords: readonly string[] = ['beneath', 'lighthouse', 'midnight', 'bridge', 'rise', 'mirror', 'dusk'];

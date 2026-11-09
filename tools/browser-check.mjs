@@ -163,7 +163,7 @@ try {
     await screenshot('gif-source');
     await toolbar('View Source');
     await navigate('bridge.htm');
-    await navigate('hidden.htm');
+    await navigate(`${entrance(8).answer}.htm`);
     assert.match(await evaluate(`document.querySelector('.browser-viewport').contentDocument.body.textContent`), /zveebe/);
     await navigate('mirror.htm');
     assert.match(await evaluate(`document.querySelector('.browser-viewport').contentDocument.body.textContent`), /ksud/);
