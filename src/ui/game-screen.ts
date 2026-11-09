@@ -5,7 +5,6 @@ import { AwaySummary } from './away-summary.ts';
 import { BrowserPanel } from './browser-panel.ts';
 import { createButton, createElement } from './dom.ts';
 import { FindingsPanel } from './findings-panel.ts';
-import { MessageBoxes } from './message-boxes.ts';
 import type { Panel } from './panel.ts';
 import { PurchasesPanel } from './purchases-panel.ts';
 import { SetupWindows } from './setup-windows.ts';
@@ -22,7 +21,6 @@ export class GameScreen {
     private readonly awaySummary: AwaySummary;
     private readonly automate: HTMLButtonElement;
     private readonly prompt: HTMLElement;
-    private readonly messageBoxes: MessageBoxes;
     private readonly setupWindows: SetupWindows;
     private readonly dashboard: HTMLElement;
     private readonly wizard = new SetupWizard();
@@ -35,7 +33,6 @@ export class GameScreen {
         const purchases = new PurchasesPanel(game);
         const findings = new FindingsPanel(game);
         this.panels = [browser, terminal, status, purchases, findings];
-        this.messageBoxes = new MessageBoxes(game);
         this.setupWindows = new SetupWindows(game);
         this.awaySummary = new AwaySummary(game.content);
         this.automate = createButton(labels.automate, () => this.wizard.open(() => game.dispatch({ type: 'automate' })));

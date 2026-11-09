@@ -19,6 +19,7 @@ export class AwaySummary {
     show(summary: OfflineSummary): void {
         const capped = summary.awaySeconds > summary.simulatedSeconds + 1;
         const gains = this.content.resources.filter((item) => (summary.resourceGains[item.id] ?? 0) > 0).map((item) => formatAmount(item.id, summary.resourceGains[item.id]!));
+        if (summary.levelsGained === 0 && gains.length === 0) return;
         const lines = [
             fill(uiText.away, { time: formatDuration(summary.awaySeconds) }),
             ...(capped ? [fill(uiText.awayCapped, { time: formatDuration(summary.simulatedSeconds) })] : []),

@@ -35,7 +35,7 @@ export const setupText = {
 } as const;
 
 export const notices = {
-    firstRateLimit: '429 Too Many Requests. The server allows 10 requests per second per IP address. Above that, your Heat rises until you get banned.',
+    firstRateLimit: '(!) 429 Too Many Requests',
     bruteForce: '(!) WARNING: no wordlist matches; falling back to brute force',
     firstBan: '(!) 429: banned; solve the captcha in the browser or wait',
     firstProxyDeath: '(!) a proxy stopped responding',

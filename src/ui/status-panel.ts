@@ -107,6 +107,7 @@ export class StatusPanel implements Panel {
         this.networkElement.hidden = !game.state.flags.networkRevealed;
         for (const [id, value] of Object.entries({ sending: `${formatNumber(effectiveRate(game))}/s`, allowed: `${formatNumber(networkCapacity(game))}/s`, ips: String(addressCount(game)), status: isBanned(game) ? fill(labels.banned, { time: formatDuration(game.state.network.bannedUntil - game.state.elapsedSeconds) }) : `${Math.round(game.state.network.heat)}%` })) setText(this.networkValues.get(id)!, value);
         const requested = requestedRate(game);
+        this.networkValues.get('sending')!.classList.toggle('over-limit', effectiveRate(game) > networkCapacity(game));
         this.setRowTitle('sending', requested > effectiveRate(game) ? fill(uiText.requestedRate, { rate: formatNumber(requested) }) : '');
         this.setRowTitle('allowed', fill(uiText.limitBreakdown, { ips: formatNumber(addressCount(game)), perAddress: requestsPerAddress }));
         this.setRowTitle('ips', fill(uiText.ipBreakdown, { proxies: liveProxies(game), rented: formatNumber(game.stat('extraAddresses')) }));

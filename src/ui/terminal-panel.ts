@@ -13,7 +13,7 @@ import { formatDuration, formatNumber } from '../format.ts';
 import { createElement, createTitleBar, setText } from './dom.ts';
 import type { Panel } from './panel.ts';
 
-const warningNotices: ReadonlySet<NoticeId> = new Set<NoticeId>(['bruteForce', 'firstBan', 'firstProxyDeath']);
+const warningNotices: ReadonlySet<NoticeId> = new Set<NoticeId>(['firstRateLimit', 'bruteForce', 'firstBan', 'firstProxyDeath']);
 
 export class TerminalPanel implements Panel {
     readonly element = createElement('section', { className: 'terminal-window', attributes: { 'aria-label': automationText.program } });

@@ -144,6 +144,7 @@ strong { font-weight: 600; }
 .proxy-row button { --pad-y: 4px; --pad-x: 4px; width: 65px; }
 .proxy-row.dead .proxy-address { color: var(--problem); text-decoration: line-through; }
 .stat-row .increased { animation: increased 3s ease-out; }
+.stat-row .over-limit { color: var(--problem); }
 .findings-window { margin-bottom: 28px; padding: 3px; background: #c0c0c0; color: #000; border: 2px solid; border-color: #fff #444 #444 #fff; box-shadow: 1px 1px 0 #000; font: 11px Tahoma, Arial, sans-serif; color-scheme: light; animation: reveal .4s ease; }
 .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 8px 4px; align-content: start; min-height: 132px; margin-top: 3px; padding: 10px 6px; background: #fff; border: 2px solid; border-color: #777 #eee #eee #777; }
 .findings-window .file, .findings-window .file:active:not(:disabled) { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; padding: 2px; background: transparent; box-shadow: none; color: #000; text-shadow: none; cursor: default; }
@@ -206,10 +207,6 @@ strong { font-weight: 600; }
 .wizard-actions button { min-width: 78px; }
 .win-progress { height: 18px; padding: 2px; background: #fff; border: 1px solid #808080; box-shadow: inset 1px 1px #404040; }
 .win-progress-fill { width: 0; height: 100%; background: repeating-linear-gradient(90deg, #000080 0 9px, transparent 9px 11px); animation: progress var(--duration, 2s) steps(18, end) forwards; }
-.message-box { display: flex; gap: 16px; align-items: flex-start; padding: 4px 4px 0; }
-.message-box p { margin: 0; line-height: 1.6; }
-.message-icon { flex: 0 0 34px; height: 30px; padding-top: 11px; clip-path: polygon(50% 0, 100% 100%, 0 100%); background: #ffd800; color: #000; font: bold 15px Arial, sans-serif; text-align: center; }
-.window-dialog:has(.message-box) .dialog-actions { justify-content: center; }
 .setup-windows { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 30; display: flex; flex-direction: column; gap: 10px; width: min(320px, calc(100vw - 40px)); pointer-events: none; }
 .setup-window { padding: 3px; background: #c0c0c0; color: #000; border: 2px solid; border-color: #fff #444 #444 #fff; box-shadow: 2px 2px 0 #000; font: 11px Tahoma, Arial, sans-serif; animation: reveal .25s ease; }
 .setup-body { padding: 10px 10px 12px; }
