@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { Game } from '../../core/game.ts';
 import { createInitialState } from '../../core/state.ts';
@@ -168,6 +169,14 @@ describe('Act I', () => {
         expect(game.state.homePage).toBe(canonicalUrl(rulesUrl));
         expect(game.dispatch({ type: 'clearHistory' })).toBe(true);
         expect(game.state.history).toEqual([]);
+    });
+
+    it('generates the same levels as before; run vitest -u when that changes on purpose', () => {
+        const levels = Array.from({ length: lastTestedLevel }, (_, index) => {
+            const target = entrance(index + 1);
+            return [target.url, target.kind, target.answer, target.clue.method ?? ''];
+        });
+        expect(createHash('sha256').update(JSON.stringify(levels)).digest('hex')).toMatchInlineSnapshot(`"7ce3b1317f41346a01683a63a90aa735ae882a355231e333f106e91c39d59e5c"`);
     });
 
     it('lists every handcrafted answer for the vocabulary build', () => {

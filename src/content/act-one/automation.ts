@@ -49,7 +49,6 @@ export const dirbuster: GameSystem = {
             }
             budget -= remaining;
             solveLevel(game, 'script');
-            state.search.configuration = configuration;
         }
     },
 };

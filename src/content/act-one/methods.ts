@@ -1,6 +1,6 @@
 import { glyphHeight, glyphPixel, glyphWidth, type Drawing, type DrawingKind } from './drawings.ts';
 import { atomicNumberSpelling, characterColors, encode, keyboardShift, toRomanNumerals, vigenere, type Encoding } from './encodings.ts';
-import { firstYear, fraction, pickByUnit, ramp, salts, unitHash } from './riddle.ts';
+import { firstYear, fraction, pickByUnit, ramp, salts, textSeed, unitHash } from './riddle.ts';
 import type { Sound } from './sounds.ts';
 import { puzzleHints } from './text.ts';
 import { vocabularySize, wordAtRank } from './vocabulary.ts';
@@ -223,7 +223,7 @@ export function yearClue(year: number, level: number, unit: number, recent: read
 
 function methodOrder(pool: readonly Method[], level: number, recent: readonly string[]): Method[] {
     const excluded = new Set(recent.slice(0, Math.min(recentMethodCount, Math.floor(pool.length * 0.6))));
-    const ranked = pool.map((method) => ({ method, key: unitHash(level, salts.method + methods.indexOf(method) * 37) ** (1 / methodWeight(method, level)) }));
+    const ranked = pool.map((method) => ({ method, key: unitHash(level, salts.method + textSeed(method.name)) ** (1 / methodWeight(method, level)) }));
     ranked.sort((first, second) => Number(excluded.has(first.method.name)) - Number(excluded.has(second.method.name)) || second.key - first.key);
     return ranked.map(({ method }) => method);
 }

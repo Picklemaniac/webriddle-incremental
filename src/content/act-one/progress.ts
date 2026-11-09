@@ -21,7 +21,7 @@ export function solveLevel(game: Game, method: SolveMethod): void {
     const { state } = game;
     const previousUrl = urlOfLevel(state.currentLevel);
     state.currentLevel += 1;
-    state.search = { requestsSpent: 0, configuration: '' };
+    state.search = { requestsSpent: 0, configuration: state.search.configuration };
     state.visitedLevels[urlOfLevel(state.currentLevel)] = state.currentLevel;
     state.statistics.lastSolveAt = state.elapsedSeconds;
     if (state.browserUrl === previousUrl) {
