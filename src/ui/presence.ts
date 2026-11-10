@@ -8,13 +8,15 @@ interface Snapshot {
     readonly resources: Readonly<Record<string, number>>;
 }
 
-const checkInMilliseconds = 15_000;
+const presentAfterInputMilliseconds = 30_000;
+const refreshSeconds = 60;
 const inputEvents: readonly string[] = ['pointermove', 'pointerdown', 'keydown', 'wheel'];
 
 export class Presence {
     private readonly game: Game;
     private readonly onReturn: (summary: OfflineSummary) => void;
-    private lastCheckInAt = Number.NEGATIVE_INFINITY;
+    private lastInputAt = Number.NEGATIVE_INFINITY;
+    private pointerPosition = '';
     private seen: Snapshot;
 
     constructor(game: Game, onReturn: (summary: OfflineSummary) => void) {
@@ -28,23 +30,40 @@ export class Presence {
             if (page !== null) this.watch(page);
         }, true);
         game.subscribe((event) => {
-            if (event.type !== 'offlineProgressApplied' && event.type !== 'stateReplaced') return;
-            this.seen = this.snapshot();
-            this.lastCheckInAt = Number.NEGATIVE_INFINITY;
+            if (event.type === 'offlineProgressApplied' || event.type === 'stateReplaced') this.seen = this.snapshot();
         });
     }
 
-    checkIn(): void {
-        this.lastCheckInAt = performance.now();
+    noticeInput(): void {
+        this.lastInputAt = performance.now();
+        if (isAway(this.game.state)) this.checkIn();
+    }
+
+    // Game time can run much faster than real time in the dev tools, so presence is refreshed in game time while the player was active a moment ago.
+    update(): void {
+        const { elapsedSeconds, statistics } = this.game.state;
+        const activeJustNow = performance.now() - this.lastInputAt < presentAfterInputMilliseconds;
+        if (activeJustNow && elapsedSeconds - (statistics.lastSeenAt ?? 0) >= refreshSeconds) this.checkIn();
+    }
+
+    private checkIn(): void {
         if (isAway(this.game.state)) this.onReturn(this.summary());
         this.game.dispatch({ type: 'checkIn' });
         this.seen = this.snapshot();
     }
 
     private watch(target: Document): void {
-        for (const type of inputEvents) {
-            target.addEventListener(type, () => { if (performance.now() - this.lastCheckInAt >= checkInMilliseconds) this.checkIn(); }, { capture: true, passive: true });
+        for (const type of inputEvents) target.addEventListener(type, (event) => this.onInput(event), { capture: true, passive: true });
+    }
+
+    private onInput(event: Event): void {
+        if (event instanceof PointerEvent && event.type === 'pointermove') {
+            // Browsers repeat the last pointer position when the page changes under a resting cursor. That is not the player.
+            const position = `${event.screenX},${event.screenY}`;
+            if (position === this.pointerPosition) return;
+            this.pointerPosition = position;
         }
+        this.noticeInput();
     }
 
     private snapshot(): Snapshot {

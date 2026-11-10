@@ -229,10 +229,11 @@ try {
     await waitFor(`${statText('Rent')} === '$5.44/s'`);
     await screenshot('network-levers', false);
     game.state.statistics.lastSeenAt = game.state.elapsedSeconds - 700;
+    await sleep(31000);
     await importGame(game);
     await waitFor(`[...document.querySelectorAll('.income-rate')].some((rate) => rate.textContent === 'waiting')`);
     await sleep(1000);
-    await evaluate(`document.querySelector('.browser-viewport').contentDocument.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))`);
+    await evaluate(`document.querySelector('.browser-viewport').contentDocument.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, screenX: 5, screenY: 5 }))`);
     await waitFor(`![...document.querySelectorAll('.income-rate')].some((rate) => rate.textContent === 'waiting')`);
     await evaluate(`document.querySelector('dialog[open]')?.close()`);
     const withEffect = JSON.stringify(upgrades.filter((item) => item.modifiers(1).length > 0).map((item) => item.id));

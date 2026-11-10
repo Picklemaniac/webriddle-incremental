@@ -18,13 +18,16 @@ const { game, awaySeconds } = loadOrCreateGame();
 const screen = new GameScreen(game);
 const presence = new Presence(game, (summary) => screen.showAwaySummary(summary));
 const loop = new GameLoop(game, {
-    render: () => screen.render(),
+    render: () => {
+        presence.update();
+        screen.render();
+    },
     resumeAfterAbsence: (seconds) => catchUp(seconds),
 });
 
 mountScreen();
 catchUp(awaySeconds);
-presence.checkIn();
+presence.noticeInput();
 startAutosave();
 
 if (import.meta.env.DEV) {
