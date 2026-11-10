@@ -14,7 +14,7 @@ interface WordlistDefinition {
     readonly coverage: number;
 }
 
-export type BlockReason = 'unguessable' | 'userAgent' | 'folder' | 'extension' | 'wildcard' | 'credentials';
+export type SlowReason = 'userAgent' | 'wildcard' | 'folder' | 'extension' | 'credentials';
 
 export interface SearchPhase {
     readonly label: string;
@@ -29,11 +29,16 @@ interface Variants {
     readonly format: (word: string, variant: number) => string;
 }
 
-export interface SearchPlan {
+interface Route {
     readonly phases: readonly SearchPhase[];
     readonly hitAt: number;
-    readonly blockedBy: BlockReason | null;
     readonly bruteForce: boolean;
+}
+
+export interface SearchPlan extends Route {
+    readonly slowedBy: SlowReason | null;
+    readonly speed: number;
+    readonly signature: string;
 }
 
 export interface SearchCapabilities {
@@ -68,6 +73,8 @@ const namesList = { fileName: 'names.txt', size: 8_000, coverage: 0.75 } as cons
 const triedExtensions: readonly string[] = ['htm', ...otherExtensions];
 const mutationsPerWord = 12;
 const pairCoverage = 900;
+const slowdowns: Readonly<Record<SlowReason, number>> = { userAgent: 10, wildcard: 20, folder: 10, extension: 8, credentials: 20 };
+const unguessable: SearchPlan = { phases: [], hitAt: Number.POSITIVE_INFINITY, bruteForce: false, slowedBy: null, speed: 0, signature: '' };
 const alphabets = { 'a-z': 'abcdefghijklmnopqrstuvwxyz', 'a-z0-9': 'abcdefghijklmnopqrstuvwxyz0123456789' } as const;
 
 const page = (name: string): string => `${name}.htm`;
@@ -84,7 +91,7 @@ const mutationVariants: Variants = {
     format: (word, variant) => page(toLeet(word, variant / mutationsPerWord)),
 };
 
-export function currentPhase(plan: SearchPlan, requestsSpent: number): { readonly phase: SearchPhase | undefined; readonly spent: number } {
+export function currentPhase(plan: Route, requestsSpent: number): { readonly phase: SearchPhase | undefined; readonly spent: number } {
     let spent = requestsSpent;
     let phase = plan.phases[0];
     for (const candidate of plan.phases) {
@@ -123,44 +130,37 @@ export function capabilitySignature(capabilities: SearchCapabilities): string {
 
 export function planSearch(targetLevel: number, capabilities: SearchCapabilities): SearchPlan {
     const target = entrance(targetLevel);
-    if (target.kind !== 'fixed' && targetLevel > userAgentBlockLevel && !capabilities.userAgent) {
-        return blocked('userAgent');
-    }
-    if (target.wildcard && !capabilities.sizeFilter) {
-        return blocked('wildcard');
-    }
-    const folderPhases: SearchPhase[] = [];
-    let folderOffset = 0;
-    if (target.folder !== null && target.folder !== folderFor(targetLevel - 1)) {
-        if (!capabilities.recursion) {
-            return blocked('folder');
-        }
-        const folderSearch = wordPlan(rankOfWord(target.folder), target.folder.length, unitHash(targetLevel, salts.door), capabilities, folderVariants);
-        folderOffset = folderSearch.hitAt;
-        folderPhases.push(...completedPhases(folderSearch).map((phase) => ({ ...phase, label: fill(searchText.folders, { phase: phase.label }) })));
-    }
-    const main = kindPlan(target, capabilities);
-    if (main.blockedBy !== null) {
-        return main;
-    }
-    return { ...main, phases: [...folderPhases, ...main.phases], hitAt: folderOffset + main.hitAt };
+    if (target.kind === 'fixed') return unguessable;
+    const entersFolder = target.folder !== null && target.folder !== folderFor(targetLevel - 1);
+    const reasons: SlowReason[] = [];
+    if (targetLevel > userAgentBlockLevel && !capabilities.userAgent) reasons.push('userAgent');
+    if (target.wildcard && !capabilities.sizeFilter) reasons.push('wildcard');
+    if (entersFolder && !capabilities.recursion) reasons.push('folder');
+    if (target.kind === 'extension' && !capabilities.extensions) reasons.push('extension');
+    if (target.kind === 'credentials' && !capabilities.clusterBomb && !capabilities.cracked) reasons.push('credentials');
+    const route = entersFolder ? insideFolder(target.folder!, targetLevel, kindRoute(target, capabilities), capabilities) : kindRoute(target, capabilities);
+    const signature = `${route.hitAt}|${route.phases.map((phase) => phase.label).join('|')}`;
+    return { ...route, slowedBy: reasons[0] ?? null, speed: reasons.reduce((speed, reason) => speed / slowdowns[reason], 1), signature };
 }
 
-function kindPlan(target: Entrance, capabilities: SearchCapabilities): SearchPlan {
+function insideFolder(folder: string, targetLevel: number, route: Route, capabilities: SearchCapabilities): Route {
+    const folderSearch = wordRoute(rankOfWord(folder), folder.length, unitHash(targetLevel, salts.door), capabilities, folderVariants);
+    const folderPhases = completedPhases(folderSearch).map((phase) => ({ ...phase, label: fill(searchText.folders, { phase: phase.label }) }));
+    return { ...route, phases: [...folderPhases, ...route.phases], hitAt: folderSearch.hitAt + route.hitAt };
+}
+
+function kindRoute(target: Entrance, capabilities: SearchCapabilities): Route {
     const [firstWord = target.answer, secondWord = target.answer, thirdWord = target.answer] = target.words;
     switch (target.kind) {
         case 'fixed':
-            return blocked('unguessable');
+            return unguessable;
         case 'word':
-            return wordPlan(rankOfWord(firstWord), firstWord.length, target.positionUnit, capabilities);
+            return wordRoute(rankOfWord(firstWord), firstWord.length, target.positionUnit, capabilities);
         case 'extension':
-            if (!capabilities.extensions) {
-                return blocked('extension');
-            }
-            return wordPlan(rankOfWord(firstWord), firstWord.length, target.positionUnit, capabilities, extensionVariants);
+            return wordRoute(rankOfWord(firstWord), firstWord.length, target.positionUnit, capabilities, extensionVariants);
         case 'leet': {
-            const routes: SearchPlan[] = [bruteForcePlan('a-z0-9', target.answer.length, target.positionUnit)];
-            if (capabilities.mutations) routes.push(wordPlan(rankOfWord(firstWord), firstWord.length, target.positionUnit, capabilities, mutationVariants));
+            const routes: Route[] = [bruteForceRoute('a-z0-9', target.answer.length, target.positionUnit)];
+            if (capabilities.mutations) routes.push(wordRoute(rankOfWord(firstWord), firstWord.length, target.positionUnit, capabilities, mutationVariants));
             const leetCoverage = capabilities.moreLeaks ? rockyouList.withMoreLeaks : rockyouList.leetCoverage;
             if (capabilities.rockyou && target.positionUnit < leetCoverage) {
                 const phase: SearchPhase = { label: rockyouList.fileName, size: rockyouList.size, candidate: (index) => page(toLeet(listEntry(index, false), (index % 89) / 89)) };
@@ -176,34 +176,31 @@ function kindPlan(target: Entrance, capabilities: SearchCapabilities): SearchPla
             return found([{ label: searchText.allNumbers, size: 10_000, candidate: (index) => page(String(index).padStart(4, '0')) }], year + 1);
         }
         case 'credentials': {
-            if (!capabilities.clusterBomb && !capabilities.cracked) {
-                return blocked('credentials');
-            }
-            const door = wordPlan(rankOfWord(firstWord), firstWord.length, target.positionUnit, capabilities, folderVariants);
+            const door = wordRoute(rankOfWord(firstWord), firstWord.length, target.positionUnit, capabilities, folderVariants);
             const login = (username: string, password: string): string => `${firstWord}/ ${username}:${password}`;
             if (capabilities.cracked) {
                 const cracked: SearchPhase = { label: searchText.cracked, size: 1, candidate: () => login(secondWord, thirdWord) };
                 return { ...door, phases: [...completedPhases(door), cracked], hitAt: door.hitAt + 1 };
             }
-            const pairs = pairPlan(secondWord, thirdWord, target.positionUnit, capabilities, () => searchText.credentialPairs, login);
+            const pairs = pairRoute(secondWord, thirdWord, target.positionUnit, capabilities, () => searchText.credentialPairs, login);
             return found([...completedPhases(door), ...pairs.phases], door.hitAt + pairs.hitAt);
         }
         case 'twoWords':
             if (!capabilities.combinator) {
-                return bruteForcePlan('a-z', target.answer.length, target.positionUnit);
+                return bruteForceRoute('a-z', target.answer.length, target.positionUnit);
             }
-            return pairPlan(firstWord, secondWord, target.positionUnit, capabilities, (first, second) => fill(searchText.wordPairs, { first, second }), (first, second) => page(`${first}${second}`));
+            return pairRoute(firstWord, secondWord, target.positionUnit, capabilities, (first, second) => fill(searchText.wordPairs, { first, second }), (first, second) => page(`${first}${second}`));
         case 'name': {
-            if (!capabilities.names || target.positionUnit >= namesList.coverage) return bruteForcePlan('a-z', target.answer.length, target.positionUnit);
+            if (!capabilities.names || target.positionUnit >= namesList.coverage) return bruteForceRoute('a-z', target.answer.length, target.positionUnit);
             const phase: SearchPhase = { label: namesList.fileName, size: namesList.size, candidate: (index) => page(answerNames[index % answerNames.length]!) };
             return found([phase], position(target.positionUnit / namesList.coverage, namesList.size));
         }
         case 'phrase':
-            return bruteForcePlan('a-z', target.answer.length, target.positionUnit);
+            return bruteForceRoute('a-z', target.answer.length, target.positionUnit);
     }
 }
 
-function wordPlan(rank: number, length: number, unit: number, capabilities: SearchCapabilities, variants = pageVariants): SearchPlan {
+function wordRoute(rank: number, length: number, unit: number, capabilities: SearchCapabilities, variants = pageVariants): Route {
     const phases: SearchPhase[] = [];
     let offset = 0;
     let previousCoverage = 0;
@@ -226,12 +223,12 @@ function wordPlan(rank: number, length: number, unit: number, capabilities: Sear
         previousCoverage = list.coverage;
         previousSize = list.size;
     }
-    const bruteForce = bruteForcePlan('a-z', length, unit, (candidate) => variants.format(candidate, 0));
+    const bruteForce = bruteForceRoute('a-z', length, unit, (candidate) => variants.format(candidate, 0));
     return { ...bruteForce, phases: [...phases, ...bruteForce.phases], hitAt: offset + bruteForce.hitAt };
 }
 
-function pairPlan(first: string, second: string, unit: number, capabilities: SearchCapabilities, label: (firstList: string, secondList: string) => string,
-    format: (first: string, second: string) => string): SearchPlan {
+function pairRoute(first: string, second: string, unit: number, capabilities: SearchCapabilities, label: (firstList: string, secondList: string) => string,
+    format: (first: string, second: string) => string): Route {
     const pairLists = capabilities.lists.filter((list) => list.coverage <= pairCoverage);
     const listFor = (word: string): WordlistDefinition => pairLists.find((list) => rankOfWord(word) <= list.coverage) ?? pairLists[pairLists.length - 1]!;
     const listPosition = (word: string, list: WordlistDefinition, wordUnit: number): number => {
@@ -249,13 +246,12 @@ function pairPlan(first: string, second: string, unit: number, capabilities: Sea
     return found([phase], (listPosition(first, firstList, unit) - 1) * secondList.size + listPosition(second, secondList, (unit * 7.31) % 1));
 }
 
-function bruteForcePlan(alphabet: keyof typeof alphabets, length: number, unit: number, format = page): SearchPlan {
+function bruteForceRoute(alphabet: keyof typeof alphabets, length: number, unit: number, format = page): Route {
     const characters = alphabets[alphabet];
     const size = characters.length ** length;
     return {
         phases: [{ label: fill(searchText.bruteForce, { alphabet, length }), size, candidate: (index) => format(bruteForceCandidate(index, characters, length)) }],
         hitAt: position(0.25 + unit * 0.5, size),
-        blockedBy: null,
         bruteForce: true,
     };
 }
@@ -274,19 +270,15 @@ function bruteForceCandidate(index: number, characters: string, length: number):
     return candidate;
 }
 
-function found(phases: readonly SearchPhase[], hitAt: number): SearchPlan {
-    return { phases, hitAt, blockedBy: null, bruteForce: false };
+function found(phases: readonly SearchPhase[], hitAt: number): Route {
+    return { phases, hitAt, bruteForce: false };
 }
 
 function position(share: number, size: number): number {
     return Math.max(1, Math.ceil(share * size));
 }
 
-function blocked(reason: BlockReason): SearchPlan {
-    return { phases: [], hitAt: Number.POSITIVE_INFINITY, blockedBy: reason, bruteForce: false };
-}
-
-function completedPhases(plan: SearchPlan): SearchPhase[] {
+function completedPhases(plan: Route): SearchPhase[] {
     let remaining = plan.hitAt;
     return plan.phases.map((phase) => {
         const requestsUntilNext = Math.min(remaining, phase.size);

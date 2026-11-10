@@ -1,9 +1,9 @@
 import type { GameSystem } from '../../core/content.ts';
 import type { Game } from '../../core/game.ts';
 import { entrance, type EntranceKind } from './levels.ts';
-import { effectiveRate } from './network.ts';
+import { answeredRate, sentRate } from './network.ts';
 import { automationBootSeconds, automationElapsed, increment, noticeOnce, solveLevel } from './progress.ts';
-import { capabilitySignature, planSearch, searchCapabilities, type BlockReason, type SearchPlan } from './search.ts';
+import { capabilitySignature, planSearch, searchCapabilities, type SearchPlan } from './search.ts';
 const wordlistKinds: ReadonlySet<EntranceKind> = new Set<EntranceKind>(['word', 'extension', 'credentials']);
 const plans = new Map<string, SearchPlan>();
 
@@ -23,14 +23,9 @@ export const dirbuster: GameSystem = {
     update(game, deltaSeconds) {
         const { state } = game;
         if (!state.flags.automated || automationElapsed(state) < automationBootSeconds) return;
-        const configuration = capabilitySignature(searchCapabilities(state));
-        if (state.search.configuration !== configuration) {
-            state.search.configuration = configuration;
-            state.search.requestsSpent = 0;
-        }
-        const rate = effectiveRate(game);
+        const rate = answeredRate(game);
         if (rate === 0) return;
-        increment(state, 'requestsSent', rate * deltaSeconds);
+        increment(state, 'requestsSent', sentRate(game) * deltaSeconds);
         let budget = rate * game.stat('searchEfficiency') * deltaSeconds;
         for (let solved = 0; solved < 100 && budget > 0; solved++) {
             const target = entrance(state.currentLevel + 1);
@@ -39,15 +34,19 @@ export const dirbuster: GameSystem = {
                 continue;
             }
             const plan = currentSearch(game);
-            if (plan.blockedBy !== null) break;
+            if (plan.speed === 0) break;
+            if (state.search.configuration !== plan.signature) {
+                state.search.configuration = plan.signature;
+                state.search.requestsSpent = 0;
+            }
             if (plan.bruteForce) noticeOnce(game, 'bruteForce');
             if (plan.bruteForce && wordlistKinds.has(target.kind)) state.flags.wordlistExhausted = true;
             const remaining = Math.max(0, plan.hitAt - state.search.requestsSpent);
-            if (budget < remaining) {
-                state.search.requestsSpent += budget;
+            if (budget * plan.speed < remaining) {
+                state.search.requestsSpent += budget * plan.speed;
                 break;
             }
-            budget -= remaining;
+            budget -= remaining / plan.speed;
             solveLevel(game, 'script');
         }
     },

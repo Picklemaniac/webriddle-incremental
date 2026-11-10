@@ -25,6 +25,7 @@ export interface SimulationReport {
     readonly activeSeconds: number;
     readonly longestIdleStretchSeconds: number;
     readonly longestProgressGapSeconds: number;
+    readonly longestPurchaseGapSeconds: number;
     readonly firstHourUnlocks: number;
     readonly upgradesPurchased: number;
     readonly routineActions: number;
@@ -44,6 +45,8 @@ interface AdvanceClock {
     readonly gameSeconds: number;
     readonly offline: boolean;
 }
+
+const upkeepActions: ReadonlySet<string> = new Set(['checkIn', 'setRatePerAddress', 'setRentedAddresses']);
 
 export function milestoneTiming(report: SimulationReport, milestoneId: string): MilestoneTiming | undefined {
     return report.milestoneTimings.find((timing) => timing.milestoneId === milestoneId);
@@ -73,6 +76,8 @@ class PlayerSimulation {
     private offlineProgress = 0;
     private routineActions = 0;
     private meaningfulActivity = false;
+    private lastPurchaseActiveSeconds: number | undefined;
+    private longestPurchaseGapSeconds = 0;
     private clock: AdvanceClock = { realSeconds: 0, activeSeconds: 0, gameSeconds: 0, offline: false };
 
     constructor(profile: PlayerProfile, content: GameContent, options: SimulationOptions) {
@@ -103,6 +108,7 @@ class PlayerSimulation {
             activeSeconds: this.activeSeconds,
             longestIdleStretchSeconds: this.longestIdleStretchSeconds,
             longestProgressGapSeconds: this.longestProgressGapSeconds,
+            longestPurchaseGapSeconds: this.longestPurchaseGapSeconds,
             firstHourUnlocks: this.firstHourUnlockIds.size,
             upgradesPurchased: Object.keys(this.game.state.purchases).length,
             routineActions: this.routineActions,
@@ -119,9 +125,16 @@ class PlayerSimulation {
         } else if (event.type === 'levelSolved' || event.type === 'findingDiscovered' || event.type === 'notice') {
             this.meaningfulActivity = true;
         } else if (event.type === 'actionApplied') {
+            if (event.action.type === 'purchase') this.observePurchase();
             if (event.action.type === 'setActivity') this.routineActions++;
-            else this.meaningfulActivity = true;
+            else if (!upkeepActions.has(event.action.type)) this.meaningfulActivity = true;
         }
+    }
+
+    private observePurchase(): void {
+        const { activeSeconds } = this.currentTime();
+        if (this.lastPurchaseActiveSeconds !== undefined) this.longestPurchaseGapSeconds = Math.max(this.longestPurchaseGapSeconds, activeSeconds - this.lastPurchaseActiveSeconds);
+        this.lastPurchaseActiveSeconds = activeSeconds;
     }
 
     private currentTime(): { realSeconds: number; activeSeconds: number } {

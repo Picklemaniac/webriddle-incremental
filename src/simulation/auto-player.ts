@@ -19,6 +19,7 @@ export class AutoPlayer {
             throw new Error('A robot step must be a positive number of seconds.');
         }
         if (this.secondsUntilDecision <= 0) {
+            game.dispatch({ type: 'checkIn' });
             this.lastDecisionActed = this.strategy.act(game);
             this.secondsUntilDecision = this.strategy.decisionIntervalSeconds;
         }

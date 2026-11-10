@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { sandboxContent } from '../testing/sandbox.ts';
+import { backlogSeconds, incomePerSecond } from '../content/act-one/economy.ts';
 import { actOneContent } from '../content/act-one/index.ts';
 import { upgrades } from '../content/act-one/upgrades.ts';
 import { testContent } from '../testing/test-content.ts';
-import type { GameState } from '../core/state.ts';
-import { continuousActiveProfile, playerProfiles, puristProfile, type PlayerProfile } from './profiles.ts';
+import { Game } from '../core/game.ts';
+import { createInitialState, type GameState } from '../core/state.ts';
+import { actOneStrategy } from './act-one-strategy.ts';
+import { AutoPlayer } from './auto-player.ts';
+import { continuousActiveProfile, handsOffProfile, longBreaksProfile, playerProfiles, puristProfile, type PlayerProfile } from './profiles.ts';
 import { assessActOnePacing } from './pacing.ts';
-import { simulatePlayer, type SimulationOptions } from './simulation.ts';
+import { milestoneTiming, simulatePlayer, type SimulationOptions } from './simulation.ts';
 
 const options: SimulationOptions = { days: 2, seed: 1, stepSeconds: 1 };
 
@@ -85,6 +89,26 @@ describe('Act I pacing', () => {
         expect(assessActOnePacing(report).filter((check) => !check.passed)).toEqual([]);
         expect(report.upgradesPurchased).toBe(upgrades.filter((item) => item.id !== 'crackHtpasswd').length);
         expect(report.offlineProgressShare).toBe(0);
+    });
+
+    it('still finishes for a player who never touches the request rate or the rent', () => {
+        const report = simulatePlayer(handsOffProfile, actOneContent, { days: 1, seed: 1, stepSeconds: 1 });
+        expect(milestoneTiming(report, 'level1000')?.activeSeconds).toBeLessThan(5 * 3600);
+        expect(report.upgradesPurchased).toBe(upgrades.filter((item) => item.id !== 'crackHtpasswd').length);
+    });
+
+    it('lets DirBuster keep going during long breaks without paying for a backlog of upgrades', () => {
+        const report = simulatePlayer(longBreaksProfile, actOneContent, { days: 3, seed: 1, stepSeconds: 1 });
+        expect(milestoneTiming(report, 'level1000')?.realSeconds).toBeLessThan(2 * 86400);
+        expect(report.offlineProgressShare).toBeGreaterThan(0.2);
+        const game = new Game(actOneContent, createInitialState(actOneContent, 1));
+        new AutoPlayer(actOneStrategy(4)).playUntil(game, () => game.state.currentLevel >= 400, 3 * 3600);
+        const money = game.state.resources.money!;
+        const level = game.state.currentLevel;
+        const income = incomePerSecond(game, 'money');
+        game.advance(2 * 3600);
+        expect(game.state.resources.money! - money).toBeLessThanOrEqual(income * backlogSeconds + 1);
+        expect(game.state.currentLevel).toBeGreaterThan(level + 20);
     });
 
     it('keeps the purist moving without automation, purchases or offline gains', () => {

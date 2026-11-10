@@ -8,6 +8,7 @@ import { Game } from './core/game.ts';
 import { createInitialState, randomSeed } from './core/state.ts';
 import { autosaveSlotName, SaveSlots } from './persistence/save-slots.ts';
 import { GameScreen } from './ui/game-screen.ts';
+import { Presence } from './ui/presence.ts';
 
 const autosaveIntervalMilliseconds = 30_000;
 const minimumAwaySecondsForSummary = 60;
@@ -15,6 +16,7 @@ const minimumAwaySecondsForSummary = 60;
 const saveSlots = new SaveSlots(localStorage, 'webriddle-incremental:');
 const { game, awaySeconds } = loadOrCreateGame();
 const screen = new GameScreen(game);
+const presence = new Presence(game, (summary) => screen.showAwaySummary(summary));
 const loop = new GameLoop(game, {
     render: () => screen.render(),
     resumeAfterAbsence: (seconds) => catchUp(seconds),
@@ -22,6 +24,7 @@ const loop = new GameLoop(game, {
 
 mountScreen();
 catchUp(awaySeconds);
+presence.checkIn();
 startAutosave();
 
 if (import.meta.env.DEV) {

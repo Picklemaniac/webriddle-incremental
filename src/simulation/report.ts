@@ -12,6 +12,7 @@ export function formatReports(reports: readonly SimulationReport[], milestones: 
         ['Active time', ...perReport((report) => formatDuration(report.activeSeconds))],
         ['Longest idle stretch', ...perReport((report) => formatDuration(report.longestIdleStretchSeconds))],
         ['Longest progress gap', ...perReport((report) => formatDuration(report.longestProgressGapSeconds))],
+        ['Longest wait for a purchase', ...perReport((report) => formatDuration(report.longestPurchaseGapSeconds))],
         ['Unlocks in first hour', ...perReport((report) => String(report.firstHourUnlocks))],
         ['Upgrades purchased', ...perReport((report) => String(report.upgradesPurchased))],
         ['Activity switches', ...perReport((report) => formatNumber(report.routineActions))],

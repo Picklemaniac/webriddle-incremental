@@ -12,7 +12,7 @@ import { setupSeconds } from './setup-windows.ts';
 
 const statLabels: Readonly<Record<string, { readonly label: string; readonly value: string }>> = statText;
 const requestStats: ReadonlySet<string> = new Set(['threadsPerScript', 'requestsPerThread']);
-const moneyStats: ReadonlySet<string> = new Set(['workRate', 'ticketBotRate']);
+const moneyStats: ReadonlySet<string> = new Set(['workRate', 'ticketBotRate', 'addressRent']);
 const byteStats: ReadonlySet<string> = new Set(['scourRate', 'scraperRate']);
 const percentStats: ReadonlySet<string> = new Set(['dorkChance']);
 const tooltipDelayMilliseconds = 350;
@@ -59,7 +59,7 @@ export class PurchasesPanel implements Panel {
     render(): void {
         const now = performance.now();
         for (const [id, until] of this.leaving) if (now >= until) this.leaving.delete(id);
-        const offered = new Set(offeredUpgrades(this.game.state).filter((item) => isUpgradeRevealed(this.game.state, item.id)).map((item) => item.id));
+        const offered = new Set(offeredUpgrades(this.game).filter((item) => isUpgradeRevealed(this.game.state, item.id)).map((item) => item.id));
         this.element.hidden = this.game.state.flags.upgradesRevealed !== true;
         this.empty.hidden = offered.size > 0 || this.leaving.size > 0;
         for (const item of upgrades) {

@@ -82,38 +82,38 @@ const pictureCiphers: readonly Encoding[] = ['rot13', 'atbash', 'caesar'];
 const leetEncodings: readonly Encoding[] = ['reversed', 'rot13', 'atbash', 'base64', 'hex', 'binary', 'ascii', 'octal', 'morse'];
 const recentMethodCount = 20;
 const newMethodLevels = 120;
-const oldMethodLevel = 60;
+const oldMethodLevel = 30;
 const hintedLevels = 120;
 const laterHintShare = 0.5;
 const essentialHints: ReadonlySet<HintKey> = new Set(['keyboardRight', 'keyboardLeft', 'earlierAnswers', 'spectrogram', 'pollux', 'shares']);
 
 const methods: readonly Method[] = [
     cipher('reversed', 11),
+    { name: 'capitals', fromLevel: 11, hint: inTitle('capitals'), clue: ({ word, answer, level }) => ({ lines: lineUp(capitalized(word, answer, level)) }) },
     cipher('a1z26', 12),
-    cipher('rot13', 16),
-    alternative('alternate', 20, ['gif', 'txt', 'json', 'css']),
-    cipher('atbash', 24, inTitle('atbash')),
-    cipher('morse', 28),
-    cipher('nato', 32),
-    { name: 'capitals', fromLevel: 36, hint: inTitle('capitals'), clue: ({ word, answer, level }) => ({ lines: lineUp(capitalized(word, answer, level)) }) },
-    { name: 'interleaved', fromLevel: 38, clue: interleaved },
-    drawn('semaphore', 40),
+    { name: 'boldLetters', fromLevel: 13, hint: inTitle('boldLetters'), clue: ({ word, answer, level }) => ({ emphasis: emphasized(word, answer, level) }) },
+    alternative('alternate', 14, ['gif', 'txt', 'json', 'css']),
+    cipher('rot13', 15),
+    { name: 'interleaved', fromLevel: 17, clue: interleaved },
+    cipher('morse', 19),
+    { name: 'acrostic', fromLevel: 21, hint: inTitle('acrostic'), clue: ({ word, answer, level }) => ({ lines: lineUp(acrostic(word, answer, level)) }) },
+    drawn('semaphore', 23),
+    cipher('atbash', 25, inTitle('atbash')),
+    cipher('nato', 27),
+    lettered('mirror', 30),
+    { name: 'lastLetters', fromLevel: 33, hint: inTitle('lastLetters'), clue: ({ word, answer, level }) => { const words = telestich(word, answer, level); return words === null ? null : { lines: lineUp(words) }; } },
+    cipher('binary', 36),
+    drawn('pigpen', 39),
+    cipher('phone', 42, inTitle('phone')),
     cipher('caesar', 45, inTitle('caesar')),
-    cipher('shift', 50, inTitle('shift')),
-    cipher('binary', 55),
-    cipher('upsideDown', 58),
-    drawn('pigpen', 62),
-    cipher('phone', 65, inTitle('phone')),
-    { name: 'boldLetters', fromLevel: 68, hint: inTitle('boldLetters'), clue: ({ word, answer, level }) => ({ emphasis: emphasized(word, answer, level) }) },
-    cipher('braille', 75, inTitle('braille')),
-    lettered('mirror', 80),
-    { name: 'acrostic', fromLevel: 85, hint: inTitle('acrostic'), clue: ({ word, answer, level }) => ({ lines: lineUp(acrostic(word, answer, level)) }) },
-    { name: 'lastLetters', fromLevel: 90, hint: inTitle('lastLetters'), clue: ({ word, answer, level }) => { const words = telestich(word, answer, level); return words === null ? null : { lines: lineUp(words) }; } },
-    cipher('polybius', 95, inTitle('polybius')),
-    drawn('flags', 100, inTitle('flags')),
-    cipher('tap', 105, inTitle('tap')),
+    cipher('upsideDown', 48),
+    cipher('braille', 52, inTitle('braille')),
+    cipher('shift', 56, inTitle('shift')),
+    cipher('polybius', 64, inTitle('polybius')),
+    drawn('flags', 72, inTitle('flags')),
+    cipher('tap', 80, inTitle('tap')),
+    cipher('keyboard', 90, inTitle(({ unit }) => (keyboardShift(unit) > 0 ? 'keyboardRight' : 'keyboardLeft'))),
     { name: 'script', fromLevel: 110, htmOnly: true, exact: true, clue: ({ word, unit }) => ({ script: passwordCheck(word, unit) }) },
-    cipher('keyboard', 115, inTitle(({ unit }) => (keyboardShift(unit) > 0 ? 'keyboardRight' : 'keyboardLeft'))),
     alternative('xmlFile', 120, ['xml']),
     { name: 'swatches', fromLevel: 125, hint: inTitle('colors'), clue: ({ word }) => ({ colors: characterColors(word) }) },
     { name: 'scrambled', fromLevel: 128, hint: inTitle('scrambled'), clue: scrambled },
@@ -261,7 +261,8 @@ function lettered(kind: DrawingKind, fromLevel: number, hint?: Hint): Method {
 
 function pictureCipher(word: string, level: number): string {
     const unit = unitHash(level, salts.layerEncoding);
-    return encode(word, pickByUnit(pictureCiphers, unit), unit);
+    const introduced = pictureCiphers.filter((encoding) => methods.some((method) => method.encoding === encoding && method.fromLevel <= level));
+    return encode(word, pickByUnit(introduced, unit), unit);
 }
 
 function inTitle(key: Hint['key']): Hint {

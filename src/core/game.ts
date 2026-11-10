@@ -47,6 +47,7 @@ export class Game {
     dispatch(action: Action): boolean {
         const applied = this.apply(action);
         if (applied) {
+            this.currentState.statistics.lastSeenAt = this.currentState.elapsedSeconds;
             this.announce({ type: 'actionApplied', action });
         }
         return applied;
@@ -112,6 +113,8 @@ export class Game {
         switch (action.type) {
             case 'purchase':
                 return this.purchase(action.purchasableId);
+            case 'checkIn':
+                return true;
             case 'navigate':
                 this.currentState.browserUrl = action.url;
                 this.content.handleNavigation(this, action.url);

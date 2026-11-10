@@ -4,10 +4,10 @@ import { currentSearch } from '../content/act-one/automation.ts';
 import { dirbustingScripts } from '../content/act-one/economy.ts';
 import { findingFile, findings } from '../content/act-one/findings.ts';
 import { entrance, urlOfLevel } from '../content/act-one/levels.ts';
-import { effectiveRate, isBanned, requestedRate } from '../content/act-one/network.ts';
+import { answeredRate, isBanned, requestedRate, sentRate } from '../content/act-one/network.ts';
 import { automationBootSeconds, automationElapsed } from '../content/act-one/progress.ts';
 import { riddleOrigin } from '../content/act-one/riddle.ts';
-import { currentPhase, starterWordlistName, type BlockReason, type SearchPhase, type SearchPlan } from '../content/act-one/search.ts';
+import { currentPhase, starterWordlistName, type SearchPhase, type SearchPlan, type SlowReason } from '../content/act-one/search.ts';
 import { automationText, fill, notices, terminalText, toolCommands, uiText, type NoticeId } from '../content/act-one/text.ts';
 import { ownedTier, toolTiers } from '../content/act-one/upgrades.ts';
 import { wordAtRank } from '../content/act-one/vocabulary.ts';
@@ -16,8 +16,11 @@ import { createElement, createTitleBar, setText } from './dom.ts';
 import type { Panel } from './panel.ts';
 
 const warningNotices: ReadonlySet<NoticeId> = new Set<NoticeId>(['firstRateLimit', 'bruteForce', 'firstBan', 'firstProxyDeath']);
-const blockedResponses: Readonly<Partial<Record<BlockReason, number>>> = { credentials: 401, userAgent: 403, wildcard: 200 };
+const slowResponses: Readonly<Partial<Record<SlowReason, number>>> = { credentials: 401, userAgent: 403, wildcard: 200 };
 const missResponse = 404;
+const droppedResponse = 429;
+const userAgentPassesEvery = 10;
+const goldenRatio = 0.618034;
 const commandTemplates = [terminalText.curlCommand, terminalText.toolCommand, terminalText.gobusterCommand, terminalText.toolCommand, terminalText.toolCommand];
 const earlyLineMilliseconds = 1500;
 const laterLineMilliseconds = 700;
@@ -65,7 +68,7 @@ export class TerminalPanel implements Panel {
         }
         const plan = currentSearch(game);
         const { phase, spent } = currentPhase(plan, game.state.search.requestsSpent);
-        const rate = effectiveRate(game);
+        const rate = answeredRate(game);
         setText(this.rate, `${formatNumber(rate)} ${uiText.requests}`);
         const folder = new URL(urlOfLevel(game.state.currentLevel)).pathname.replace(/[^/]*$/, '');
         const command = this.commandText(phase, folder);
@@ -74,9 +77,9 @@ export class TerminalPanel implements Panel {
         const footer = this.footerText(plan, phase, spent, rate);
         setText(this.footer, footer);
         this.footer.title = footer;
-        this.footer.classList.toggle('warning', isBanned(game) || plan.blockedBy !== null);
+        this.footer.classList.toggle('warning', isBanned(game) || plan.slowedBy !== null);
         this.progress.style.width = `${phase ? Math.min(100, spent / phase.size * 100) : 0}%`;
-        const searched = phase !== undefined && plan.blockedBy === null && !isBanned(game) && dirbustingScripts(game) > 0 && rate > 0 ? phase : null;
+        const searched = phase !== undefined && plan.speed > 0 && !isBanned(game) && dirbustingScripts(game) > 0 && rate > 0 ? phase : null;
         const request = (index: number): string => this.requestAddress(searched, index, folder);
         setText(this.live, searched ? `${terminalText.testing} ${request(spent)}` : '');
         this.emitLine(plan, rate, seconds, () => request(Math.max(0, spent - 1)));
@@ -100,9 +103,10 @@ export class TerminalPanel implements Panel {
         const game = this.game;
         if (isBanned(game)) return fill(terminalText.banned, { time: formatDuration(game.state.network.bannedUntil - game.state.elapsedSeconds) });
         if (dirbustingScripts(game) === 0) return uiText.paused;
-        if (plan.blockedBy) return terminalText.blocks[plan.blockedBy];
+        if (plan.speed === 0) return terminalText.unguessable;
         if (phase === undefined) return uiText.waiting;
-        const time = formatDuration((phase.size - spent) / Math.max(0.001, rate * game.stat('searchEfficiency')));
+        const time = formatDuration((phase.size - spent) / Math.max(0.001, rate * game.stat('searchEfficiency') * plan.speed));
+        if (plan.slowedBy !== null) return fill(terminalText.slowProgress, { reason: terminalText.slow[plan.slowedBy], time });
         return fill(terminalText.progress, { list: phase.label, tried: formatNumber(spent), total: formatNumber(phase.size), time });
     }
 
@@ -126,9 +130,17 @@ export class TerminalPanel implements Panel {
         if (nextLine || requestedRate(game) === 0 || now - this.lastLineAt < sampleInterval(rate) || requestsSent <= this.lastSampledRequests || isBanned(game)) return;
         this.lastSampledRequests = requestsSent;
         this.sampleIndex++;
-        const code = (plan.blockedBy === null ? undefined : blockedResponses[plan.blockedBy]) ?? missResponse;
-        const note = plan.blockedBy === 'wildcard' ? `  ${terminalText.identicalResponse}` : '';
+        const code = this.responseCode(plan);
+        const note = code === slowResponses.wildcard ? `  ${terminalText.identicalResponse}` : '';
         this.line(`${String(code)}  ${sampledRequest()}${note}`, code === missResponse ? 'miss' : 'warning');
+    }
+
+    private responseCode(plan: SearchPlan): number {
+        const sent = sentRate(this.game);
+        const droppedShare = sent > 0 ? 1 - answeredRate(this.game) / sent : 0;
+        if ((this.sampleIndex * goldenRatio) % 1 < droppedShare) return droppedResponse;
+        if (plan.slowedBy === 'userAgent' && this.sampleIndex % userAgentPassesEvery === 0) return missResponse;
+        return (plan.slowedBy === null ? undefined : slowResponses[plan.slowedBy]) ?? missResponse;
     }
 
     private onEvent(event: GameEvent): void {

@@ -23,5 +23,6 @@ export function assessActOnePacing(report: SimulationReport): readonly PacingChe
         check('Level 100 in 30–50 active minutes', timeOf('level100'), 1800, 3000),
         check('Level 1000 in 3–4 active hours', timeOf('level1000'), 10800, 14400),
         check('No progress gap longer than four minutes', report.longestProgressGapSeconds, 0, 240),
+        check('No wait longer than twelve minutes between purchases', report.longestPurchaseGapSeconds, 0, 720),
     ];
 }

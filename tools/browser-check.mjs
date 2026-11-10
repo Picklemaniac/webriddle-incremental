@@ -214,10 +214,33 @@ try {
     await importGame(game);
     await sleep(900);
     await screenshot('working');
-    await evaluate(`[...document.querySelectorAll('.upgrade-card')].find((card) => !card.hidden).dispatchEvent(new MouseEvent('mouseenter'))`);
+    await setSlider('Requests per IP', 5);
+    await waitFor(`${sliderText('Requests per IP')} === '5/s'`);
+    assert.equal(await evaluate(statText('Answered')), await evaluate(statText('Requests sent')), 'A low rate drops no requests');
+    await setSlider('Rented IPs', 0);
+    await setSlider('Requests per IP', 24);
+    await waitFor(`document.querySelector('.stat-row .over-limit') !== null`);
+    await waitFor(`[...document.querySelectorAll('.terminal-line')].some((line) => line.textContent.startsWith('429'))`);
+    await setSlider('Requests per IP', 5);
+    await setSlider('Rented IPs', 0);
+    await waitFor(`${sliderText('Rented IPs')}.startsWith('0 of ')`);
+    assert.equal(await evaluate(statText('Rent')), '$0/s');
+    await setSlider('Rented IPs', 32);
+    await waitFor(`${statText('Rent')} === '$5.44/s'`);
+    await screenshot('network-levers', false);
+    game.state.statistics.lastSeenAt = game.state.elapsedSeconds - 700;
+    await importGame(game);
+    await waitFor(`[...document.querySelectorAll('.income-rate')].some((rate) => rate.textContent === 'waiting')`);
+    await sleep(1000);
+    await evaluate(`document.querySelector('.browser-viewport').contentDocument.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))`);
+    await waitFor(`![...document.querySelectorAll('.income-rate')].some((rate) => rate.textContent === 'waiting')`);
+    await evaluate(`document.querySelector('dialog[open]')?.close()`);
+    const withEffect = JSON.stringify(upgrades.filter((item) => item.modifiers(1).length > 0).map((item) => item.id));
+    const effectCard = `[...document.querySelectorAll('.upgrade-card')].find((card) => !card.hidden && ${withEffect}.includes(card.dataset.upgrade))`;
+    await evaluate(`${effectCard}.dispatchEvent(new MouseEvent('mouseenter'))`);
     await waitFor(`!document.querySelector('.win-tooltip').hidden`);
     await screenshot('upgrade-tooltip');
-    await evaluate(`[...document.querySelectorAll('.upgrade-card')].find((card) => !card.hidden).dispatchEvent(new MouseEvent('mouseleave'))`);
+    await evaluate(`${effectCard}.dispatchEvent(new MouseEvent('mouseleave'))`);
     await assertLayout(1440);
     await toolbar('View Source');
     const inspectedPage = await evaluate(`document.querySelector('.browser-viewport').contentDocument.title`);
@@ -245,7 +268,7 @@ try {
     await waitFor(`!/, 0 dead/.test(document.querySelector('.proxy-summary').textContent)`);
     await evaluate(`document.querySelector('.proxy-details').open = true`);
     assert.ok(await evaluate(`document.querySelector('.proxy-details').textContent.includes('203.0.113.24')`), 'The IP list shows your own address');
-    if (game.state.purchases.rentedAddresses) assert.ok(await evaluate(`document.querySelector('.proxy-details').textContent.includes('198.18.0.0/28')`), 'The IP list shows rented addresses');
+    if (game.state.purchases.rentedAddresses) assert.ok(await evaluate(`document.querySelector('.proxy-details').textContent.includes('198.18.0.0/27')`), 'The IP list shows rented addresses');
     await evaluate(`document.querySelectorAll('.proxy-row.dead button').forEach((button) => button.click())`);
     await waitFor(`/, 0 dead/.test(document.querySelector('.proxy-summary').textContent)`);
     await evaluate(`document.querySelector('.proxy-details').open = false`);
@@ -256,6 +279,10 @@ try {
     if (expectsDevelopmentTools) {
         await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', {key:String.fromCharCode(92),bubbles:true}))`);
         assert.equal(await evaluate(`document.querySelector('.dev-panel').hidden`), false);
+        await clickText('.dev-panel', '+1h');
+        await waitFor(`document.querySelector('dialog[open]')?.textContent.includes('Your jobs only kept earning for the first 10 minutes.')`);
+        await screenshot('away-jobs', false);
+        await clickText('dialog[open]', 'OK');
         await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', {key:String.fromCharCode(92),bubbles:true}))`);
     } else assert.equal(await evaluate(`document.querySelector('.dev-panel')`), null);
 
@@ -275,6 +302,18 @@ try {
     await waitFor(`document.querySelector('.browser-viewport').contentDocument.querySelector('[data-captcha-submit]') === null`);
     game.state.captcha = null;
     game.state.network.bannedUntil = 0;
+
+    const walled = new Game(actOneContent, createInitialState(actOneContent, 3));
+    new AutoPlayer(actOneStrategy(4)).playUntil(walled, () => walled.state.currentLevel >= 30, 7200);
+    delete walled.state.purchases.fakeUserAgent;
+    walled.state.currentLevel = 45;
+    walled.state.browserUrl = urlOfLevel(45);
+    await importGame(walled);
+    await waitFor(`document.querySelector('.terminal-footer').textContent.startsWith('The server blocks most requests, about ')`);
+    assert.equal(await evaluate(`document.querySelector('.terminal-footer').classList.contains('warning')`), true);
+    await waitFor(`[...document.querySelectorAll('.terminal-line')].some((line) => line.textContent.startsWith('403'))`);
+    assert.ok(await evaluate(`[...document.querySelectorAll('.upgrade-card')].some((card) => !card.hidden && card.dataset.upgrade === 'fakeUserAgent')`), 'The wall offers the upgrade that fixes it');
+    await screenshot('slow-wall', false);
 
     /** @type {number[]} */
     const credentialCandidates = Array.from({ length: 300 }, (_, index) => 500 + index);
@@ -307,7 +346,7 @@ try {
     await evaluate(`document.querySelector('.dashboard').scrollIntoView()`);
     await screenshot('dashboard-narrow', false);
     assert.deepEqual(problems, [], 'Browser errors');
-    console.log('Browser checks passed: opening puzzles, navigation, source, hidden text, automate, favorites, save import/export, mature UI, worker widths, dev visibility, captcha, credentials, and narrow layout.');
+    console.log('Browser checks passed: opening puzzles, navigation, source, hidden text, automate, favorites, save import/export, mature UI, network levers, a slowing wall, worker widths, dev visibility, captcha, credentials, and narrow layout.');
     console.log(`Screenshots: ${outputDirectory}`);
 } finally {
     if (socket?.readyState === WebSocket.OPEN) {
@@ -340,7 +379,7 @@ async function waitFor(expression) {
         try { if (await evaluate(expression)) return; } catch {}
         await sleep(100);
     }
-    throw new Error(`Timed out waiting for ${expression}`);
+    throw new Error([`Timed out waiting for ${expression}`, ...problems].join('\n'));
 }
 
 async function clickText(scope, text) {
@@ -367,6 +406,18 @@ async function navigate(address) {
     await sleep(180);
     await send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point });
     await sleep(750);
+}
+
+function sliderText(label) {
+    return `document.querySelector('[aria-label="${label}"]').parentElement.lastElementChild.textContent`;
+}
+
+function statText(label) {
+    return `[...document.querySelectorAll('.stat-row')].find((row) => row.firstElementChild.textContent === ${JSON.stringify(label)}).lastElementChild.textContent`;
+}
+
+async function setSlider(label, value) {
+    await evaluate(`(() => { const slider = document.querySelector('[aria-label="${label}"]'); slider.value = '${value}'; slider.dispatchEvent(new Event('input', { bubbles: true })); })()`);
 }
 
 async function importGame(game) {

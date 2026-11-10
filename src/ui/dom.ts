@@ -29,6 +29,12 @@ export function createButton(label: string, onClick: () => void, className?: str
     return button;
 }
 
+export function createSlider(label: string, onChange: (value: number) => void): HTMLInputElement {
+    const slider = createElement('input', { className: 'win-slider', attributes: { type: 'range', min: '0', step: '1', 'aria-label': label } });
+    slider.addEventListener('input', () => onChange(Number(slider.value)));
+    return slider;
+}
+
 export function section(title: string): HTMLElement {
     return createElement('section', { className: 'panel' }, [createElement('h2', { text: title })]);
 }

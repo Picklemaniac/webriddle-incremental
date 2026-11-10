@@ -27,7 +27,11 @@ const maximumSkipSeconds = 30 * 86_400;
 export function startDevTools(context: DevToolsContext): void {
     const { game } = context;
     const log = new SessionLog(logEndpoint);
-    game.subscribe(({ type, ...details }) => log.record(type, game.state.elapsedSeconds, { ...details, level: game.state.currentLevel }));
+    game.subscribe((event) => {
+        if (event.type === 'actionApplied' && event.action.type === 'checkIn') return;
+        const { type, ...details } = event;
+        log.record(type, game.state.elapsedSeconds, { ...details, level: game.state.currentLevel });
+    });
     log.record('sessionStarted', game.state.elapsedSeconds, { level: game.state.currentLevel });
     setInterval(() => recordSnapshot(game, log), snapshotIntervalMilliseconds);
     setInterval(() => log.flush(), logFlushIntervalMilliseconds);

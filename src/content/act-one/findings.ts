@@ -2,7 +2,7 @@ import type { GameSystem } from '../../core/content.ts';
 import type { Game } from '../../core/game.ts';
 import type { GameState } from '../../core/state.ts';
 import type { Modifier } from '../../core/stats.ts';
-import { effectiveRate } from './network.ts';
+import { answeredRate } from './network.ts';
 import { urlOfLevel } from './levels.ts';
 import { increment, solveLevel } from './progress.ts';
 import { fill, findingText, type FindingId } from './text.ts';
@@ -57,7 +57,7 @@ function discoverFinding(game: Game, finding: Finding): void {
 
 export const findingDrops: GameSystem = {
     update(game, deltaSeconds) {
-        if (!game.state.flags.automated || effectiveRate(game) === 0) return;
+        if (!game.state.flags.automated || answeredRate(game) === 0) return;
         const { statistics } = game.state;
         if (statistics.nextFindAfter === undefined) statistics.nextFindAfter = nextDelay(game);
         increment(game.state, 'secondsSinceFind', deltaSeconds);

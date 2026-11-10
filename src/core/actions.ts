@@ -4,7 +4,9 @@ export type Action =
     | { readonly type: 'submitCredentials'; readonly url: string; readonly username: string; readonly password: string }
     | { readonly type: 'automate' }
     | { readonly type: 'setActivity'; readonly activity: string }
-    | { readonly type: 'setThrottle'; readonly enabled: boolean }
+    | { readonly type: 'checkIn' }
+    | { readonly type: 'setRatePerAddress'; readonly rate: number }
+    | { readonly type: 'setRentedAddresses'; readonly count: number }
     | { readonly type: 'assignJob'; readonly jobId: string; readonly change: number }
     | { readonly type: 'replaceProxy'; readonly proxyIndex: number }
     | { readonly type: 'answerCaptcha'; readonly answer: string }

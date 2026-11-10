@@ -99,11 +99,11 @@ const handcraftedEntrances: Readonly<Record<number, HandcraftedEntrance>> = {
     3: { kind: 'fixed', answer: 'level3', clue: { lines: [handcraftedText.level2] } },
     4: { kind: 'word', answer: 'beneath', clue: { lines: [handcraftedText.level3], comment: handcraftedText.level3Comment } },
     5: { kind: 'word', answer: 'lighthouse', clue: { lines: [handcraftedText.level4], hiddenText: 'lighthouse' } },
-    6: { kind: 'word', answer: 'midnight', positionUnit: 0.08, clue: { title: handcraftedText.level5Title, lines: binaryLines('midnight') } },
+    6: { kind: 'word', answer: 'midnight', positionUnit: 0.08, clue: { method: 'binary', title: handcraftedText.level5Title, lines: binaryLines('midnight') } },
     7: { kind: 'word', answer: 'bridge', clue: { lines: [handcraftedText.level6], imageName: 'present.jpg' } },
     8: { kind: 'word', answer: handcraftedText.level7Tooltip, clue: { imageTitle: handcraftedText.level7Tooltip } },
-    9: { kind: 'word', answer: 'mirror', clue: { title: handcraftedText.level8Title, lines: [encode('mirror', 'rot13')] } },
-    10: { kind: 'word', answer: 'dusk', clue: { lines: [encode('dusk', 'reversed')] } },
+    9: { kind: 'word', answer: 'mirror', clue: { method: 'rot13', title: handcraftedText.level8Title, lines: [encode('mirror', 'rot13')] } },
+    10: { kind: 'word', answer: 'dusk', clue: { method: 'reversed', lines: [encode('dusk', 'reversed')] } },
 };
 
 const handcraftedPageImageWords: Readonly<Record<number, string>> = {
@@ -329,7 +329,7 @@ function buildEntrance(level: number, { kind, answer, clue, folder, extension = 
 
 function recentMethods(level: number): string[] {
     const methods: string[] = [];
-    for (let previous = level - 1; previous >= Math.max(firstGeneratedLevel, level - recentLevels); previous--) {
+    for (let previous = level - 1; previous >= Math.max(2, level - recentLevels); previous--) {
         const method = entrance(previous).clue.method;
         if (method !== undefined) methods.push(method);
     }

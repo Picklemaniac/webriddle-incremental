@@ -1,5 +1,6 @@
 import type { GameSystem } from '../../core/content.ts';
 import type { Game } from '../../core/game.ts';
+import type { GameState } from '../../core/state.ts';
 import { owns } from './progress.ts';
 
 export type JobId = 'scraping' | 'ticketing' | 'riddles';
@@ -23,6 +24,8 @@ export const jobs: readonly JobDefinition[] = [
     { id: 'ticketing', unlockedBy: 'autoReplyMacros', resource: 'money', rateStat: 'ticketBotRate' },
     { id: 'riddles', unlockedBy: 'otherRiddles', resource: 'insight', rateStat: 'riddleBotRate' },
 ];
+
+export const backlogSeconds = 600;
 
 export const activities: readonly ActivityDefinition[] = [
     { id: 'riddles', resource: 'insight', rateStat: 'riddleRate' },
@@ -80,14 +83,25 @@ export function activityRate(game: Game, activityId: ActivityId): number {
     return game.stat(activity.rateStat);
 }
 
+export function isAway(state: GameState): boolean {
+    return state.elapsedSeconds - (state.statistics.lastSeenAt ?? 0) > backlogSeconds;
+}
+
 export function incomePerSecond(game: Game, resource: string): number {
     const activity = activities.find((candidate) => candidate.resource === resource && candidate.id === game.state.activity);
     const job = jobs.find((candidate) => candidate.resource === resource)!;
     return (activity === undefined ? 0 : game.stat(activity.rateStat)) + assignedScripts(game, job.id) * game.stat(job.rateStat);
 }
 
+export function incomeWhileEarning(game: Game, resource: string): number {
+    const activity = activities.find((candidate) => candidate.resource === resource)!;
+    const job = jobs.find((candidate) => candidate.resource === resource)!;
+    return game.stat(activity.rateStat) + assignedScripts(game, job.id) * game.stat(job.rateStat);
+}
+
 export const passiveIncome: GameSystem = {
     update(game, deltaSeconds) {
+        if (isAway(game.state)) return;
         for (const { resource } of activities) game.gainResource(resource, incomePerSecond(game, resource) * deltaSeconds);
     },
 };

@@ -35,7 +35,7 @@ export class GameScreen {
         const findings = new FindingsPanel(game);
         this.panels = [browser, terminal, status, purchases, findings];
         this.setupWindows = new SetupWindows(game);
-        this.awaySummary = new AwaySummary(game.content);
+        this.awaySummary = new AwaySummary(game);
         this.automate = createButton(labels.automate, () => this.wizard.open(() => game.dispatch({ type: 'automate' })), 'automate-offer');
         this.prompt = createElement('div', { className: 'prompt-area' }, [this.automate]);
         const browserColumn = createElement('div', { className: 'browser-column' }, [browser.element, this.prompt]);

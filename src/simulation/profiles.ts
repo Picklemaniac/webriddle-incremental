@@ -40,11 +40,21 @@ export const playerProfiles: readonly PlayerProfile[] = [
 ];
 
 export const puristProfile: PlayerProfile = {
-    name: 'purist', dailySessions: [{ startHour: 18, durationMinutes: 180 }], strategy: actOneStrategy(5, true), stopAtMilestone: 'level1000',
+    name: 'purist', dailySessions: [{ startHour: 18, durationMinutes: 180 }], strategy: actOneStrategy(5, 'purist'), stopAtMilestone: 'level1000',
 };
 
 export const continuousActiveProfile: PlayerProfile = {
     name: 'continuous active', dailySessions: [{ startHour: 18, durationMinutes: 360 }], strategy: actOneStrategy(4),
+};
+
+export const handsOffProfile: PlayerProfile = {
+    name: 'hands off', dailySessions: [{ startHour: 18, durationMinutes: 360 }], strategy: actOneStrategy(4, 'handsOff'),
+};
+
+export const longBreaksProfile: PlayerProfile = {
+    name: 'long breaks',
+    dailySessions: [14, 16.5, 19, 21.5].map((startHour) => ({ startHour, durationMinutes: 30 })),
+    strategy: actOneStrategy(4),
 };
 
 function contentStrategy(interval: number, fallback: Strategy): Strategy {
