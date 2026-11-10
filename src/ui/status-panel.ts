@@ -148,11 +148,14 @@ export class StatusPanel implements Panel {
         const answered = answeredRate(game);
         const requested = requestedRate(game);
         const dropped = sent - answered;
+        const hasDroppedBefore = game.state.flags['notice:firstRateLimit'] === true;
+        this.answered.row.hidden = !hasDroppedBefore;
+        this.load.row.hidden = !hasDroppedBefore;
         setText(this.sending.value, `${formatNumber(sent)}/s`);
         setText(this.answered.value, `${formatNumber(answered)}/s`);
-        this.answered.value.classList.toggle('over-limit', dropped >= 1);
+        this.answered.value.classList.toggle('over-limit', dropped > 0);
         setTitle(this.sending, requested > sent ? fill(uiText.requestedRate, { rate: formatNumber(requested) }) : '');
-        setTitle(this.answered, dropped >= 1 ? fill(uiText.droppedRate, { rate: formatNumber(dropped) }) : '');
+        setTitle(this.answered, dropped > 0 ? fill(uiText.droppedRate, { rate: formatNumber(Math.ceil(dropped)) }) : '');
         setText(this.load.value, uiText.serverLoads[serverLoad(game.state)]);
         const adaptive = isAdaptive(game);
         this.rate.slider.hidden = adaptive;

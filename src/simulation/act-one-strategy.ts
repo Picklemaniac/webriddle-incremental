@@ -100,10 +100,15 @@ function buyUpgrades(game: Game): { readonly acted: boolean; readonly offered: r
         return stats.some((statId) => incomeStats.has(statId) || (needsMoreScripts && requestStats.has(statId))) ? incomePriority : 0;
     };
     const offered = offeredUpgrades(game).filter((item) => isUpgradeRevealed(state, item.id)).sort((first, second) => priority(second) - priority(first));
+    const savedFor = new Set<string>();
     let acted = false;
     for (const item of offered) {
-        if (canAfford(state, item.price)) acted = game.dispatch({ type: 'purchase', purchasableId: item.id }) || acted;
-        else if (priority(item) === urgentPriority || (priority(item) === incomePriority && secondsUntilAffordable(game, item) < savingSeconds)) break;
+        if (Object.keys(item.price).some((resource) => savedFor.has(resource))) continue;
+        if (canAfford(state, item.price)) {
+            acted = game.dispatch({ type: 'purchase', purchasableId: item.id }) || acted;
+        } else if (priority(item) === urgentPriority || (priority(item) === incomePriority && secondsUntilAffordable(game, item) < savingSeconds)) {
+            for (const [resource, amount] of Object.entries(item.price)) if ((state.resources[resource] ?? 0) < amount) savedFor.add(resource);
+        }
     }
     return { acted, offered };
 }
