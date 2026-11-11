@@ -14,17 +14,23 @@ interface WordlistDefinition {
     readonly coverage: number;
 }
 
-export type SlowReason = 'userAgent' | 'wildcard' | 'credentials' | 'wordlist';
+export type SlowReason = 'userAgent' | 'wildcard' | 'credentials';
 
 interface NamedList {
     readonly fileName: string;
     readonly size: number;
 }
 
-// What slows a search down, and the card that lifts it. A hidden cause is only known once the level has been found.
-interface Need {
+// A wall slows every request down while it stands. The card that lifts it is offered at once.
+interface Wall {
     readonly fix: string;
     readonly reason: SlowReason;
+    readonly slowdown: number;
+}
+
+// What DirBuster lacks when a name is in none of its wordlists, and how many times longer guessing takes. A hidden need is only known once the level has been found.
+interface Need {
+    readonly fix: string;
     readonly slowdown: number;
     readonly hidden: boolean;
 }
@@ -34,6 +40,8 @@ export interface SearchPhase {
     readonly size: number;
     readonly candidate: (index: number) => string;
     readonly requestsUntilNext?: number;
+    // Set on the names DirBuster guesses after every wordlist has been tried. Holds the wordlists that would have had the name.
+    readonly guessedWithout?: readonly string[];
 }
 
 interface Variants {
@@ -45,7 +53,6 @@ interface Variants {
 interface Route {
     readonly phases: readonly SearchPhase[];
     readonly hitAt: number;
-    readonly bruteForce: boolean;
     readonly needs: readonly Need[];
     readonly boosters: readonly string[];
 }
@@ -121,12 +128,12 @@ const likelyPairsDivisor = 3;
 const guessingSpread = 2;
 const guessedCharacters = 'abcdefghijklmnopqrstuvwxyz';
 const firstMeetingSeconds = 60;
+const firstGuessSeconds = 20;
 const unguessable: SearchPlan = {
-    phases: [], hitAt: Number.POSITIVE_INFINITY, bruteForce: false, needs: [], boosters: [], folder: null, slowedBy: null, speed: 0, signature: '', missing: [], learns: [],
+    phases: [], hitAt: Number.POSITIVE_INFINITY, needs: [], boosters: [], folder: null, slowedBy: null, speed: 0, signature: '', missing: [], learns: [],
 };
 
-const seenWhileSearching = (fix: string, reason: SlowReason, slowdown: number): Need => ({ fix, reason, slowdown, hidden: false });
-const missingWordlist = (fix: string): Need => seenWhileSearching(fix, 'wordlist', 20);
+const missingWordlist = (fix: string): Need => ({ fix, slowdown: 20, hidden: false });
 // Roughly what DirBuster gets through at a level, for a player who keeps up with the upgrades.
 const typicalRequestsPerSecond = (level: number): number => 150 * (level / 100) ** 2.5;
 
@@ -173,6 +180,30 @@ export function currentPhase(plan: Route, requestsSpent: number): { readonly pha
     return { phase, spent };
 }
 
+// The wordlists that would have had a name DirBuster has had to guess so far, or undefined while it has not run out of words.
+export function wordlistsRunOut(plan: Route, requestsSpent: number): readonly string[] | undefined {
+    let missed: readonly string[] | undefined;
+    let offset = 0;
+    for (const phase of plan.phases) {
+        if (offset > requestsSpent) break;
+        if (phase.guessedWithout !== undefined) missed = [...(missed ?? []), ...phase.guessedWithout];
+        offset += phase.requestsUntilNext ?? phase.size;
+    }
+    return missed;
+}
+
+// When a purchase changes the search, the wordlists DirBuster had already finished are not tried again.
+export function requestsKept(previousSignature: string, plan: Route, requestsSpent: number): number {
+    const finished = previousSignature.split('|').slice(1);
+    let kept = 0;
+    for (const [index, phase] of plan.phases.entries()) {
+        const size = phase.requestsUntilNext ?? phase.size;
+        if (phase.label !== finished[index] || phase.guessedWithout !== undefined || kept + size > Math.min(requestsSpent, plan.hitAt - 1)) break;
+        kept += size;
+    }
+    return kept;
+}
+
 export function searchCapabilities(state: GameState): SearchCapabilities {
     const owned = (id: string): boolean => owns(state, id);
     return {
@@ -217,31 +248,30 @@ export function planSearch(targetLevel: number, capabilities: SearchCapabilities
     if (target.kind === 'fixed') return unguessable;
     const entersFolder = target.kind !== 'subdomain' && target.folder !== null && target.folder !== folderFor(targetLevel - 1);
     const guessesFolder = entersFolder && !capabilities.recursion;
-    const walls: Need[] = [];
-    if (capabilities.scriptsBlocked && !capabilities.userAgent) walls.push(seenWhileSearching('fakeUserAgent', 'userAgent', 10));
-    if (target.wildcard && !guessesFolder && !capabilities.sizeFilter) walls.push(seenWhileSearching('sizeFilter', 'wildcard', 20));
-    if (target.kind === 'credentials' && !capabilities.clusterBomb && !capabilities.cracked) walls.push(seenWhileSearching('clusterBomb', 'credentials', 20));
+    const walls: Wall[] = [];
+    if (capabilities.scriptsBlocked && !capabilities.userAgent) walls.push({ fix: 'fakeUserAgent', reason: 'userAgent', slowdown: 10 });
+    if (target.wildcard && !guessesFolder && !capabilities.sizeFilter) walls.push({ fix: 'sizeFilter', reason: 'wildcard', slowdown: 20 });
+    if (target.kind === 'credentials' && !capabilities.clusterBomb && !capabilities.cracked) walls.push({ fix: 'clusterBomb', reason: 'credentials', slowdown: 20 });
     const located = entersFolder ? insideFolder(target.folder!, targetLevel, kindRoute(target, capabilities), capabilities) : kindRoute(target, capabilities);
     const route = guessesFolder ? unknownKind('dirb', 10, located, target.level, capabilities) : located;
-    const needs = [...walls, ...route.needs];
     return {
         ...route,
-        needs,
         folder: guessesFolder ? folderFor(targetLevel - 1) : target.folder,
-        slowedBy: needs[0]?.reason ?? null,
-        speed: needs.reduce((speed, need) => speed / need.slowdown, 1),
+        slowedBy: walls[0]?.reason ?? null,
+        speed: walls.reduce((speed, wall) => speed / wall.slowdown, 1),
         signature: `${route.hitAt}|${route.phases.map((phase) => phase.label).join('|')}`,
-        missing: [...new Set(needs.filter((need) => !need.hidden).map((need) => need.fix))],
-        learns: needs.filter((need) => need.hidden).map((need) => need.fix),
+        missing: walls.map((wall) => wall.fix),
+        learns: route.needs.filter((need) => need.hidden).map((need) => need.fix),
     };
 }
 
-// Without its card a folder or a kind of answer is found by guessing. Until the player has seen one, it is an easy one that takes about a minute.
+// Without its card a folder or a kind of answer is found by guessing. Until the player has seen one, it is an easy one: about a minute, or the wordlists and a short guess when those take longer.
 function unknownKind(card: LearnedCard, slowdown: number, listed: Route, level: number, capabilities: SearchCapabilities): Route {
-    const slowdowns = listed.needs.reduce((total, need) => total * need.slowdown, slowdown);
-    const easy = Math.max(1, Math.ceil(firstMeetingSeconds * typicalRequestsPerSecond(level) / slowdowns));
-    const hitAt = capabilities.met.includes(card) ? listed.hitAt : easy;
-    return guessing({ ...listed, hitAt }, { fix: card, reason: 'wordlist', slowdown, hidden: true });
+    const need: Need = { fix: card, slowdown, hidden: true };
+    if (capabilities.met.includes(card)) return guessing(listed, need, capabilities);
+    const typical = typicalRequestsPerSecond(level);
+    const requests = Math.max(firstMeetingSeconds * typical, everyList(capabilities, pageVariants).hitAt + firstGuessSeconds * typical);
+    return guessing(listed, need, capabilities, pageVariants, requests);
 }
 
 function ruleRoute(card: LearnedCard, slowdown: number, owned: boolean, variants: Variants, target: Entrance, word: string, capabilities: SearchCapabilities): Route {
@@ -321,7 +351,7 @@ function leetRoute(target: Entrance, word: string, capabilities: SearchCapabilit
         const rank = rankOfWord(word);
         const mutated = listRoute(rank, target.positionUnit, listsCovering(rank, capabilities.lists), capabilities.sortedByFrequency, mutationVariants);
         const list = missingList(rank, capabilities.lists);
-        if (list !== undefined) return guessing(mutated, missingWordlist(list.id));
+        if (list !== undefined) return guessing(mutated, missingWordlist(list.id), capabilities);
         return capabilities.mutations ? mutated : unknownKind('mutationRules', 20, mutated, target.level, capabilities);
     }
     const leak = leakLists.find((list) => target.positionUnit < list.share)!;
@@ -344,7 +374,7 @@ function listsCovering(rank: number, owned: readonly WordlistDefinition[]): read
 function wordRoute(rank: number, unit: number, capabilities: SearchCapabilities, variants = pageVariants): Route {
     const listed = listRoute(rank, unit, listsCovering(rank, capabilities.lists), capabilities.sortedByFrequency, variants);
     const missing = missingList(rank, capabilities.lists);
-    return missing === undefined ? listed : guessing(listed, missingWordlist(missing.id), (candidate) => variants.format(candidate, 0));
+    return missing === undefined ? listed : guessing(listed, missingWordlist(missing.id), capabilities, variants);
 }
 
 function listRoute(rank: number, unit: number, lists: readonly WordlistDefinition[], sortedByFrequency: boolean, variants: Variants): Route {
@@ -401,13 +431,22 @@ function shortened(route: Route, divisor: number, label: string): Route {
     };
 }
 
-function guessing(listed: Route, need: Need, format = page): Route {
-    return { phases: [guessedNames(listed.hitAt * guessingSpread, format)], hitAt: listed.hitAt, bruteForce: true, needs: [...listed.needs, need], boosters: [] };
+// DirBuster cannot know that a name is in none of its wordlists, so it tries them all before it starts guessing.
+function guessing(listed: Route, need: Need, capabilities: SearchCapabilities, variants = pageVariants, requests = listed.hitAt * need.slowdown): Route {
+    const lists = everyList(capabilities, variants);
+    const hitAt = Math.max(lists.hitAt + 1, Math.ceil(requests));
+    const needs = [...listed.needs, need];
+    const guesses = guessedNames((hitAt - lists.hitAt) * guessingSpread, (name) => variants.format(name, 0));
+    return { phases: [...lists.phases, { ...guesses, guessedWithout: needs.filter((item) => !item.hidden).map((item) => item.fix) }], hitAt, needs, boosters: [] };
+}
+
+function everyList(capabilities: SearchCapabilities, variants: Variants): Route {
+    return listRoute(Number.POSITIVE_INFINITY, 0, capabilities.lists, capabilities.sortedByFrequency, variants);
 }
 
 function bruteForceRoute(length: number, unit: number): Route {
     const size = guessedCharacters.length ** length;
-    return { phases: [guessedNames(size, page)], hitAt: position(0.25 + unit * 0.5, size), bruteForce: true, needs: [], boosters: [] };
+    return found([guessedNames(size, page)], position(0.25 + unit * 0.5, size));
 }
 
 function guessedNames(size: number, format: (name: string) => string): SearchPhase {
@@ -438,7 +477,7 @@ function guessedName(index: number): string {
 }
 
 function found(phases: readonly SearchPhase[], hitAt: number): Route {
-    return { phases, hitAt, bruteForce: false, needs: [], boosters: [] };
+    return { phases, hitAt, needs: [], boosters: [] };
 }
 
 function position(share: number, size: number): number {

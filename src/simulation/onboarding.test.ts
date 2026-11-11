@@ -106,11 +106,15 @@ describe('Act I onboarding', () => {
         game.state.purchases.fakeUserAgent = 1;
         game.advance(60);
         expect(isUpgradeRevealed(game.state, 'english10k')).toBe(false);
-        const needsList = Array.from({ length: 200 }, (_, index) => index + 30).find((level) => planSearch(level, searchCapabilities(game.state)).missing.includes('english10k'))!;
+        const lacksList = (level: number): boolean => planSearch(level, searchCapabilities(game.state)).phases.at(-1)?.guessedWithout?.includes('english10k') === true;
+        const needsList = Array.from({ length: 200 }, (_, index) => index + 30).find(lacksList)!;
         game.state.currentLevel = needsList - 1;
+        game.advance(60);
+        expect(game.state.flags.wordlistExhausted).not.toBe(true);
+        expect(isUpgradeRevealed(game.state, 'english10k')).toBe(false);
         let cardSecond: number | undefined;
         let second = 0;
-        for (; second < 60 && game.state.flags.dataRevealed !== true; second++) {
+        for (; second < 900 && game.state.flags.dataRevealed !== true; second++) {
             game.advance(1);
             if (cardSecond === undefined && isUpgradeRevealed(game.state, 'english10k')) cardSecond = second;
         }

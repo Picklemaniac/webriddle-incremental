@@ -15,7 +15,7 @@ import { formatDuration, formatNumber } from '../format.ts';
 import { createElement, createTitleBar, setText } from './dom.ts';
 import type { Panel } from './panel.ts';
 
-const warningNotices: ReadonlySet<NoticeId> = new Set<NoticeId>(['firstRateLimit', 'bruteForce', 'firstBan', 'firstProxyDeath']);
+const warningNotices: ReadonlySet<NoticeId> = new Set<NoticeId>(['firstRateLimit', 'firstBan', 'firstProxyDeath']);
 const slowResponses: Readonly<Partial<Record<SlowReason, number>>> = { credentials: 401, userAgent: 403, wildcard: 200 };
 const missResponse = 404;
 const userAgentPassesEvery = 10;
@@ -42,6 +42,7 @@ export class TerminalPanel implements Panel {
     private lastLineAt = performance.now();
     private lastSampledRequests = 0;
     private sampleIndex = 0;
+    private wasGuessing = false;
 
     constructor(game: Game) {
         this.game = game;
@@ -75,7 +76,10 @@ export class TerminalPanel implements Panel {
         const footer = this.footerText(plan, phase, spent, rate);
         setText(this.footer, footer);
         this.footer.title = footer;
-        this.footer.classList.toggle('warning', isBanned(game) || plan.slowedBy !== null);
+        const guessing = phase?.guessedWithout !== undefined;
+        if (guessing && !this.wasGuessing) this.queueLine(notices.bruteForce, 'warning');
+        this.wasGuessing = guessing;
+        this.footer.classList.toggle('warning', isBanned(game) || plan.slowedBy !== null || guessing);
         this.progress.style.width = `${phase ? Math.min(100, spent / phase.size * 100) : 0}%`;
         const searched = phase !== undefined && plan.speed > 0 && !isBanned(game) && dirbustingScripts(game) > 0 && rate > 0 ? phase : null;
         const request = (index: number): string => this.requestAddress(searched, index, folder);
@@ -105,6 +109,7 @@ export class TerminalPanel implements Panel {
         if (phase === undefined) return uiText.waiting;
         const time = formatDuration((phase.size - spent) / Math.max(0.001, rate * game.stat('searchEfficiency') * plan.speed));
         if (plan.slowedBy !== null) return fill(terminalText.slowProgress, { reason: terminalText.slow[plan.slowedBy], time });
+        if (phase.guessedWithout !== undefined) return fill(terminalText.slowProgress, { reason: terminalText.outOfWordlists, time });
         return fill(terminalText.progress, { list: phase.label, tried: formatNumber(spent), total: formatNumber(phase.size), time });
     }
 
@@ -142,6 +147,7 @@ export class TerminalPanel implements Panel {
             this.pendingLines.length = 0;
             this.sampleIndex = 0;
             this.lastSampledRequests = 0;
+            this.wasGuessing = false;
             this.lastLineAt = performance.now();
             return;
         }

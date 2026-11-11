@@ -454,8 +454,8 @@ export const terminalText = {
         userAgent: 'The server blocks most requests',
         wildcard: 'Every name returns a page',
         credentials: 'Trying common logins',
-        wordlist: 'No wordlist has this name',
     },
+    outOfWordlists: 'No wordlist has this name',
     slowProgress: '{reason}, about {time} left',
 } as const;
 

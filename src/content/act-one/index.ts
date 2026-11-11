@@ -1,6 +1,6 @@
 import type { GameContent, GameSystem } from '../../core/content.ts';
 import type { Game } from '../../core/game.ts';
-import { currentSearch, dirbuster } from './automation.ts';
+import { dirbuster, missingNow } from './automation.ts';
 import { answerCaptcha } from './captchas.ts';
 import { assignJob, isResourceRevealed, passiveIncome, setActivity } from './economy.ts';
 import { findingDrops, findingModifiers, findingsEnabled } from './findings.ts';
@@ -73,7 +73,7 @@ function revealNextOffer(game: Game, seconds: number): boolean {
     const shownLimit = seconds < introductionSeconds ? earlyOfferLimit : laterOfferLimit;
     if (offers.filter((item) => isUpgradeRevealed(state, item.id)).length >= shownLimit) return false;
     const candidates = offers.filter((item) => !isUpgradeRevealed(state, item.id) && readyForUpgrade(game, item));
-    const { missing } = currentSearch(game);
+    const missing = missingNow(game);
     const fixesWall = (item: Upgrade): number => Number(missing.includes(item.id));
     const capped = requestedRate(game) > networkCapacity(game);
     candidates.sort((first, second) => fixesWall(second) - fixesWall(first) || Number(second.onNeed) - Number(first.onNeed) ||
