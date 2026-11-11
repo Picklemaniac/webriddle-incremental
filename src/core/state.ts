@@ -19,7 +19,9 @@ interface NetworkState {
     heat: number;
     bannedUntil: number;
     proxies: Proxy[];
-    rentBudget: number;
+    rentedAddresses: number;
+    knownRentable: number;
+    rentShare: number;
 }
 
 export interface GameState {
@@ -67,7 +69,7 @@ export function createInitialState(content: GameContent, seed: number): GameStat
         findings: {},
         activity: '',
         search: { requestsSpent: 0, configuration: '' },
-        network: { heat: 0, bannedUntil: 0, proxies: [], rentBudget: 0.5 },
+        network: { heat: 0, bannedUntil: 0, proxies: [], rentedAddresses: 0, knownRentable: 0, rentShare: 1 },
         captcha: null,
         favorites: [],
         history: [],

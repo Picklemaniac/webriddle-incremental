@@ -7,7 +7,8 @@ export interface Habits {
     readonly captchaSeconds?: number | null;
     readonly replacesProxies?: boolean;
     readonly assignsScripts?: boolean;
-    readonly rentBudget?: number;
+    readonly rentedShare?: number;
+    readonly rentEverySeconds?: number;
 }
 
 const handSolveActions: ReadonlySet<Action['type']> = new Set(['navigate', 'submitCredentials']);
@@ -17,12 +18,16 @@ const robotCaptchaSeconds = 12;
 export function withHabits(strategy: Strategy, habits: Habits): Strategy {
     let robotView: Game | undefined;
     let captchaSince: number | undefined;
+    let rentMovedAt = Number.NEGATIVE_INFINITY;
     const allows = (action: Action, game: Game): boolean => {
         if (action.type === 'answerCaptcha') return false;
         if (handSolveActions.has(action.type) && game.state.flags.automated === true && habits.solvesByHand === false) return false;
         if (action.type === 'replaceProxy' && habits.replacesProxies === false) return false;
         if (action.type === 'assignJob' && habits.assignsScripts === false) return false;
-        if (action.type === 'setRentBudget' && habits.rentBudget !== undefined) return false;
+        if (action.type === 'setRentedAddresses') {
+            if (habits.rentedShare !== undefined || game.state.elapsedSeconds - rentMovedAt < (habits.rentEverySeconds ?? 0)) return false;
+            rentMovedAt = game.state.elapsedSeconds;
+        }
         return true;
     };
     return {
@@ -47,7 +52,9 @@ export function withHabits(strategy: Strategy, habits: Habits): Strategy {
                 }
             }
             acted = strategy.act(robotView) || acted;
-            if (habits.rentBudget !== undefined) acted = game.dispatch({ type: 'setRentBudget', share: habits.rentBudget }) || acted;
+            if (habits.rentedShare !== undefined) {
+                acted = game.dispatch({ type: 'setRentedAddresses', count: Math.round(game.stat('rentableAddresses') * habits.rentedShare) }) || acted;
+            }
             return acted;
         },
     };

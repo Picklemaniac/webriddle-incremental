@@ -1,38 +1,30 @@
 import type { GameSystem } from '../../core/content.ts';
 import type { Game } from '../../core/game.ts';
 import { createCaptcha } from './captchas.ts';
-import { dirbustingScripts, incomePerSecond, isAway } from './economy.ts';
+import { dirbustingScripts, incomePerSecond, incomeWhileEarning, isAway, scriptSlots } from './economy.ts';
 import { increment, markNeeded, noticeOnce, owns } from './progress.ts';
 import { laterAddressBlocks, upgrades } from './upgrades.ts';
 
 export const requestsPerAddress = 10;
 export const ownAddress = '203.0.113.24';
-export const highestRentBudget = 0.75;
-export const rentBudgetStep = 0.05;
 const banSeconds = 300;
 const heatPerExcessRatio = 3;
 const coolingPerSecond = 3;
+const newBlockRentedShare = 0.5;
+const startingRentShareOfIncome = 0.3;
 const proxySeconds = 180;
 
 export function liveProxies(game: Game): number {
     return game.state.network.proxies.filter((proxy) => proxy.diesAtSeconds > game.state.elapsedSeconds).length;
 }
 
-function affordableAddresses(game: Game): number {
-    return Math.floor(game.state.network.rentBudget * incomePerSecond(game, 'money') / game.stat('addressRent'));
-}
-
-export function rentedAddresses(game: Game): number {
-    return Math.min(game.stat('rentableAddresses'), affordableAddresses(game));
-}
-
-export function isRentCapped(game: Game): boolean {
-    const rentable = game.stat('rentableAddresses');
-    return rentable > 0 && affordableAddresses(game) > rentable;
+// The rented addresses that work: all of them, or the part the player can pay for.
+export function rentedInUse(game: Game): number {
+    return game.state.network.rentedAddresses * game.state.network.rentShare;
 }
 
 export function addressCount(game: Game): number {
-    return 1 + liveProxies(game) + rentedAddresses(game);
+    return 1 + liveProxies(game) + rentedInUse(game);
 }
 
 export function networkCapacity(game: Game): number {
@@ -40,13 +32,13 @@ export function networkCapacity(game: Game): number {
 }
 
 export function rentPerSecond(game: Game): number {
-    return rentedAddresses(game) * game.stat('addressRent');
+    return game.state.network.rentedAddresses * game.stat('addressRent');
 }
 
 export function rentedBlocks(game: Game): readonly { readonly range: string; readonly addresses: number; readonly rented: number }[] {
     const sizes = upgrades.filter((item) => owns(game.state, item.id))
         .flatMap((item) => (item.modifiers?.(1) ?? []).filter((modifier) => modifier.statId === 'rentableAddresses').map((modifier) => modifier.value));
-    let unplaced = rentedAddresses(game);
+    let unplaced = game.state.network.rentedAddresses;
     return sizes.map((addresses, index) => {
         const rented = Math.min(addresses, unplaced);
         unplaced -= rented;
@@ -54,8 +46,24 @@ export function rentedBlocks(game: Game): readonly { readonly range: string; rea
     });
 }
 
+function scriptRate(game: Game): number {
+    return game.stat('threadsPerScript') * game.stat('requestsPerThread');
+}
+
 export function requestedRate(game: Game): number {
-    return dirbustingScripts(game) * game.stat('threadsPerScript') * game.stat('requestsPerThread');
+    return dirbustingScripts(game) * scriptRate(game);
+}
+
+function hasNoRoomForAnotherScript(game: Game): boolean {
+    return requestedRate(game) + scriptRate(game) > networkCapacity(game);
+}
+
+export function limitHoldsBack(game: Game): boolean {
+    return game.state.flags.networkRevealed === true && hasNoRoomForAnotherScript(game);
+}
+
+export function showsTheLimit(game: Game): boolean {
+    return requestedRate(game) > networkCapacity(game) || (scriptSlots(game) > 1 && hasNoRoomForAnotherScript(game));
 }
 
 export function isBanned(game: Game): boolean {
@@ -78,12 +86,9 @@ export function setThrottle(game: Game, enabled: boolean): boolean {
     return true;
 }
 
-export function setRentBudget(game: Game, share: number): boolean {
-    const steps = share / rentBudgetStep;
-    if (!Number.isFinite(share) || share < 0 || share > highestRentBudget + 1e-9 || Math.abs(steps - Math.round(steps)) > 1e-9) return false;
-    const budget = Math.round(steps) * rentBudgetStep;
-    if (Math.abs(budget - game.state.network.rentBudget) < 1e-9) return false;
-    game.state.network.rentBudget = budget;
+export function setRentedAddresses(game: Game, count: number): boolean {
+    if (!Number.isInteger(count) || count < 0 || count > game.stat('rentableAddresses') || count === game.state.network.rentedAddresses) return false;
+    game.state.network.rentedAddresses = count;
     return true;
 }
 
@@ -99,17 +104,39 @@ export function replaceProxy(game: Game, proxyIndex: number): boolean {
     return true;
 }
 
+function rentPartOfNewBlocks(game: Game): void {
+    const { network } = game.state;
+    const rentable = game.stat('rentableAddresses');
+    if (rentable <= network.knownRentable) return;
+    const newlyOffered = Math.round((rentable - network.knownRentable) * newBlockRentedShare);
+    const affordable = Math.floor(incomeWhileEarning(game, 'money') * startingRentShareOfIncome / game.stat('addressRent'));
+    network.rentedAddresses += Math.max(0, Math.min(newlyOffered, affordable - network.rentedAddresses));
+    network.knownRentable = rentable;
+}
+
+function rentsEveryAddress(game: Game): boolean {
+    const { rentedAddresses, rentShare } = game.state.network;
+    return rentedAddresses > 0 && rentedAddresses === game.stat('rentableAddresses') && rentShare === 1;
+}
+
 export const rent: GameSystem = {
     update(game, deltaSeconds) {
         const { state } = game;
-        if (isRentCapped(game)) {
+        rentPartOfNewBlocks(game);
+        if (rentsEveryAddress(game) && limitHoldsBack(game)) {
             const nextBlock = laterAddressBlocks.find((id) => !owns(state, id));
             if (nextBlock !== undefined) markNeeded(state, nextBlock);
         }
-        const paid = rentPerSecond(game) * deltaSeconds;
-        if (paid === 0) return;
-        // While the player is away the jobs do not pay out, and what they would earn covers the rent.
-        if (!isAway(state)) state.resources.money = (state.resources.money ?? 0) - paid;
+        const due = rentPerSecond(game) * deltaSeconds;
+        if (due === 0) {
+            state.network.rentShare = 1;
+            return;
+        }
+        // While the player is away the jobs do not pay out, and what they would earn goes to the rent.
+        const away = isAway(state);
+        const paid = Math.min(due, away ? incomePerSecond(game, 'money') * deltaSeconds : state.resources.money ?? 0);
+        if (!away) state.resources.money = (state.resources.money ?? 0) - paid;
+        state.network.rentShare = paid / due;
         increment(state, 'rentPaid', paid);
     },
 };
@@ -135,10 +162,8 @@ export const network: GameSystem = {
         if (!state.flags.automated || isBanned(game)) return;
         const capacity = networkCapacity(game);
         const excess = Math.max(0, requestedRate(game) - capacity);
-        if (excess > 0) {
-            state.flags.networkRevealed = true;
-            noticeOnce(game, 'firstRateLimit');
-        }
+        if (showsTheLimit(game)) state.flags.networkRevealed = true;
+        if (excess > 0) noticeOnce(game, 'firstRateLimit');
         const overLimit = excess > 0 && !isThrottled(game);
         state.network.heat = Math.max(0, state.network.heat + deltaSeconds * (overLimit ? heatPerExcessRatio * excess / capacity : -coolingPerSecond));
         if (state.network.heat >= 100) {

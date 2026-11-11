@@ -6,7 +6,7 @@ export type Action =
     | { readonly type: 'setActivity'; readonly activity: string }
     | { readonly type: 'checkIn' }
     | { readonly type: 'setThrottle'; readonly enabled: boolean }
-    | { readonly type: 'setRentBudget'; readonly share: number }
+    | { readonly type: 'setRentedAddresses'; readonly count: number }
     | { readonly type: 'assignJob'; readonly jobId: string; readonly change: number }
     | { readonly type: 'replaceProxy'; readonly proxyIndex: number }
     | { readonly type: 'answerCaptcha'; readonly answer: string }

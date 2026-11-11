@@ -216,8 +216,8 @@ try {
     await importGame(game);
     await sleep(900);
     await screenshot('working');
-    await setSlider('Pay spent on IPs', 0);
-    await waitFor(`${sliderText('Pay spent on IPs')} === '0%' && ${statText('Rented IPs')}.startsWith('0 of ')`);
+    await setSlider('Rented IPs', 0);
+    await waitFor(`${sliderText('Rented IPs')}.startsWith('0 of ')`);
     assert.equal(await evaluate(statText('Rent')), '$0/s');
     assert.equal(await evaluate(`document.querySelector('.throttle-switch').textContent`), 'On');
     assert.equal(await evaluate(`document.querySelector('.stat-row .over-limit')`), null, 'Throttle keeps the scripts under the server limit');
@@ -225,10 +225,18 @@ try {
     await waitFor(`document.querySelector('.throttle-switch').textContent === 'Off' && document.querySelector('.stat-row .over-limit') !== null`);
     await evaluate(`document.querySelector('.throttle-switch').click()`);
     await waitFor(`document.querySelector('.throttle-switch').textContent === 'On' && document.querySelector('.stat-row .over-limit') === null`);
-    await setSlider('Pay spent on IPs', 10);
-    await waitFor(`${sliderText('Pay spent on IPs')} === '50%' && ${statText('Rent')} !== '$0/s'`);
-    await waitFor(`${statNumber('IP addresses')} > 10 && ${statNumber('Server limit')} === ${statNumber('IP addresses')} * 10`);
+    await setSlider('Rented IPs', 32);
+    await waitFor(`${sliderText('Rented IPs')}.startsWith('32 of ') && ${statText('Rent')} === '$7.68/s'`);
+    await waitFor(`${statNumber('IP addresses')} >= 33 && ${statNumber('Server limit')} === ${statNumber('IP addresses')} * 10`);
     await screenshot('network-levers', false);
+    const broke = game.clone();
+    broke.state.resources.money = 0;
+    broke.state.jobs = {};
+    broke.state.activity = '';
+    broke.state.network.rentedAddresses = broke.stat('rentableAddresses');
+    await importGame(broke);
+    await waitFor(`${statValue('Rent')}.classList.contains('over-limit') && ${statValue('Rent')}.closest('.stat-row').title === 'You can only pay for 0 of them right now.'`);
+    await screenshot('broke', false);
     game.state.statistics.lastSeenAt = game.state.elapsedSeconds - 700;
     await sleep(31000);
     await importGame(game);
@@ -307,9 +315,8 @@ try {
 
     const walled = new Game(actOneContent, createInitialState(actOneContent, 3));
     new AutoPlayer(actOneStrategy(4)).playUntil(walled, () => walled.state.currentLevel >= 30, 7200);
-    delete walled.state.purchases.fakeUserAgent;
-    walled.state.currentLevel = 45;
-    walled.state.browserUrl = urlOfLevel(45);
+    assert.notEqual(walled.state.purchases.fakeUserAgent, 1, 'The server only blocks scripts after three bans');
+    walled.state.statistics.bans = 3;
     walled.state.statistics.nextRevealAt = walled.state.elapsedSeconds;
     await importGame(walled);
     await waitFor(`document.querySelector('.terminal-footer').textContent.startsWith('The server blocks most requests, about ')`);
@@ -317,6 +324,19 @@ try {
     await waitFor(`[...document.querySelectorAll('.terminal-line')].some((line) => line.textContent.startsWith('403'))`);
     await waitFor(`[...document.querySelectorAll('.upgrade-card')].some((card) => !card.hidden && card.dataset.upgrade === 'fakeUserAgent')`, 600);
     await screenshot('slow-wall', false);
+
+    const unknownKind = Array.from({ length: 400 }, (_, index) => 230 + index).find((level) => entrance(level).kind === 'name' && entrance(level).folder === entrance(level - 1).folder);
+    assert.ok(unknownKind !== undefined, 'No level with a first name found in the test range');
+    const puzzled = game.clone();
+    assert.notEqual(puzzled.state.purchases.namesList, 1);
+    puzzled.state.currentLevel = unknownKind - 1;
+    puzzled.state.browserUrl = urlOfLevel(unknownKind - 1);
+    puzzled.state.search = { requestsSpent: 0, configuration: '' };
+    await importGame(puzzled);
+    await waitFor(`document.querySelector('.terminal-footer').textContent.startsWith('No wordlist has this name, about ')`);
+    await waitFor(`/^--> Testing: \\/([a-z0-9]+\\/)?[a-z]+\\.htm$/.test(document.querySelector('.terminal-line.live').textContent)`);
+    assert.equal(await evaluate(`[...document.querySelectorAll('.upgrade-card')].some((card) => !card.hidden && card.dataset.upgrade === 'namesList')`), false, 'A kind of answer is not known before one is found');
+    await screenshot('unknown-kind', false);
 
     /** @type {number[]} */
     const credentialCandidates = Array.from({ length: 300 }, (_, index) => 500 + index);
@@ -349,7 +369,7 @@ try {
     await evaluate(`document.querySelector('.dashboard').scrollIntoView()`);
     await screenshot('dashboard-narrow', false);
     assert.deepEqual(problems, [], 'Browser errors');
-    console.log('Browser checks passed: opening puzzles, navigation, source, hidden text, automate, favorites, save import/export, mature UI, the rent slider and Throttle, a slowing wall, worker widths, dev visibility, captcha, credentials, and narrow layout.');
+    console.log('Browser checks passed: opening puzzles, navigation, source, hidden text, automate, favorites, save import/export, mature UI, the rent slider, going broke and Throttle, a slowing wall, an unknown kind of answer, worker widths, dev visibility, captcha, credentials, and narrow layout.');
     console.log(`Screenshots: ${outputDirectory}`);
 } finally {
     if (socket?.readyState === WebSocket.OPEN) {
@@ -417,6 +437,10 @@ function sliderText(label) {
 
 function statText(label) {
     return `[...document.querySelectorAll('.stat-row')].find((row) => row.firstElementChild.textContent === ${JSON.stringify(label)}).lastElementChild.textContent`;
+}
+
+function statValue(label) {
+    return `[...document.querySelectorAll('.stat-row')].find((row) => row.firstElementChild.textContent === ${JSON.stringify(label)}).lastElementChild`;
 }
 
 function statNumber(label) {

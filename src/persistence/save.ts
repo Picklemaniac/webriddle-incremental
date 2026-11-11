@@ -1,6 +1,6 @@
 import type { GameState } from '../core/state.ts';
 
-export const currentSaveVersion = 8;
+export const currentSaveVersion = 9;
 
 export const saveErrorText = {
     newerVersion: 'This save comes from a newer version of the game (save version {version}).',
@@ -59,7 +59,9 @@ const stateChecks: Readonly<Record<keyof GameState, ValueCheck>> = {
         heat: nonnegativeNumber,
         bannedUntil: nonnegativeNumber,
         proxies: arrayOf((proxy) => requiredFields(proxy, { address: text, latencyMilliseconds: nonnegativeNumber, diesAtSeconds: nonnegativeNumber })),
-        rentBudget: (value) => nonnegativeNumber(value) && (value as number) <= 1,
+        rentedAddresses: nonnegativeInteger,
+        knownRentable: nonnegativeInteger,
+        rentShare: nonnegativeNumber,
     }),
     captcha: (value) => value === null || requiredFields(value, { word: captchaWord }),
     favorites: arrayOf(text),

@@ -116,7 +116,9 @@ describe('save format', () => {
             heat: 100,
             bannedUntil: 90,
             proxies: [{ address: '192.0.2.1:8000', latencyMilliseconds: 60, diesAtSeconds: 360 }],
-            rentBudget: 0.35,
+            rentedAddresses: 12,
+            knownRentable: 32,
+            rentShare: 0.5,
         };
         state.favorites = ['http://riddle.example/level1.htm'];
         state.captcha = { word: 'apple' };

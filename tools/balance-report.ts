@@ -39,10 +39,10 @@ const players: readonly Player[] = [
     { name: 'waits out every ban', habits: { captchaSeconds: null } },
     { name: 'never replaces proxies', habits: { replacesProxies: false } },
     { name: 'never assigns scripts', habits: { assignsScripts: false } },
+    { name: 'rent every 10 minutes', habits: { rentEverySeconds: 600 } },
     { name: 'rent slider untouched', habits: {}, style: 'handsOff' },
-    { name: 'rent at 25%', habits: { rentBudget: 0.25 } },
-    { name: 'rent at 75%', habits: { rentBudget: 0.75 } },
-    { name: 'casual', habits: { solvesByHand: false, captchaSeconds: 25 }, style: 'handsOff', reactionSeconds: 30 },
+    { name: 'rents every IP', habits: { rentedShare: 1 } },
+    { name: 'casual', habits: { solvesByHand: false, captchaSeconds: 25, rentEverySeconds: 600 }, reactionSeconds: 30 },
 ];
 
 function robotFor(player: Player): AutoPlayer {

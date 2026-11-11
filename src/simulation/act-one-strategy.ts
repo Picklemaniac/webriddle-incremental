@@ -3,7 +3,7 @@ import {
     activities, activityRate, assignedScripts, dirbustingScripts, incomePerSecond, isJobUnlocked, isResourceRevealed, jobs, scriptSlots, type ActivityId, type JobId,
 } from '../content/act-one/economy.ts';
 import { entrance, entranceAction } from '../content/act-one/levels.ts';
-import { effectiveRate, isThrottled, networkCapacity, rentPerSecond, requestedRate } from '../content/act-one/network.ts';
+import { effectiveRate, isThrottled, liveProxies, networkCapacity, rentPerSecond, requestedRate, requestsPerAddress } from '../content/act-one/network.ts';
 import { automationLevel, isNeeded, isUpgradeRevealed, owns } from '../content/act-one/progress.ts';
 import { currentPhase } from '../content/act-one/search.ts';
 import { capacityUpgrades, offeredUpgrades, upgrades, type Upgrade } from '../content/act-one/upgrades.ts';
@@ -29,8 +29,9 @@ const solveSecondsPerRootLevel = 3;
 const stuckSearchSeconds = 180;
 const minimumIncomePerSecond = 0.001;
 const longestWaitSeconds = 3600;
-const savingRentBudget = 0.4;
-const idleRentBudget = 0.75;
+const savingRentShare = 0.35;
+const burnSeconds = 300;
+const rentStepShare = 0.05;
 
 export function actOneStrategy(decisionIntervalSeconds: number, style: PlayStyle = 'attentive'): Strategy {
     const memories = new WeakMap<Game, DecisionMemory>();
@@ -105,10 +106,17 @@ function buyUpgrades(game: Game): { readonly acted: boolean; readonly offered: r
 }
 
 function chooseRent(game: Game, offered: readonly Upgrade[]): boolean {
-    if (game.stat('rentableAddresses') === 0) return false;
-    const money = game.state.resources.money ?? 0;
+    const { state } = game;
+    const rentable = game.stat('rentableAddresses');
+    if (rentable === 0) return false;
+    const money = state.resources.money ?? 0;
+    const income = incomePerSecond(game, 'money');
     const saving = offered.some((item) => (item.price.money ?? 0) > money);
-    return game.dispatch({ type: 'setRentBudget', share: saving ? savingRentBudget : idleRentBudget });
+    const budget = saving ? income * savingRentShare : income + money / burnSeconds;
+    const useful = maximumSearchers(game) * requestsPerScript(game) / requestsPerAddress - 1 - liveProxies(game);
+    const target = Math.max(0, Math.min(rentable, Math.floor(budget / game.stat('addressRent')), Math.ceil(useful)));
+    if (Math.abs(target - state.network.rentedAddresses) < Math.max(1, rentable * rentStepShare) && target !== rentable && target !== 0) return false;
+    return game.dispatch({ type: 'setRentedAddresses', count: target });
 }
 
 function requestsPerScript(game: Game): number {
@@ -171,7 +179,7 @@ function secondsUntilAffordable(game: Game, item: Upgrade): number {
 }
 
 function spareIncome(game: Game, resource: string): number {
-    return incomePerSecond(game, resource) - (resource === 'money' ? rentPerSecond(game) : 0);
+    return incomePerSecond(game, resource) - (resource === 'money' ? rentPerSecond(game) * game.state.network.rentShare : 0);
 }
 
 function chooseActivity(game: Game, offered: readonly Upgrade[]): ActivityId | undefined {

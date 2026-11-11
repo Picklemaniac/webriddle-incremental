@@ -77,6 +77,7 @@ export class Game {
         try {
             const summary = simulateOfflineProgress(this, awaySeconds);
             this.currentState.statistics.offlineSeconds = (this.currentState.statistics.offlineSeconds ?? 0) + summary.simulatedSeconds;
+            if (summary.simulatedSeconds < awaySeconds) this.currentState.flags.offlineCapReached = true;
             this.announce({ type: 'offlineProgressApplied', summary });
             return summary;
         } finally {

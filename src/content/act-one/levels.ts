@@ -78,7 +78,6 @@ interface HandcraftedEntrance {
 }
 
 export const firstGeneratedLevel = 11;
-export const userAgentBlockLevel = 45;
 const firstFolderLevel = 100;
 const commonWordShare = 0.25;
 const commonWordRanks = 300;

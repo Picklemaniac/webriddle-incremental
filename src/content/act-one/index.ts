@@ -5,7 +5,8 @@ import { answerCaptcha } from './captchas.ts';
 import { assignJob, isResourceRevealed, passiveIncome, setActivity } from './economy.ts';
 import { findingDrops, findingModifiers, findingsEnabled } from './findings.ts';
 import { entrance } from './levels.ts';
-import { isBanned, network, networkCapacity, rent, replaceProxy, requestedRate, setRentBudget, setThrottle } from './network.ts';
+import { needs } from './needs.ts';
+import { isBanned, network, networkCapacity, rent, replaceProxy, requestedRate, setRentedAddresses, setThrottle, showsTheLimit } from './network.ts';
 import { canonicalUrl, resolvePage } from './pages.ts';
 import { automationElapsed, automationLevel, isUpgradeRevealed, owns, solveLevel } from './progress.ts';
 import { homeUrl, startUrl } from './riddle.ts';
@@ -116,7 +117,7 @@ const pacedNetwork: GameSystem = {
     update(game, seconds) {
         const revealed = game.state.flags.networkRevealed;
         const scriptsPending = !game.state.flags.scriptsRevealed && game.stat('scriptSlots') >= 2;
-        if (!revealed && requestedRate(game) > networkCapacity(game) && (scriptsPending || game.state.elapsedSeconds < nextRevealAt(game))) return;
+        if (!revealed && showsTheLimit(game) && (scriptsPending || game.state.elapsedSeconds < nextRevealAt(game))) return;
         network.update(game, seconds);
         if (!revealed && game.state.flags.networkRevealed) reserveReveal(game);
     },
@@ -151,7 +152,7 @@ export const actOneContent: GameContent = {
         { id: 'firstUpgrade', name: 'First upgrade', isReached: (state) => Object.keys(state.purchases).length > 0 },
         ...[10, 50, 100, 200, 300, 500, 700, 1000].map((level) => ({ id: `level${level}`, name: `Level ${level}`, isReached: (state: Game['state']) => state.currentLevel >= level })),
     ],
-    systems: [passiveIncome, rent, pacedNetwork, pacedFindings, reveals, dirbuster],
+    systems: [passiveIncome, rent, pacedNetwork, pacedFindings, needs, reveals, dirbuster],
     extraModifiers: findingModifiers,
     resolvePage,
     handleNavigation(game, address) {
@@ -172,7 +173,7 @@ export const actOneContent: GameContent = {
                 return true;
             case 'setActivity': return setActivity(game, action.activity);
             case 'setThrottle': return setThrottle(game, action.enabled);
-            case 'setRentBudget': return setRentBudget(game, action.share);
+            case 'setRentedAddresses': return setRentedAddresses(game, action.count);
             case 'assignJob': return assignJob(game, action.jobId, action.change);
             case 'replaceProxy': return replaceProxy(game, action.proxyIndex);
             case 'answerCaptcha': return answerCaptcha(game, action.answer);

@@ -1,5 +1,6 @@
 import type { GameSystem } from '../../core/content.ts';
 import type { Game } from '../../core/game.ts';
+import type { GameState } from '../../core/state.ts';
 import { entrance, type EntranceKind } from './levels.ts';
 import { effectiveRate } from './network.ts';
 import { automationBootSeconds, automationElapsed, increment, markNeeded, noticeOnce, solveLevel } from './progress.ts';
@@ -20,10 +21,23 @@ export function currentSearch(game: Game): SearchPlan {
     return plan;
 }
 
+// A new folder or a new kind of answer can only be recognised once one has been found. Its card is offered from then on.
+function learnFromFoundLevels(state: GameState): void {
+    const learnedThrough = state.statistics.learnedThrough ?? state.currentLevel;
+    if (learnedThrough < state.currentLevel) {
+        const capabilities = searchCapabilities(state);
+        for (let level = learnedThrough + 1; level <= state.currentLevel; level++) {
+            for (const id of planSearch(level, capabilities).learns) markNeeded(state, id);
+        }
+    }
+    state.statistics.learnedThrough = state.currentLevel;
+}
+
 export const dirbuster: GameSystem = {
     update(game, deltaSeconds) {
         const { state } = game;
         if (!state.flags.automated || automationElapsed(state) < automationBootSeconds) return;
+        learnFromFoundLevels(state);
         const rate = effectiveRate(game);
         if (rate === 0) return;
         increment(state, 'requestsSent', rate * deltaSeconds);

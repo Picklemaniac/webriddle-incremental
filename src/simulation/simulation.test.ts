@@ -8,7 +8,8 @@ import { Game } from '../core/game.ts';
 import { createInitialState, type GameState } from '../core/state.ts';
 import { actOneStrategy } from './act-one-strategy.ts';
 import { AutoPlayer } from './auto-player.ts';
-import { continuousActiveProfile, handsOffProfile, longBreaksProfile, playerProfiles, puristProfile, type PlayerProfile } from './profiles.ts';
+import { withHabits } from './habits.ts';
+import { continuousActiveProfile, longBreaksProfile, playerProfiles, puristProfile, type PlayerProfile } from './profiles.ts';
 import { assessActOnePacing } from './pacing.ts';
 import { milestoneTiming, simulatePlayer, type SimulationOptions } from './simulation.ts';
 
@@ -91,10 +92,11 @@ describe('Act I pacing', () => {
         expect(report.offlineProgressShare).toBe(0);
     });
 
-    it('still finishes for a player who never touches the rent', () => {
-        const report = simulatePlayer(handsOffProfile, actOneContent, { days: 1, seed: 1, stepSeconds: 1 });
-        expect(milestoneTiming(report, 'level1000')?.activeSeconds).toBeLessThan(5 * 3600);
-        expect(report.upgradesPurchased).toBeGreaterThanOrEqual(upgrades.length - 3);
+    it('still finishes in four hours for a player who moves the rent slider once in ten minutes at most', () => {
+        const profile = { ...continuousActiveProfile, strategy: withHabits(actOneStrategy(4), { rentEverySeconds: 600 }) };
+        const report = simulatePlayer(profile, actOneContent, { days: 1, seed: 1, stepSeconds: 1 });
+        expect(milestoneTiming(report, 'level1000')?.activeSeconds).toBeLessThan(4 * 3600);
+        expect(report.upgradesPurchased).toBeGreaterThanOrEqual(upgrades.length - 4);
     });
 
     it('lets DirBuster keep going during long breaks without paying for a backlog of upgrades', () => {

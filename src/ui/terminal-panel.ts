@@ -3,7 +3,7 @@ import type { GameEvent } from '../core/events.ts';
 import { currentSearch } from '../content/act-one/automation.ts';
 import { dirbustingScripts } from '../content/act-one/economy.ts';
 import { findingFile, findings } from '../content/act-one/findings.ts';
-import { entrance, urlOfLevel } from '../content/act-one/levels.ts';
+import { urlOfLevel } from '../content/act-one/levels.ts';
 import { effectiveRate, isBanned, requestedRate } from '../content/act-one/network.ts';
 import { automationBootSeconds, automationElapsed } from '../content/act-one/progress.ts';
 import { riddleOrigin } from '../content/act-one/riddle.ts';
@@ -68,8 +68,7 @@ export class TerminalPanel implements Panel {
         const { phase, spent } = currentPhase(plan, game.state.search.requestsSpent);
         const rate = effectiveRate(game);
         setText(this.rate, `${formatNumber(rate)} ${uiText.requests}`);
-        const targetFolder = entrance(game.state.currentLevel + 1).folder;
-        const folder = targetFolder === null ? '/' : `/${targetFolder}/`;
+        const folder = plan.folder === null ? '/' : `/${plan.folder}/`;
         const command = this.commandText(phase, folder);
         setText(this.command, command);
         this.command.title = command;
