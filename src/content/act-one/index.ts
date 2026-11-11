@@ -1,6 +1,6 @@
 import type { GameContent, GameSystem } from '../../core/content.ts';
 import type { Game } from '../../core/game.ts';
-import { dirbuster, missingNow } from './automation.ts';
+import { currentSearch, dirbuster } from './automation.ts';
 import { answerCaptcha } from './captchas.ts';
 import { assignJob, isResourceRevealed, passiveIncome, setActivity } from './economy.ts';
 import { findingDrops, findingModifiers, findingsEnabled } from './findings.ts';
@@ -8,7 +8,7 @@ import { entrance } from './levels.ts';
 import { needs } from './needs.ts';
 import { isBanned, network, networkCapacity, rent, replaceProxy, requestedRate, setRentedAddresses, setThrottle, showsTheLimit } from './network.ts';
 import { canonicalUrl, resolvePage } from './pages.ts';
-import { automationElapsed, automationLevel, isUpgradeRevealed, owns, solveLevel } from './progress.ts';
+import { automationElapsed, automationLevel, isNeeded, isUpgradeRevealed, owns, solveLevel } from './progress.ts';
 import { homeUrl, startUrl } from './riddle.ts';
 import { labels } from './text.ts';
 import { capacityUpgrades, offeredUpgrades, upgrades, type Upgrade } from './upgrades.ts';
@@ -48,7 +48,7 @@ const reveals: GameSystem = {
             state.flags.insightRevealed = true;
         } else if (!state.flags.moneyRevealed && seconds >= moneyIntroductionSeconds && owns(state, 'curlBatch')) {
             if (!revealWithCurrency(game, 'ram', 'moneyRevealed')) return;
-        } else if (!state.flags.dataRevealed && state.flags.wordlistExhausted === true) {
+        } else if (!state.flags.dataRevealed && isNeeded(state, 'english10k')) {
             if (!revealWithCurrency(game, 'english10k', 'dataRevealed')) return;
         } else if (!revealNextOffer(game, seconds)) {
             return;
@@ -73,7 +73,7 @@ function revealNextOffer(game: Game, seconds: number): boolean {
     const shownLimit = seconds < introductionSeconds ? earlyOfferLimit : laterOfferLimit;
     if (offers.filter((item) => isUpgradeRevealed(state, item.id)).length >= shownLimit) return false;
     const candidates = offers.filter((item) => !isUpgradeRevealed(state, item.id) && readyForUpgrade(game, item));
-    const missing = missingNow(game);
+    const { missing } = currentSearch(game);
     const fixesWall = (item: Upgrade): number => Number(missing.includes(item.id));
     const capped = requestedRate(game) > networkCapacity(game);
     candidates.sort((first, second) => fixesWall(second) - fixesWall(first) || Number(second.onNeed) - Number(first.onNeed) ||

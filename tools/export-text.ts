@@ -109,11 +109,11 @@ function searchLabels(): string[] {
     const state = createInitialState(actOneContent, 1);
     for (const upgrade of upgrades) state.purchases[upgrade.id] = 1;
     const complete = searchCapabilities(state);
-    const variants = [complete, { ...complete, cracked: false }, { ...complete, mutations: false },
-        { ...complete, lists: complete.lists.slice(0, 1), mutations: false, rockyou: false, numberRanges: false, cracked: false, combinator: false }];
+    const uncracked = { ...complete, cracked: false };
+    const variants = [complete, uncracked, { ...uncracked, usernames: false, passwords: false, likelyPairs: false }, { ...uncracked, cards: [] }];
     const labels = new Set<string>();
     for (let level = 6; level <= lastLevel; level++) {
-        for (const capabilities of variants) for (const phase of planSearch(level, capabilities).phases) labels.add(phase.label);
+        for (const capabilities of variants) for (const stage of [0, 1, 2]) for (const phase of planSearch(level, capabilities, stage).phases) labels.add(phase.label);
     }
     return [...labels].sort();
 }

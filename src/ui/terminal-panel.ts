@@ -16,7 +16,9 @@ import { createElement, createTitleBar, setText } from './dom.ts';
 import type { Panel } from './panel.ts';
 
 const warningNotices: ReadonlySet<NoticeId> = new Set<NoticeId>(['firstRateLimit', 'firstBan', 'firstProxyDeath']);
-const slowResponses: Readonly<Partial<Record<SlowReason, number>>> = { credentials: 401, userAgent: 403, wildcard: 200 };
+const hitResponse = 200;
+const loginResponse = 401;
+const slowResponses: Readonly<Partial<Record<SlowReason, number>>> = { credentials: loginResponse, userAgent: 403, wildcard: hitResponse };
 const missResponse = 404;
 const userAgentPassesEvery = 10;
 const commandTemplates = [terminalText.curlCommand, terminalText.toolCommand, terminalText.gobusterCommand, terminalText.toolCommand, terminalText.toolCommand];
@@ -43,6 +45,8 @@ export class TerminalPanel implements Panel {
     private lastSampledRequests = 0;
     private sampleIndex = 0;
     private wasGuessing = false;
+    private lastSearch: { level: number; stage: number; finds: SearchPlan['finds'] } = { level: 0, stage: 0, finds: 'level' };
+    private lastStep = { requestsSpent: 0, at: 0 };
 
     constructor(game: Game) {
         this.game = game;
@@ -69,22 +73,32 @@ export class TerminalPanel implements Panel {
         const { phase, spent } = currentPhase(plan, game.state.search.requestsSpent);
         const rate = effectiveRate(game);
         setText(this.rate, `${formatNumber(rate)} ${uiText.requests}`);
-        const folder = plan.folder === null ? '/' : `/${plan.folder}/`;
+        const folder = plan.base;
+        this.announceFind(plan);
         const command = this.commandText(phase, folder);
         setText(this.command, command);
         this.command.title = command;
         const footer = this.footerText(plan, phase, spent, rate);
         setText(this.footer, footer);
         this.footer.title = footer;
-        const guessing = phase?.guessedWithout !== undefined;
+        const guessing = phase?.guessing === true;
         if (guessing && !this.wasGuessing) this.queueLine(notices.bruteForce, 'warning');
         this.wasGuessing = guessing;
         this.footer.classList.toggle('warning', isBanned(game) || plan.slowedBy !== null || guessing);
         this.progress.style.width = `${phase ? Math.min(100, spent / phase.size * 100) : 0}%`;
         const searched = phase !== undefined && plan.speed > 0 && !isBanned(game) && dirbustingScripts(game) > 0 && rate > 0 ? phase : null;
         const request = (index: number): string => this.requestAddress(searched, index, folder);
-        setText(this.live, searched ? `${terminalText.testing} ${request(spent)}` : '');
-        this.emitLine(plan, rate, seconds, () => request(Math.max(0, spent - 1)));
+        const reached = spent + this.underway(rate * game.stat('searchEfficiency') * plan.speed);
+        setText(this.live, searched ? `${terminalText.testing} ${request(reached)}` : '');
+        this.emitLine(plan, rate, seconds, () => request(Math.max(0, reached - 1)));
+    }
+
+    // The game moves the search on a few times a second. In between, DirBuster is somewhere among the requests of the next step.
+    private underway(requestsPerSecond: number): number {
+        const { requestsSpent } = this.game.state.search;
+        const now = performance.now();
+        if (requestsSpent !== this.lastStep.requestsSpent) this.lastStep = { requestsSpent, at: now };
+        return requestsPerSecond * Math.min(this.game.content.tickSeconds ?? 0, (now - this.lastStep.at) / 1000);
     }
 
     private renderBooting(): void {
@@ -94,6 +108,17 @@ export class TerminalPanel implements Panel {
         this.footer.classList.remove('warning');
         this.progress.style.width = '0%';
         this.lastLineAt = performance.now();
+    }
+
+    // A folder or a login page that DirBuster finds on the way to a level gets a line of its own.
+    private announceFind(plan: SearchPlan): void {
+        const { currentLevel, search } = this.game.state;
+        const previous = this.lastSearch;
+        if (currentLevel === previous.level && search.stage > previous.stage) {
+            if (previous.finds === 'login') this.queueLine(`${loginResponse}  ${plan.base}`, 'warning');
+            else this.queueLine(`${hitResponse}  ${plan.base}`, 'hit');
+        }
+        this.lastSearch = { level: currentLevel, stage: search.stage, finds: plan.finds };
     }
 
     private commandText(phase: SearchPhase | undefined, folder: string): string {
@@ -107,9 +132,9 @@ export class TerminalPanel implements Panel {
         if (dirbustingScripts(game) === 0) return uiText.paused;
         if (plan.speed === 0) return terminalText.unguessable;
         if (phase === undefined) return uiText.waiting;
+        if (phase.guessing) return fill(terminalText.guessing, { reason: terminalText.outOfWordlists, tried: formatNumber(spent) });
         const time = formatDuration((phase.size - spent) / Math.max(0.001, rate * game.stat('searchEfficiency') * plan.speed));
         if (plan.slowedBy !== null) return fill(terminalText.slowProgress, { reason: terminalText.slow[plan.slowedBy], time });
-        if (phase.guessedWithout !== undefined) return fill(terminalText.slowProgress, { reason: terminalText.outOfWordlists, time });
         return fill(terminalText.progress, { list: phase.label, tried: formatNumber(spent), total: formatNumber(phase.size), time });
     }
 
@@ -148,6 +173,7 @@ export class TerminalPanel implements Panel {
             this.sampleIndex = 0;
             this.lastSampledRequests = 0;
             this.wasGuessing = false;
+            this.lastSearch = { level: 0, stage: 0, finds: 'level' };
             this.lastLineAt = performance.now();
             return;
         }

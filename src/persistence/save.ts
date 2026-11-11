@@ -1,6 +1,6 @@
 import type { GameState } from '../core/state.ts';
 
-export const currentSaveVersion = 9;
+export const currentSaveVersion = 10;
 
 export const saveErrorText = {
     newerVersion: 'This save comes from a newer version of the game (save version {version}).',
@@ -54,7 +54,7 @@ const stateChecks: Readonly<Record<keyof GameState, ValueCheck>> = {
     jobs: recordOf(nonnegativeInteger),
     findings: recordOf(nonnegativeInteger),
     activity: text,
-    search: (value) => optionalFields(value, { requestsSpent: nonnegativeNumber, configuration: text }),
+    search: (value) => optionalFields(value, { stage: nonnegativeInteger, requestsSpent: nonnegativeNumber, configuration: text }),
     network: (value) => optionalFields(value, {
         heat: nonnegativeNumber,
         bannedUntil: nonnegativeNumber,

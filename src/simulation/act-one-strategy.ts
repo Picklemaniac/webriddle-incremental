@@ -1,4 +1,4 @@
-import { currentSearch, missingNow } from '../content/act-one/automation.ts';
+import { currentSearch } from '../content/act-one/automation.ts';
 import {
     activities, activityRate, assignedScripts, dirbustingScripts, incomePerSecond, isJobUnlocked, isResourceRevealed, jobs, scriptSlots, type ActivityId, type JobId,
 } from '../content/act-one/economy.ts';
@@ -83,7 +83,7 @@ function decisionMemory(memories: WeakMap<Game, DecisionMemory>, game: Game, dec
 
 function buyUpgrades(game: Game): { readonly acted: boolean; readonly offered: readonly Upgrade[] } {
     const { state } = game;
-    const missing = missingNow(game);
+    const { missing } = currentSearch(game);
     const capped = requestedRate(game) >= networkCapacity(game);
     const needsMoreScripts = networkCapacity(game) > requestsPerScript(game);
     const priority = (item: Upgrade): number => {
@@ -204,8 +204,8 @@ function isStuck(game: Game): boolean {
     const plan = currentSearch(game);
     if (plan.speed === 0) return true;
     const { phase, spent } = currentPhase(plan, game.state.search.requestsSpent);
-    const requestsLeft = phase === undefined ? 0 : phase.size - spent;
-    return requestsLeft / Math.max(1, effectiveRate(game) * game.stat('searchEfficiency') * plan.speed) > stuckSearchSeconds;
+    if (phase === undefined) return false;
+    return phase.guessing === true || (phase.size - spent) / Math.max(1, effectiveRate(game) * game.stat('searchEfficiency') * plan.speed) > stuckSearchSeconds;
 }
 
 function handSolveSeconds(level: number): number {

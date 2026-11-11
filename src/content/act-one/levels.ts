@@ -9,7 +9,7 @@ import { alternateFiles, clueLines, fill, handcraftedText, linkedFiles, pageText
 import { rankOfWord, vocabularySize, wordAtRank } from './vocabulary.ts';
 import { answerNames, folderNames, latinWords } from './word-lists.ts';
 
-export type EntranceKind = 'fixed' | 'word' | 'extension' | 'name' | 'leet' | 'number' | 'credentials' | 'twoWords' | 'phrase'
+type EntranceKind = 'fixed' | 'word' | 'extension' | 'name' | 'leet' | 'number' | 'credentials' | 'twoWords' | 'phrase'
     | 'capitals' | 'reversed' | 'backup' | 'date' | 'latin' | 'subdomain';
 type GeneratedKind = Exclude<EntranceKind, 'fixed'>;
 
@@ -81,6 +81,8 @@ export const firstGeneratedLevel = 11;
 const firstFolderLevel = 100;
 const commonWordShare = 0.25;
 const commonWordRanks = 300;
+// A name that needs a rule, such as another ending or capitals, is one of the commonest words. DirBuster only tries its rules on the wordlists that have those.
+export const ruleWordRanks = 900;
 const levelsPerFolder = 100;
 const untitledShare = 0.3;
 
@@ -139,7 +141,18 @@ export function urlOfLevel(level: number): string {
     return level <= 1 ? startUrl : entrance(level).url;
 }
 
-export function folderFor(level: number): string | null {
+// The folder DirBuster was in before this level. A level on its own subdomain does not move it.
+export function folderBefore(level: number): string | null {
+    let previous = level - 1;
+    while (previous >= firstSubdomainLevel && chooseKind(previous) === 'subdomain') previous--;
+    return folderFor(previous);
+}
+
+export function isWildcardFolder(folder: string | null): boolean {
+    return folder !== null && wildcardFolders.has(folder);
+}
+
+function folderFor(level: number): string | null {
     if (level < firstFolderLevel) {
         return null;
     }
@@ -261,7 +274,7 @@ function generatedEntrance(level: number, attempt: number): Entrance {
             return buildEntrance(level, { kind, answer: word, clue: wordClue(level, word, wordPageName, true, recent), folder });
         }
         case 'extension': {
-            const word = sampleWord(level, unit(salts.rank));
+            const word = sampleRuleWord(level, unit(salts.rank));
             const extension = pickByUnit(otherExtensions, unit(salts.extension));
             const wordHint = wordClue(level, word, wordPageName, false, recent);
             const ending = showsLine(level, firstExtensionLevel) ? [pickByUnit(clueLines.extension, unit(salts.ending))] : [];
@@ -273,7 +286,7 @@ function generatedEntrance(level: number, attempt: number): Entrance {
             return buildEntrance(level, { kind, answer: name, clue: wordClue(level, name, wordPageName, true, recent), folder });
         }
         case 'leet': {
-            const word = sampleWord(level, unit(salts.rank));
+            const word = sampleRuleWord(level, unit(salts.rank));
             const answer = toLeet(word, unit(salts.leet));
             const clue = encodedClue(answer, leetEncodingFor(unit(salts.encoding), recent), level, unit(salts.clue));
             return buildEntrance(level, { kind, answer, words: [word], clue, folder });
@@ -299,7 +312,7 @@ function generatedEntrance(level: number, attempt: number): Entrance {
             return buildEntrance(level, { kind, answer: `${first}${second}`, words: [first, second], clue, folder });
         }
         case 'capitals': {
-            const word = sampleWord(level, unit(salts.rank));
+            const word = sampleRuleWord(level, unit(salts.rank));
             const answer = word.toUpperCase();
             return buildEntrance(level, { kind, answer, words: [word], clue: encodedClue(answer, caseEncodingFor(unit(salts.encoding), recent), level, unit(salts.clue)), folder });
         }
@@ -310,7 +323,7 @@ function generatedEntrance(level: number, attempt: number): Entrance {
             return buildEntrance(level, { kind, answer, words: [word], clue, folder });
         }
         case 'backup': {
-            const word = sampleWord(level, unit(salts.rank));
+            const word = sampleRuleWord(level, unit(salts.rank));
             const extension = `htm.${pickByUnit(backupEndings, unit(salts.extension))}`;
             const wordHint = wordClue(level, word, wordPageName, false, recent);
             const ending = showsLine(level, firstBackupLevel) ? [pickByUnit(clueLines.backup, unit(salts.ending))] : [];
@@ -329,7 +342,7 @@ function generatedEntrance(level: number, attempt: number): Entrance {
             return buildEntrance(level, { kind, answer: word, clue: encodedClue(word, textEncodingFor(level, unit(salts.encoding), recent), level, unit(salts.clue)), folder });
         }
         case 'subdomain': {
-            const word = sampleWord(level, unit(salts.rank));
+            const word = sampleRuleWord(level, unit(salts.rank));
             const hint = encodedClue(word, textEncodingFor(level, unit(salts.encoding), recent), level, unit(salts.clue));
             const lines = showsLine(level, firstSubdomainLevel) ? [pickByUnit(clueLines.subdomain, unit(salts.ending))] : [];
             return buildEntrance(level, { kind, answer: word, clue: { ...hint, lines: [...(hint.lines ?? []), ...lines] }, folder });
@@ -426,14 +439,18 @@ function maximumRank(level: number): number {
     return Math.min(vocabularySize, Math.max(200, Math.round(120 * (level / 30) ** 1.25)));
 }
 
-function sampleWord(level: number, unit: number): string {
-    return wordAtRank(Math.max(1, Math.floor(maximumRank(level) * unit ** 1.4)));
+function sampleWord(level: number, unit: number, highestRank = vocabularySize): string {
+    return wordAtRank(Math.max(1, Math.floor(Math.min(highestRank, maximumRank(level)) * unit ** 1.4)));
+}
+
+function sampleRuleWord(level: number, unit: number): string {
+    return sampleWord(level, unit, ruleWordRanks);
 }
 
 function reversibleWord(level: number, unit: number): string {
-    const rank = rankOfWord(sampleWord(level, unit));
-    for (let offset = 0; offset < vocabularySize; offset++) {
-        const word = wordAtRank(((rank + offset - 1) % vocabularySize) + 1);
+    const rank = rankOfWord(sampleRuleWord(level, unit));
+    for (let offset = 0; offset < ruleWordRanks; offset++) {
+        const word = wordAtRank(((rank + offset - 1) % ruleWordRanks) + 1);
         const backwards = [...word].reverse().join('');
         if (wordAtRank(rankOfWord(backwards)) !== backwards) return word;
     }

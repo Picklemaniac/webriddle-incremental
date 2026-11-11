@@ -16,7 +16,7 @@ const kinds: Readonly<Partial<Record<UpgradeId, SetupKind>>> = {
 };
 
 const downloadFiles: Readonly<Partial<Record<UpgradeId, string>>> = {
-    english10k: 'english-10k.txt', dictWords: 'words', scrabble: 'scrabble.txt', rockyou: 'rockyou.txt', freeProxies: 'proxies.txt', proxyUptime: 'proxies-checked.txt', namesList: 'names.txt', moreLeaks: 'leaks.txt',
+    english10k: 'english-10k.txt', dictWords: 'words', scrabble: 'scrabble.txt', rockyou: 'rockyou-75.txt', freeProxies: 'proxies.txt', proxyUptime: 'proxies-checked.txt', namesList: 'names.txt', moreLeaks: 'leaks.txt',
     usernames: 'usernames.txt', passwords: 'passwords.txt', latinList: 'latin.txt',
 };
 

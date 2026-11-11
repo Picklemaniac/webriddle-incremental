@@ -81,7 +81,7 @@ function createCommands({ game, loop, saveSlots, screen }: DevToolsContext, log:
             game.state.currentLevel = level;
             game.state.browserUrl = urlOfLevel(level);
             game.state.visitedLevels[game.state.browserUrl] = level;
-            game.state.search = { requestsSpent: 0, configuration: '' };
+            game.state.search = { stage: 0, requestsSpent: 0, configuration: '' };
             game.state.captcha = null;
             game.state.network.bannedUntil = 0;
             game.state.network.heat = 0;

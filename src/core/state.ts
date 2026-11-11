@@ -11,6 +11,7 @@ export interface CaptchaChallenge {
 }
 
 interface SearchState {
+    stage: number;
     requestsSpent: number;
     configuration: string;
 }
@@ -68,7 +69,7 @@ export function createInitialState(content: GameContent, seed: number): GameStat
         jobs: {},
         findings: {},
         activity: '',
-        search: { requestsSpent: 0, configuration: '' },
+        search: { stage: 0, requestsSpent: 0, configuration: '' },
         network: { heat: 0, bannedUntil: 0, proxies: [], rentedAddresses: 0, knownRentable: 0, rentShare: 1 },
         captcha: null,
         favorites: [],

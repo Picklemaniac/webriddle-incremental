@@ -100,25 +100,23 @@ describe('Act I onboarding', () => {
         expect(game.state.network.heat).toBeLessThan(5);
     });
 
-    it('introduces data only once DirBuster runs out of words.txt', () => {
+    it('introduces data only once DirBuster has found an answer that is not in words.txt', () => {
         const game = startAutomation();
         Object.assign(game.state.flags, { 'seen:curlBatch': true, insightRevealed: true, moneyRevealed: true });
         game.state.purchases.fakeUserAgent = 1;
         game.advance(60);
         expect(isUpgradeRevealed(game.state, 'english10k')).toBe(false);
-        const lacksList = (level: number): boolean => planSearch(level, searchCapabilities(game.state)).phases.at(-1)?.guessedWithout?.includes('english10k') === true;
-        const needsList = Array.from({ length: 200 }, (_, index) => index + 30).find(lacksList)!;
-        game.state.currentLevel = needsList - 1;
-        game.advance(60);
-        expect(game.state.flags.wordlistExhausted).not.toBe(true);
-        expect(isUpgradeRevealed(game.state, 'english10k')).toBe(false);
+        const isGuessed = (level: number): boolean => planSearch(level, searchCapabilities(game.state)).learns.includes('english10k');
+        const guessedLevel = Array.from({ length: 200 }, (_, index) => index + 30).find(isGuessed)!;
+        game.state.currentLevel = guessedLevel - 1;
         let cardSecond: number | undefined;
         let second = 0;
-        for (; second < 900 && game.state.flags.dataRevealed !== true; second++) {
+        for (; second < 3600 && game.state.flags.dataRevealed !== true; second++) {
+            if (game.state.currentLevel < guessedLevel) expect(isUpgradeRevealed(game.state, 'english10k')).toBe(false);
             game.advance(1);
             if (cardSecond === undefined && isUpgradeRevealed(game.state, 'english10k')) cardSecond = second;
         }
-        expect(game.state.flags.wordlistExhausted).toBe(true);
+        expect(game.state.currentLevel).toBeGreaterThanOrEqual(guessedLevel);
         expect(game.state.flags.dataRevealed).toBe(true);
         expect(second - cardSecond!).toBeGreaterThanOrEqual(6);
     });

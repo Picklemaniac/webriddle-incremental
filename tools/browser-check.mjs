@@ -332,21 +332,35 @@ try {
     assert.notEqual(puzzled.state.purchases.namesList, 1);
     puzzled.state.currentLevel = unknownKind - 1;
     puzzled.state.browserUrl = urlOfLevel(unknownKind - 1);
-    puzzled.state.search = { requestsSpent: 0, configuration: '' };
+    puzzled.state.search = { stage: 0, requestsSpent: 0, configuration: '' };
     await importGame(puzzled);
     const saysNoWordlistMatches = `[...document.querySelectorAll('.terminal-line')].some((line) => line.textContent.includes('no wordlist matches'))`;
     await waitFor(`/: \\S+ of \\S+ tried, about /.test(document.querySelector('.terminal-footer').textContent)`);
-    assert.equal(await evaluate(saysNoWordlistMatches), false, 'DirBuster tries its wordlists before it says that none of them has the name');
+    assert.equal(await evaluate(saysNoWordlistMatches), false, 'DirBuster makes its passes before it says that no wordlist has the name');
     const guessedPlan = planSearch(unknownKind, searchCapabilities(puzzled.state));
-    const wordlistRequests = guessedPlan.phases.filter((phase) => phase.guessedWithout === undefined).reduce((sum, phase) => sum + phase.size, 0);
-    assert.ok(wordlistRequests >= 10_000 && guessedPlan.hitAt > wordlistRequests, 'The search runs through every wordlist before it guesses');
-    puzzled.state.search = { requestsSpent: wordlistRequests - 1, configuration: guessedPlan.signature };
+    const passRequests = guessedPlan.phases.filter((phase) => phase.guessing === undefined).reduce((sum, phase) => sum + phase.size, 0);
+    assert.ok(passRequests >= 10_000 && guessedPlan.hitAt > passRequests, 'The search makes every pass before it guesses');
+    const plainLevel = Array.from({ length: 50 }, (_, index) => unknownKind + 1 + index).find((level) => entrance(level).kind === 'word' && entrance(level).folder === entrance(level - 1).folder);
+    assert.deepEqual(planSearch(plainLevel, searchCapabilities(puzzled.state)).phases.filter((phase) => phase.guessing === undefined).map((phase) => phase.label),
+        guessedPlan.phases.slice(0, -1).map((phase) => phase.label), 'The passes are the same on a level with a name of an unknown kind as on any other level');
+    puzzled.state.search = { stage: 0, requestsSpent: passRequests - 1, configuration: guessedPlan.signature };
     await importGame(puzzled);
-    await waitFor(`document.querySelector('.terminal-footer').textContent.startsWith('No wordlist has this name, about ')`);
+    await waitFor(`/^No wordlist has this name, \\S+ guesses so far$/.test(document.querySelector('.terminal-footer').textContent)`);
     await waitFor(saysNoWordlistMatches);
-    await waitFor(`/^--> Testing: \\/([a-z0-9]+\\/)?[a-z]+\\.htm$/.test(document.querySelector('.terminal-line.live').textContent)`);
+    await waitFor(`/^--> Testing: \\/([a-z0-9]+\\/)?[a-z0-9]{3,8}\\.htm$/.test(document.querySelector('.terminal-line.live').textContent)`);
     assert.equal(await evaluate(`[...document.querySelectorAll('.upgrade-card')].some((card) => !card.hidden && card.dataset.upgrade === 'namesList')`), false, 'A kind of answer is not known before one is found');
     await screenshot('unknown-kind', false);
+
+    const moving = game.clone();
+    moving.state.currentLevel = 299;
+    moving.state.browserUrl = urlOfLevel(299);
+    moving.state.search = { stage: 0, requestsSpent: 0, configuration: '' };
+    const folderPlan = planSearch(300, searchCapabilities(moving.state));
+    assert.deepEqual([folderPlan.finds, folderPlan.base], ['folder', '/basalt/'], 'DirBuster looks for a new folder from the folder it is in');
+    await importGame(moving);
+    await waitFor(`[...document.querySelectorAll('.terminal-line')].some((line) => line.textContent === '200  /cinder/')`);
+    assert.ok(await evaluate(`document.querySelector('.terminal-command').textContent.includes('/cinder/')`), 'DirBuster searches inside the folder it has found');
+    await screenshot('new-folder', false);
 
     /** @type {number[]} */
     const credentialCandidates = Array.from({ length: 300 }, (_, index) => 500 + index);
@@ -379,7 +393,7 @@ try {
     await evaluate(`document.querySelector('.dashboard').scrollIntoView()`);
     await screenshot('dashboard-narrow', false);
     assert.deepEqual(problems, [], 'Browser errors');
-    console.log('Browser checks passed: opening puzzles, navigation, source, hidden text, automate, favorites, save import/export, mature UI, the rent slider, going broke and Throttle, a slowing wall, an unknown kind of answer, worker widths, dev visibility, captcha, credentials, and narrow layout.');
+    console.log('Browser checks passed: opening puzzles, navigation, source, hidden text, automate, favorites, save import/export, mature UI, the rent slider, going broke and Throttle, a slowing wall, an unknown kind of answer, a new folder, worker widths, dev visibility, captcha, credentials, and narrow layout.');
     console.log(`Screenshots: ${outputDirectory}`);
 } finally {
     if (socket?.readyState === WebSocket.OPEN) {

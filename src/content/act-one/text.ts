@@ -220,7 +220,7 @@ export const upgradeText = {
     proxyPool: { name: 'Larger proxy pool', description: 'Six more free proxies.' },
     cable: { name: 'Cable internet', description: 'Internet over the TV cable, three times as fast as ADSL.' },
     mutationRules: { name: 'Mutation rules', description: 'DirBuster also tries each word with digits for letters, like l1ght.' },
-    rockyou: { name: 'rockyou.txt', description: 'A list of 14,344,391 leaked passwords. It has words with several digits in them, like l1gh7.' },
+    rockyou: { name: 'rockyou-75.txt', description: 'The 59,187 most used passwords from the RockYou leak. It has words with several digits in them, like l1gh7.' },
     server: { name: 'Server', description: 'A server under your desk that runs four more scripts.' },
     scrabble: { name: 'scrabble.txt', description: 'Every word allowed in Scrabble, 279,496 in total.' },
     rentedAddresses: { name: 'Rented IP addresses', description: 'Lets you rent up to 32 IP addresses. You pay rent for the ones you use, and they never stop working.' },
@@ -240,6 +240,7 @@ export const upgradeText = {
     capitalRule: { name: 'Capitals rule', description: 'DirBuster also tries each name in capital letters, like LIGHT.' },
     reverseRule: { name: 'Reverse rule', description: 'DirBuster also tries each word backwards, like thgil.' },
     backupExtensions: { name: 'Backup extensions', description: 'DirBuster also tries the copies that editors leave behind, like light.htm.bak.' },
+    numberRanges: { name: 'Number ranges', description: 'DirBuster also tries every number from 0000 to 9999.' },
     dateFormats: { name: 'Date formats', description: 'DirBuster also tries every date from 1000 to 2099, like 14071789.' },
     latinList: { name: 'latin.txt', description: 'A Latin dictionary with every form of every word, 400,000 in total.' },
     subdomainScan: { name: 'Subdomain scan', description: 'DirBuster also tries each word as a subdomain, like light.notfinite.net.' },
@@ -247,7 +248,7 @@ export const upgradeText = {
     webCrawler: { name: 'Web crawler', description: 'A crawler that follows links on its own and doubles the data you collect again.' },
     secondAddressBlock: { name: 'Second address block', description: 'Lets you rent another 128 IP addresses.' },
     dedicatedServer: { name: 'Dedicated server', description: 'A rented server in a data center that runs four more scripts.' },
-    moreLeaks: { name: 'More leaked passwords', description: 'Another leak with 20 million passwords. It has the words with digits that rockyou.txt misses.' },
+    moreLeaks: { name: 'More leaked passwords', description: 'Another leak with 250,000 passwords. It has the words with digits that rockyou-75.txt misses.' },
     leasedRange: { name: 'Leased address range', description: 'Lets you rent 256 more IP addresses.' },
     helpdeskManager: { name: 'Help desk manager', description: 'Another promotion that doubles your pay again.' },
     customFuzzer: { name: 'Your own fuzzer', description: 'A fuzzer you wrote yourself. It is faster than ffuf.' },
@@ -457,6 +458,7 @@ export const terminalText = {
     },
     outOfWordlists: 'No wordlist has this name',
     slowProgress: '{reason}, about {time} left',
+    guessing: '{reason}, {tried} guesses so far',
 } as const;
 
 export const searchText = {
