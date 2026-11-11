@@ -1,7 +1,7 @@
 import type { GameSystem } from '../../core/content.ts';
 import type { Game } from '../../core/game.ts';
 import { entrance, type EntranceKind } from './levels.ts';
-import { answeredRate, sentRate } from './network.ts';
+import { effectiveRate } from './network.ts';
 import { automationBootSeconds, automationElapsed, increment, noticeOnce, solveLevel } from './progress.ts';
 import { capabilitySignature, planSearch, searchCapabilities, type SearchPlan } from './search.ts';
 const wordlistKinds: ReadonlySet<EntranceKind> = new Set<EntranceKind>(['word', 'extension', 'credentials']);
@@ -23,9 +23,9 @@ export const dirbuster: GameSystem = {
     update(game, deltaSeconds) {
         const { state } = game;
         if (!state.flags.automated || automationElapsed(state) < automationBootSeconds) return;
-        const rate = answeredRate(game);
+        const rate = effectiveRate(game);
         if (rate === 0) return;
-        increment(state, 'requestsSent', sentRate(game) * deltaSeconds);
+        increment(state, 'requestsSent', rate * deltaSeconds);
         let budget = rate * game.stat('searchEfficiency') * deltaSeconds;
         for (let solved = 0; solved < 100 && budget > 0; solved++) {
             const target = entrance(state.currentLevel + 1);

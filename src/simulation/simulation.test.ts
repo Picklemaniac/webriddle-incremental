@@ -91,7 +91,7 @@ describe('Act I pacing', () => {
         expect(report.offlineProgressShare).toBe(0);
     });
 
-    it('still finishes for a player who never touches the request rate or the rent', () => {
+    it('still finishes for a player who never touches the rent', () => {
         const report = simulatePlayer(handsOffProfile, actOneContent, { days: 1, seed: 1, stepSeconds: 1 });
         expect(milestoneTiming(report, 'level1000')?.activeSeconds).toBeLessThan(5 * 3600);
         expect(report.upgradesPurchased).toBe(upgrades.filter((item) => item.id !== 'crackHtpasswd').length);

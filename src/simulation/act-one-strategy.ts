@@ -3,9 +3,7 @@ import {
     activities, activityRate, assignedScripts, dirbustingScripts, incomePerSecond, isJobUnlocked, isResourceRevealed, jobs, scriptSlots, type ActivityId, type JobId,
 } from '../content/act-one/economy.ts';
 import { entrance, entranceAction } from '../content/act-one/levels.ts';
-import {
-    answeredPerAddress, answeredRate, highestRatePerAddress, isAdaptive, liveProxies, rentPerSecond, requestedRate, serverTolerance,
-} from '../content/act-one/network.ts';
+import { effectiveRate, isThrottled, liveProxies, networkCapacity, rentPerSecond, requestedRate, requestsPerAddress } from '../content/act-one/network.ts';
 import { automationLevel, isUpgradeRevealed, owns } from '../content/act-one/progress.ts';
 import { currentPhase } from '../content/act-one/search.ts';
 import { capacityUpgrades, offeredUpgrades, upgrades, type Upgrade } from '../content/act-one/upgrades.ts';
@@ -15,7 +13,7 @@ import type { Strategy } from './strategies.ts';
 
 export type PlayStyle = 'attentive' | 'handsOff' | 'purist';
 
-interface DecisionMemory { level: number; handSeconds: number; captchaSeconds: number; tuneSeconds: number }
+interface DecisionMemory { level: number; handSeconds: number; captchaSeconds: number }
 
 const incomeStats: ReadonlySet<string> = new Set(['workRate', 'ticketBotRate', 'scourRate', 'scraperRate', 'riddleRate', 'riddleBotRate', 'scriptSlots', 'addressRent']);
 const requestStats: ReadonlySet<string> = new Set(['threadsPerScript', 'requestsPerThread']);
@@ -31,7 +29,6 @@ const solveSecondsPerRootLevel = 3;
 const stuckSearchSeconds = 180;
 const minimumIncomePerSecond = 0.001;
 const longestWaitSeconds = 3600;
-const rateTuningSeconds = 40;
 const savingRentShare = 0.35;
 const burnSeconds = 300;
 const rentStepShare = 0.05;
@@ -60,11 +57,6 @@ export function actOneStrategy(decisionIntervalSeconds: number, style: PlayStyle
                 if (style === 'attentive') acted = chooseRent(game, purchases.offered) || acted;
                 acted = assignScripts(game) || acted;
                 acted = replaceDeadProxies(game) || acted;
-                memory.tuneSeconds += decisionIntervalSeconds;
-                if (style === 'attentive' && memory.tuneSeconds >= rateTuningSeconds) {
-                    memory.tuneSeconds = 0;
-                    acted = tuneRate(game) || acted;
-                }
             }
             if ((purist || !state.flags.automated || isStuck(game)) && memory.handSeconds >= handSolveSeconds(state.currentLevel)) {
                 memory.handSeconds = 0;
@@ -78,7 +70,7 @@ export function actOneStrategy(decisionIntervalSeconds: number, style: PlayStyle
 function decisionMemory(memories: WeakMap<Game, DecisionMemory>, game: Game, decisionIntervalSeconds: number): DecisionMemory {
     let memory = memories.get(game);
     if (!memory) {
-        memory = { level: game.state.currentLevel, handSeconds: 0, captchaSeconds: 0, tuneSeconds: rateTuningSeconds };
+        memory = { level: game.state.currentLevel, handSeconds: 0, captchaSeconds: 0 };
         memories.set(game, memory);
     }
     if (memory.level !== game.state.currentLevel) {
@@ -92,8 +84,8 @@ function decisionMemory(memories: WeakMap<Game, DecisionMemory>, game: Game, dec
 function buyUpgrades(game: Game): { readonly acted: boolean; readonly offered: readonly Upgrade[] } {
     const { state } = game;
     const { slowedBy } = currentSearch(game);
-    const capped = requestedRate(game) >= serverTolerance(game);
-    const needsMoreScripts = serverTolerance(game) > requestsPerScript(game);
+    const capped = requestedRate(game) >= networkCapacity(game);
+    const needsMoreScripts = networkCapacity(game) > requestsPerScript(game);
     const priority = (item: Upgrade): number => {
         if ((item.fixes !== undefined && item.fixes === slowedBy) || (capped && capacityUpgrades.has(item.id))) return urgentPriority;
         const stats = (item.modifiers?.(1) ?? []).map((modifier) => modifier.statId);
@@ -113,12 +105,6 @@ function buyUpgrades(game: Game): { readonly acted: boolean; readonly offered: r
     return { acted, offered };
 }
 
-function tuneRate(game: Game): boolean {
-    if (game.state.flags.networkRevealed !== true || isAdaptive(game)) return false;
-    const rate = Math.max(1, Math.min(highestRatePerAddress(game), Math.floor(answeredPerAddress(game))));
-    return game.dispatch({ type: 'setRatePerAddress', rate });
-}
-
 function chooseRent(game: Game, offered: readonly Upgrade[]): boolean {
     const { state } = game;
     const rentable = game.stat('rentableAddresses');
@@ -127,7 +113,7 @@ function chooseRent(game: Game, offered: readonly Upgrade[]): boolean {
     const income = incomePerSecond(game, 'money');
     const saving = offered.some((item) => (item.price.money ?? 0) > money);
     const budget = saving ? income * savingRentShare : income + money / burnSeconds;
-    const useful = maximumSearchers(game) * requestsPerScript(game) / answeredPerAddress(game) - 1 - liveProxies(game);
+    const useful = maximumSearchers(game) * requestsPerScript(game) / requestsPerAddress - 1 - liveProxies(game);
     const target = Math.max(0, Math.min(rentable, Math.floor(budget / game.stat('addressRent')), Math.ceil(useful)));
     if (Math.abs(target - state.network.rentedAddresses) < Math.max(1, rentable * rentStepShare) && target !== rentable && target !== 0) return false;
     return game.dispatch({ type: 'setRentedAddresses', count: target });
@@ -143,8 +129,8 @@ function maximumSearchers(game: Game): number {
 
 function assignScripts(game: Game): boolean {
     const slots = scriptSlots(game);
-    const scriptsToFillLimit = serverTolerance(game) / requestsPerScript(game);
-    const searchers = Math.min(maximumSearchers(game), Math.max(1, Math.ceil(scriptsToFillLimit)));
+    const scriptsToFillLimit = networkCapacity(game) / requestsPerScript(game);
+    const searchers = Math.min(maximumSearchers(game), Math.max(1, isThrottled(game) ? Math.ceil(scriptsToFillLimit) : Math.floor(scriptsToFillLimit)));
     const targets = jobTargets(game, slots - searchers);
     let acted = false;
     for (const job of jobs) {
@@ -219,7 +205,7 @@ function isStuck(game: Game): boolean {
     if (plan.speed === 0) return true;
     const { phase, spent } = currentPhase(plan, game.state.search.requestsSpent);
     const requestsLeft = phase === undefined ? 0 : phase.size - spent;
-    return requestsLeft / Math.max(1, answeredRate(game) * game.stat('searchEfficiency') * plan.speed) > stuckSearchSeconds;
+    return requestsLeft / Math.max(1, effectiveRate(game) * game.stat('searchEfficiency') * plan.speed) > stuckSearchSeconds;
 }
 
 function handSolveSeconds(level: number): number {

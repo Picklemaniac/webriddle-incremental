@@ -5,7 +5,7 @@ export type Action =
     | { readonly type: 'automate' }
     | { readonly type: 'setActivity'; readonly activity: string }
     | { readonly type: 'checkIn' }
-    | { readonly type: 'setRatePerAddress'; readonly rate: number }
+    | { readonly type: 'setThrottle'; readonly enabled: boolean }
     | { readonly type: 'setRentedAddresses'; readonly count: number }
     | { readonly type: 'assignJob'; readonly jobId: string; readonly change: number }
     | { readonly type: 'replaceProxy'; readonly proxyIndex: number }

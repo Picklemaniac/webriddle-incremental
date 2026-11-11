@@ -1,28 +1,18 @@
 import type { GameSystem } from '../../core/content.ts';
 import type { Game } from '../../core/game.ts';
-import type { GameState } from '../../core/state.ts';
 import { createCaptcha } from './captchas.ts';
 import { dirbustingScripts, incomePerSecond, incomeWhileEarning, isAway } from './economy.ts';
 import { increment, noticeOnce, owns } from './progress.ts';
 import { upgrades } from './upgrades.ts';
 
-export type ServerLoad = 'quiet' | 'normal' | 'busy';
-
+export const requestsPerAddress = 10;
 export const ownAddress = '203.0.113.24';
 const banSeconds = 300;
-const heatPerOvershoot = 3;
+const heatPerExcessRatio = 3;
 const coolingPerSecond = 3;
-const backOffHeat = 60;
-const resumeHeat = 30;
-const adaptiveMargin = 0.95;
 const newBlockRentedShare = 0.5;
 const startingRentShareOfIncome = 0.3;
 const proxySeconds = 180;
-const highestRateFactor = 2;
-const trafficSettleSeconds = 60;
-const trafficWaves: readonly { readonly periodSeconds: number; readonly swing: number }[] = [{ periodSeconds: 900, swing: 0.22 }, { periodSeconds: 340, swing: 0.08 }];
-const busyBelow = 0.85;
-const quietAbove = 1.15;
 
 export function liveProxies(game: Game): number {
     return game.state.network.proxies.filter((proxy) => proxy.diesAtSeconds > game.state.elapsedSeconds).length;
@@ -36,32 +26,8 @@ export function addressCount(game: Game): number {
     return 1 + liveProxies(game) + rentedInUse(game);
 }
 
-export function trafficFactor(state: GameState): number {
-    const revealedAt = state.statistics.networkRevealedAt;
-    const seconds = revealedAt === undefined ? 0 : state.elapsedSeconds - revealedAt - trafficSettleSeconds;
-    if (seconds <= 0) return 1;
-    return trafficWaves.reduce((factor, wave) => factor - wave.swing * Math.sin(2 * Math.PI * seconds / wave.periodSeconds), 1);
-}
-
-export function serverLoad(state: GameState): ServerLoad {
-    const factor = trafficFactor(state);
-    return factor < busyBelow ? 'busy' : factor > quietAbove ? 'quiet' : 'normal';
-}
-
-export function answeredPerAddress(game: Game): number {
-    return game.stat('requestsPerAddress') * trafficFactor(game.state);
-}
-
-export function highestRatePerAddress(game: Game): number {
-    return game.stat('requestsPerAddress') * highestRateFactor;
-}
-
-export function ratePerAddress(game: Game): number {
-    return game.stat('requestsPerAddress') + game.state.network.rateChange;
-}
-
-export function serverTolerance(game: Game): number {
-    return addressCount(game) * answeredPerAddress(game);
+export function networkCapacity(game: Game): number {
+    return requestsPerAddress * addressCount(game);
 }
 
 export function rentPerSecond(game: Game): number {
@@ -87,29 +53,19 @@ export function isBanned(game: Game): boolean {
     return game.state.network.bannedUntil > game.state.elapsedSeconds;
 }
 
-export function isAdaptive(game: Game): boolean {
-    return owns(game.state, 'adaptiveRate');
+export function isThrottled(game: Game): boolean {
+    return owns(game.state, 'throttle') && game.state.flags.throttleOff !== true;
 }
 
-export function sentRate(game: Game): number {
+export function effectiveRate(game: Game): number {
     if (isBanned(game)) return 0;
-    const requested = requestedRate(game);
-    const tolerance = serverTolerance(game);
-    if (game.state.flags.networkRevealed !== true) return Math.min(requested, tolerance);
-    if (isAdaptive(game)) return Math.min(requested, tolerance * adaptiveMargin);
-    const limited = Math.min(requested, ratePerAddress(game) * addressCount(game));
-    return game.state.flags.backingOff === true ? Math.min(limited, tolerance) : limited;
+    const capped = isThrottled(game) || game.state.flags.networkRevealed !== true;
+    return capped ? Math.min(requestedRate(game), networkCapacity(game)) : requestedRate(game);
 }
 
-export function answeredRate(game: Game): number {
-    const sent = sentRate(game);
-    const tolerance = serverTolerance(game);
-    return sent <= tolerance ? sent : tolerance * tolerance / sent;
-}
-
-export function setRatePerAddress(game: Game, rate: number): boolean {
-    if (!Number.isInteger(rate) || rate < 1 || rate > highestRatePerAddress(game) || rate === ratePerAddress(game)) return false;
-    game.state.network.rateChange = rate - game.stat('requestsPerAddress');
+export function setThrottle(game: Game, enabled: boolean): boolean {
+    if (!owns(game.state, 'throttle') || isThrottled(game) === enabled) return false;
+    game.state.flags.throttleOff = !enabled;
     return true;
 }
 
@@ -177,19 +133,14 @@ export const network: GameSystem = {
             game.announce({ type: 'unbanned', byCaptcha: false });
         }
         if (!state.flags.automated || isBanned(game)) return;
-        const tolerance = serverTolerance(game);
-        if (state.flags.networkRevealed !== true) {
-            if (requestedRate(game) <= tolerance) return;
+        const capacity = networkCapacity(game);
+        const excess = Math.max(0, requestedRate(game) - capacity);
+        if (excess > 0) {
             state.flags.networkRevealed = true;
-            state.statistics.networkRevealedAt = state.elapsedSeconds;
+            noticeOnce(game, 'firstRateLimit');
         }
-        const overshoot = Math.max(0, sentRate(game) / tolerance - 1);
-        if (overshoot > 0) noticeOnce(game, 'firstRateLimit');
-        state.network.heat = Math.max(0, state.network.heat + deltaSeconds * (overshoot > 0 ? heatPerOvershoot * overshoot : -coolingPerSecond));
-        if (owns(state, 'throttle')) {
-            if (state.network.heat >= backOffHeat) state.flags.backingOff = true;
-            else if (state.network.heat <= resumeHeat) state.flags.backingOff = false;
-        }
+        const overLimit = excess > 0 && !isThrottled(game);
+        state.network.heat = Math.max(0, state.network.heat + deltaSeconds * (overLimit ? heatPerExcessRatio * excess / capacity : -coolingPerSecond));
         if (state.network.heat >= 100) {
             state.network.heat = 100;
             state.network.bannedUntil = state.elapsedSeconds + banSeconds;

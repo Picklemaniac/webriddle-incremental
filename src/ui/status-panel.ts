@@ -3,8 +3,9 @@ import {
     activities, activityRate, assignedScripts, backlogSeconds, dirbustingScripts, incomePerSecond, isAway, isJobUnlocked, isResourceRevealed, scriptSlots, type ActivityId, type JobId,
 } from '../content/act-one/economy.ts';
 import {
-    addressCount, answeredRate, highestRatePerAddress, isAdaptive, isBanned, liveProxies, ownAddress, ratePerAddress, rentedBlocks, rentedInUse, rentPerSecond, requestedRate, sentRate, serverLoad,
+    addressCount, effectiveRate, isBanned, isThrottled, liveProxies, networkCapacity, ownAddress, rentedBlocks, rentedInUse, rentPerSecond, requestedRate, requestsPerAddress,
 } from '../content/act-one/network.ts';
+import { owns } from '../content/act-one/progress.ts';
 import { activityText, connectionNames, fill, labels, toolNames, uiText } from '../content/act-one/text.ts';
 import { connectionTiers, ownedTier, toolTiers } from '../content/act-one/upgrades.ts';
 import { formatDuration, formatNumber } from '../format.ts';
@@ -35,14 +36,14 @@ export class StatusPanel implements Panel {
     private readonly threads = addStat(this.machineElement, uiText.threads);
     private readonly efficiency = addStat(this.machineElement, uiText.efficiency);
     private readonly sending = addStat(this.networkElement, labels.sending);
-    private readonly answered = addStat(this.networkElement, labels.answered);
-    private readonly load = addStat(this.networkElement, labels.serverLoad);
-    private readonly rate = addSlider(this.networkElement, labels.ratePerAddress, (rate) => this.game.dispatch({ type: 'setRatePerAddress', rate }));
+    private readonly allowed = addStat(this.networkElement, labels.rateLimit);
+    private readonly ips = addStat(this.networkElement, labels.ips);
+    private readonly rented = addSlider(this.networkElement, labels.rentedAddresses, (count) => this.game.dispatch({ type: 'setRentedAddresses', count }));
+    private readonly rent = addStat(this.networkElement, labels.rent);
     private readonly status = addStat(this.networkElement, labels.heat);
     private readonly heat = createElement('div', { className: 'heat-fill' });
-    private readonly ips: StatRow;
-    private readonly rented: SliderRow;
-    private readonly rent: StatRow;
+    private readonly throttle = createButton('', () => this.game.dispatch({ type: 'setThrottle', enabled: !isThrottled(this.game) }), 'throttle-switch');
+    private readonly throttleRow = createElement('div', { className: 'stat-row' }, [createElement('span', { text: labels.throttle }), this.throttle]);
     private readonly proxySummary = createElement('span', { className: 'proxy-summary' });
     private readonly proxySummaryRow = createElement('div', { className: 'stat-row' }, [createElement('span', { text: uiText.proxies }), this.proxySummary]);
     private readonly proxyList = createElement('div');
@@ -82,13 +83,7 @@ export class StatusPanel implements Panel {
             createElement('summary', { text: uiText.individualProxies }),
             createElement('div', { className: 'proxy-list' }, [ownRow.element, this.proxyList, this.blockList]),
         ]);
-        this.networkElement.append(createElement('div', { className: 'heat-track' }, [this.heat]));
-        this.ips = addStat(this.networkElement, labels.ips);
-        this.rented = addSlider(this.networkElement, labels.rentedAddresses, (count) => game.dispatch({ type: 'setRentedAddresses', count }));
-        this.rent = addStat(this.networkElement, labels.rent);
-        this.rate.slider.min = '1';
-        setTitle(this.load, uiText.serverLoadHelp);
-        this.networkElement.append(this.proxySummaryRow, addressList);
+        this.networkElement.append(createElement('div', { className: 'heat-track' }, [this.heat]), this.throttleRow, this.proxySummaryRow, addressList);
         this.element.append(this.you, this.scripts);
         game.subscribe((event) => { if (event.type === 'stateReplaced') this.permanentAddresses = undefined; });
     }
@@ -144,26 +139,19 @@ export class StatusPanel implements Panel {
     private renderNetwork(): void {
         const game = this.game;
         this.networkElement.hidden = !game.state.flags.networkRevealed;
-        const sent = sentRate(game);
-        const answered = answeredRate(game);
+        const sent = effectiveRate(game);
+        const capacity = networkCapacity(game);
         const requested = requestedRate(game);
-        const dropped = sent - answered;
-        const hasDroppedBefore = game.state.flags['notice:firstRateLimit'] === true;
-        this.answered.row.hidden = !hasDroppedBefore;
-        this.load.row.hidden = !hasDroppedBefore;
         setText(this.sending.value, `${formatNumber(sent)}/s`);
-        setText(this.answered.value, `${formatNumber(answered)}/s`);
-        this.answered.value.classList.toggle('over-limit', dropped > 0);
-        setTitle(this.sending, requested > sent ? fill(uiText.requestedRate, { rate: formatNumber(requested) }) : '');
-        setTitle(this.answered, dropped > 0 ? fill(uiText.droppedRate, { rate: formatNumber(Math.ceil(dropped)) }) : '');
-        setText(this.load.value, uiText.serverLoads[serverLoad(game.state)]);
-        const adaptive = isAdaptive(game);
-        this.rate.slider.hidden = adaptive;
-        this.rate.slider.max = String(highestRatePerAddress(game));
-        this.rate.slider.value = String(ratePerAddress(game));
-        setText(this.rate.value, adaptive ? fill(uiText.automaticRate, { rate: (sent / addressCount(game)).toFixed(1) }) : fill(uiText.ratePerAddress, { rate: ratePerAddress(game) }));
+        setText(this.allowed.value, `${formatNumber(capacity)}/s`);
         setText(this.status.value, isBanned(game) ? fill(labels.banned, { time: formatDuration(game.state.network.bannedUntil - game.state.elapsedSeconds) }) : `${Math.round(game.state.network.heat)}%`);
+        this.sending.value.classList.toggle('over-limit', sent > capacity);
+        setTitle(this.sending, requested > sent ? fill(uiText.requestedRate, { rate: formatNumber(requested) }) : '');
+        setTitle(this.allowed, fill(uiText.limitBreakdown, { ips: formatNumber(addressCount(game)), perAddress: requestsPerAddress }));
         this.heat.style.width = `${game.state.network.heat}%`;
+        this.throttleRow.hidden = !owns(game.state, 'throttle');
+        setText(this.throttle, isThrottled(game) ? uiText.on : uiText.off);
+        this.throttle.setAttribute('aria-pressed', String(isThrottled(game)));
         this.renderRent();
     }
 
@@ -174,7 +162,7 @@ export class StatusPanel implements Panel {
         setText(this.ips.value, formatNumber(addressCount(game)));
         setTitle(this.ips, fill(uiText.ipBreakdown, { proxies: liveProxies(game), rented: formatNumber(rentedInUse(game)) }));
         const permanentAddresses = rentable + game.stat('proxySlots');
-        if (this.permanentAddresses !== undefined && permanentAddresses > this.permanentAddresses) for (const stat of [this.ips, this.rented]) flash(stat.value);
+        if (this.permanentAddresses !== undefined && permanentAddresses > this.permanentAddresses) for (const stat of [this.ips, this.allowed, this.rented]) flash(stat.value);
         this.permanentAddresses = permanentAddresses;
         this.rented.row.hidden = rentable === 0;
         this.rent.row.hidden = rentable === 0;

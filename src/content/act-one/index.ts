@@ -5,7 +5,7 @@ import { answerCaptcha } from './captchas.ts';
 import { assignJob, isResourceRevealed, passiveIncome, setActivity } from './economy.ts';
 import { findingDrops, findingModifiers, findingsEnabled } from './findings.ts';
 import { entrance } from './levels.ts';
-import { isBanned, network, rent, replaceProxy, requestedRate, serverTolerance, setRatePerAddress, setRentedAddresses } from './network.ts';
+import { isBanned, network, networkCapacity, rent, replaceProxy, requestedRate, setRentedAddresses, setThrottle } from './network.ts';
 import { canonicalUrl, resolvePage } from './pages.ts';
 import { automationElapsed, automationLevel, isUpgradeRevealed, owns, solveLevel } from './progress.ts';
 import { homeUrl, startUrl } from './riddle.ts';
@@ -68,7 +68,7 @@ function revealNextOffer(game: Game, seconds: number): boolean {
     const candidates = offers.filter((item) => !isUpgradeRevealed(state, item.id) && readyForUpgrade(game, item));
     const { slowedBy } = currentSearch(game);
     const fixesWall = (item: Upgrade): number => Number(item.fixes !== undefined && item.fixes === slowedBy);
-    const capped = requestedRate(game) > serverTolerance(game);
+    const capped = requestedRate(game) > networkCapacity(game);
     candidates.sort((first, second) => fixesWall(second) - fixesWall(first) ||
         Number(capped && capacityUpgrades.has(second.id)) - Number(capped && capacityUpgrades.has(first.id)) ||
         Number(second.id === 'ram') - Number(first.id === 'ram'));
@@ -81,7 +81,7 @@ function revealNextOffer(game: Game, seconds: number): boolean {
 function readyForUpgrade(game: Game, item: Upgrade): boolean {
     const { state } = game;
     if (!Object.keys(item.price).every((resource) => isResourceRevealed(game, resource))) return false;
-    if (item.id === 'throttle' || item.id === 'adaptiveRate') return state.flags.networkRevealed === true;
+    if (item.id === 'throttle') return state.flags.networkRevealed === true;
     if (item.id === 'wgetMirror') return state.flags.dataRevealed === true && state.flags.scriptsRevealed === true;
     if (item.id === 'autoReplyMacros' || item.id === 'otherRiddles') return state.flags.scriptsRevealed === true;
     return true;
@@ -109,7 +109,7 @@ function reserveReveal(game: Game): void {
 const pacedNetwork: GameSystem = {
     update(game, seconds) {
         const revealed = game.state.flags.networkRevealed;
-        if (!revealed && requestedRate(game) > serverTolerance(game) && game.state.elapsedSeconds < nextRevealAt(game)) return;
+        if (!revealed && requestedRate(game) > networkCapacity(game) && game.state.elapsedSeconds < nextRevealAt(game)) return;
         network.update(game, seconds);
         if (!revealed && game.state.flags.networkRevealed) reserveReveal(game);
     },
@@ -134,8 +134,8 @@ export const actOneContent: GameContent = {
     homeUrl,
     startUrl,
     resources: [{ id: 'insight', name: labels.insight }, { id: 'money', name: labels.money }, { id: 'data', name: labels.data }],
-    baseStats: { requestsPerThread: 2, threadsPerScript: 1, scriptSlots: 1, riddleRate: 0.4, workRate: 1, scourRate: 1024,
-        ticketBotRate: 0.7, riddleBotRate: 0.3, scraperRate: 1024, proxySlots: 0, proxyLifetime: 1, requestsPerAddress: 10, rentableAddresses: 0, addressRent: 0.17, searchEfficiency: 1, dorkChance: 0 },
+    baseStats: { requestsPerThread: 2, threadsPerScript: 1, scriptSlots: 1, riddleRate: 0.3, workRate: 1, scourRate: 1024,
+        ticketBotRate: 0.7, riddleBotRate: 0.3, scraperRate: 1024, proxySlots: 0, proxyLifetime: 1, rentableAddresses: 0, addressRent: 0.17, searchEfficiency: 1, dorkChance: 0 },
     purchasables: upgrades.map((item) => ({
         ...item, isAvailable: (state) => isUpgradeRevealed(state, item.id) && item.isAvailable(state),
     })),
@@ -164,7 +164,7 @@ export const actOneContent: GameContent = {
                 game.state.statistics.nextRevealAt = game.state.elapsedSeconds + firstRevealDelaySeconds;
                 return true;
             case 'setActivity': return setActivity(game, action.activity);
-            case 'setRatePerAddress': return setRatePerAddress(game, action.rate);
+            case 'setThrottle': return setThrottle(game, action.enabled);
             case 'setRentedAddresses': return setRentedAddresses(game, action.count);
             case 'assignJob': return assignJob(game, action.jobId, action.change);
             case 'replaceProxy': return replaceProxy(game, action.proxyIndex);

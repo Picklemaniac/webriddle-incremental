@@ -12,7 +12,7 @@ import { canonicalUrl } from './pages.ts';
 import { hallOfFameUrl, hintsUrl, riddleHomeUrl, rulesUrl } from './riddle.ts';
 import { createCaptcha } from './captchas.ts';
 import { backlogSeconds, incomePerSecond, isAway } from './economy.ts';
-import { addressCount, answeredRate, rentedBlocks, rentPerSecond, sentRate, serverTolerance, trafficFactor } from './network.ts';
+import { addressCount, effectiveRate, networkCapacity, rentedBlocks, rentPerSecond, requestedRate } from './network.ts';
 import { planSearch, searchCapabilities, type SlowReason } from './search.ts';
 import { offeredUpgrades, upgrades } from './upgrades.ts';
 import { actOneStrategy } from '../../simulation/act-one-strategy.ts';
@@ -247,12 +247,12 @@ describe('Act I', () => {
 
     it('lists rented addresses as address blocks and fills them in order', () => {
         const game = newGame();
-        for (const id of ['rentedAddresses', 'addressBlock', 'secondAddressBlock', 'leasedRange', 'dataCenterRange']) game.state.purchases[id] = 1;
+        for (const id of ['rentedAddresses', 'addressBlock', 'secondAddressBlock', 'leasedRange', 'dataCenterRange', 'secondDataCenterRange']) game.state.purchases[id] = 1;
         game.state.network.rentedAddresses = 200;
         const blocks = rentedBlocks(game);
-        expect(blocks.map((block) => block.range)).toEqual(['198.18.0.0/27', '198.18.4.0/25', '198.18.8.0/25', '198.18.12.0/24', '198.18.16.0/23']);
-        expect(blocks.map((block) => block.rented)).toEqual([32, 128, 40, 0, 0]);
-        expect(game.stat('rentableAddresses')).toBe(32 + 128 + 128 + 256 + 512);
+        expect(blocks.map((block) => block.range)).toEqual(['198.18.0.0/27', '198.18.4.0/25', '198.18.8.0/24', '198.18.12.0/23', '198.18.16.0/23', '198.18.20.0/23']);
+        expect(blocks.map((block) => block.rented)).toEqual([32, 128, 40, 0, 0, 0]);
+        expect(game.stat('rentableAddresses')).toBe(32 + 128 + 256 + 512 + 512 + 512);
     });
 
     it('keeps all generated levels solvable by hand, including credentials', () => {
@@ -278,69 +278,67 @@ describe('Act I', () => {
         expect(game.state.currentLevel).toBe(level);
     });
 
-    it('answers fewer requests the further the rate is over what the server accepts', () => {
-        const game = overTheLimit();
-        expect(sentRate(game)).toBe(10);
-        expect(answeredRate(game)).toBe(10);
-        expect(game.state.network.heat).toBe(0);
-        expect(game.dispatch({ type: 'setRatePerAddress', rate: 16 })).toBe(true);
-        expect(sentRate(game)).toBe(16);
-        expect(answeredRate(game)).toBeCloseTo(100 / 16);
-        game.advance(5);
-        expect(game.state.network.heat).toBeGreaterThan(0);
-        expect(game.dispatch({ type: 'setRatePerAddress', rate: 21 })).toBe(false);
-        expect(game.dispatch({ type: 'setRatePerAddress', rate: 0 })).toBe(false);
-        expect(game.dispatch({ type: 'setRatePerAddress', rate: 6 })).toBe(true);
-        game.advance(30);
-        expect(answeredRate(game)).toBe(6);
-        expect(game.state.network.heat).toBe(0);
-    });
-
-    it('bans a player who keeps sending too much, accepts the actual captcha, and supports waiting it out', () => {
-        const game = overTheLimit();
-        game.dispatch({ type: 'setRatePerAddress', rate: 16 });
+    it('bans excessive traffic, accepts the actual captcha, and supports waiting it out', () => {
+        const game = newGame();
+        game.state.currentLevel = 5;
+        game.dispatch({ type: 'automate' });
+        game.state.purchases.curlBatch = 1;
+        game.state.purchases.keepAlive = 1;
+        game.invalidateStats();
         game.advance(150);
         expect(game.state.captcha).not.toBeNull();
-        expect(answeredRate(game)).toBe(0);
+        expect(effectiveRate(game)).toBe(0);
         game.dispatch({ type: 'answerCaptcha', answer: 'wrong' });
         expect(game.state.captcha).not.toBeNull();
         expect(game.state.flags.captchaRejected).toBe(true);
         game.dispatch({ type: 'answerCaptcha', answer: game.state.captcha!.word.toUpperCase() });
         expect(game.state.captcha).toBeNull();
+        game.state.purchases.throttle = 1;
+        game.invalidateStats();
+        game.advance(200);
+        expect(game.state.captcha).toBeNull();
+        expect(effectiveRate(game)).toBeLessThanOrEqual(networkCapacity(game));
         game.state.captcha = createCaptcha(game);
         game.state.network.bannedUntil = game.state.elapsedSeconds + 90;
         game.advance(91);
         expect(game.state.captcha).toBeNull();
     });
 
-    it('backs off with Throttle before a ban, and tunes itself with Adaptive rate', () => {
-        const game = overTheLimit();
-        game.dispatch({ type: 'setRatePerAddress', rate: 20 });
+    it('lets requests over the limit through at the cost of Heat, with a switchable Throttle', () => {
+        const game = newGame();
+        game.state.currentLevel = 5;
+        game.dispatch({ type: 'automate' });
+        game.state.purchases.curlBatch = 1;
+        game.state.purchases.keepAlive = 1;
+        game.invalidateStats();
+        game.advance(10);
+        expect(effectiveRate(game)).toBe(networkCapacity(game));
+        game.advance(50);
+        expect(game.state.flags.networkRevealed).toBe(true);
+        expect(effectiveRate(game)).toBe(requestedRate(game));
+        expect(effectiveRate(game)).toBeGreaterThan(networkCapacity(game));
+        expect(game.state.network.heat).toBeGreaterThan(0);
+        expect(game.dispatch({ type: 'setThrottle', enabled: true })).toBe(false);
         game.state.purchases.throttle = 1;
-        game.advance(1800);
-        expect(game.state.statistics.bans ?? 0).toBe(0);
-        expect(game.state.network.heat).toBeLessThan(100);
-        game.state.purchases.adaptiveRate = 1;
-        game.advance(1800);
-        expect(game.state.network.heat).toBe(0);
-        expect(sentRate(game)).toBeCloseTo(serverTolerance(game) * 0.95);
-        expect(answeredRate(game)).toBe(sentRate(game));
+        expect(effectiveRate(game)).toBe(networkCapacity(game));
+        expect(game.dispatch({ type: 'setThrottle', enabled: false })).toBe(true);
+        expect(effectiveRate(game)).toBe(requestedRate(game));
     });
 
-    it('lets the server limit drift between 70% and 130% once the network has been found', () => {
-        const { state } = newGame();
-        expect(trafficFactor(state)).toBe(1);
-        state.statistics.networkRevealedAt = 100;
-        state.elapsedSeconds = 150;
-        expect(trafficFactor(state)).toBe(1);
-        const factors = Array.from({ length: 3600 }, (_, index) => {
-            state.elapsedSeconds = 160 + index * 7;
-            return trafficFactor(state);
-        });
-        expect(Math.min(...factors)).toBeGreaterThanOrEqual(0.7 - 1e-9);
-        expect(Math.min(...factors)).toBeLessThan(0.75);
-        expect(Math.max(...factors)).toBeLessThanOrEqual(1.3 + 1e-9);
-        expect(Math.max(...factors)).toBeGreaterThan(1.25);
+    it('raises the server limit by ten requests a second for every rented IP address', () => {
+        const game = automatedAt(120);
+        game.state.purchases.rentedAddresses = 1;
+        game.state.purchases.throttle = 1;
+        game.state.resources.money = 1000;
+        game.invalidateStats();
+        game.dispatch({ type: 'checkIn' });
+        game.dispatch({ type: 'setRentedAddresses', count: 0 });
+        game.advance(0.25);
+        game.dispatch({ type: 'setRentedAddresses', count: 0 });
+        expect(networkCapacity(game)).toBe(10);
+        game.dispatch({ type: 'setRentedAddresses', count: 32 });
+        game.advance(0.25);
+        expect(networkCapacity(game)).toBe(330);
     });
 
     it('rents IP addresses by the second and only as many as the player can pay for', () => {
@@ -529,18 +527,6 @@ function automatedAt(level: number): Game {
     game.state.browserUrl = urlOfLevel(level);
     game.state.flags.automated = true;
     game.state.elapsedSeconds = 60;
-    return game;
-}
-
-function overTheLimit(): Game {
-    const game = newGame();
-    game.state.currentLevel = 5;
-    game.dispatch({ type: 'automate' });
-    game.state.purchases.curlBatch = 1;
-    game.state.purchases.keepAlive = 1;
-    game.invalidateStats();
-    game.advance(60);
-    expect(game.state.flags.networkRevealed).toBe(true);
     return game;
 }
 

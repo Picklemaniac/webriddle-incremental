@@ -214,19 +214,18 @@ try {
     await importGame(game);
     await sleep(900);
     await screenshot('working');
-    await setSlider('Requests per IP', 5);
-    await waitFor(`${sliderText('Requests per IP')} === '5/s'`);
-    assert.equal(await evaluate(statText('Answered')), await evaluate(statText('Requests sent')), 'A low rate drops no requests');
-    await setSlider('Rented IPs', 0);
-    await setSlider('Requests per IP', 24);
-    await waitFor(`document.querySelector('.stat-row .over-limit') !== null`);
-    await waitFor(`[...document.querySelectorAll('.terminal-line')].some((line) => line.textContent.startsWith('429'))`);
-    await setSlider('Requests per IP', 5);
     await setSlider('Rented IPs', 0);
     await waitFor(`${sliderText('Rented IPs')}.startsWith('0 of ')`);
     assert.equal(await evaluate(statText('Rent')), '$0/s');
+    assert.equal(await evaluate(`document.querySelector('.throttle-switch').textContent`), 'On');
+    assert.equal(await evaluate(`document.querySelector('.stat-row .over-limit')`), null, 'Throttle keeps the scripts under the server limit');
+    await evaluate(`document.querySelector('.throttle-switch').click()`);
+    await waitFor(`document.querySelector('.throttle-switch').textContent === 'Off' && document.querySelector('.stat-row .over-limit') !== null`);
+    await evaluate(`document.querySelector('.throttle-switch').click()`);
+    await waitFor(`document.querySelector('.throttle-switch').textContent === 'On' && document.querySelector('.stat-row .over-limit') === null`);
     await setSlider('Rented IPs', 32);
     await waitFor(`${statText('Rent')} === '$5.44/s'`);
+    await waitFor(`${statNumber('IP addresses')} >= 33 && ${statNumber('Server limit')} === ${statNumber('IP addresses')} * 10`);
     await screenshot('network-levers', false);
     game.state.statistics.lastSeenAt = game.state.elapsedSeconds - 700;
     await sleep(31000);
@@ -309,11 +308,12 @@ try {
     delete walled.state.purchases.fakeUserAgent;
     walled.state.currentLevel = 45;
     walled.state.browserUrl = urlOfLevel(45);
+    walled.state.statistics.nextRevealAt = walled.state.elapsedSeconds;
     await importGame(walled);
     await waitFor(`document.querySelector('.terminal-footer').textContent.startsWith('The server blocks most requests, about ')`);
     assert.equal(await evaluate(`document.querySelector('.terminal-footer').classList.contains('warning')`), true);
     await waitFor(`[...document.querySelectorAll('.terminal-line')].some((line) => line.textContent.startsWith('403'))`);
-    assert.ok(await evaluate(`[...document.querySelectorAll('.upgrade-card')].some((card) => !card.hidden && card.dataset.upgrade === 'fakeUserAgent')`), 'The wall offers the upgrade that fixes it');
+    await waitFor(`[...document.querySelectorAll('.upgrade-card')].some((card) => !card.hidden && card.dataset.upgrade === 'fakeUserAgent')`);
     await screenshot('slow-wall', false);
 
     /** @type {number[]} */
@@ -347,7 +347,7 @@ try {
     await evaluate(`document.querySelector('.dashboard').scrollIntoView()`);
     await screenshot('dashboard-narrow', false);
     assert.deepEqual(problems, [], 'Browser errors');
-    console.log('Browser checks passed: opening puzzles, navigation, source, hidden text, automate, favorites, save import/export, mature UI, network levers, a slowing wall, worker widths, dev visibility, captcha, credentials, and narrow layout.');
+    console.log('Browser checks passed: opening puzzles, navigation, source, hidden text, automate, favorites, save import/export, mature UI, rented IPs and Throttle, a slowing wall, worker widths, dev visibility, captcha, credentials, and narrow layout.');
     console.log(`Screenshots: ${outputDirectory}`);
 } finally {
     if (socket?.readyState === WebSocket.OPEN) {
@@ -415,6 +415,10 @@ function sliderText(label) {
 
 function statText(label) {
     return `[...document.querySelectorAll('.stat-row')].find((row) => row.firstElementChild.textContent === ${JSON.stringify(label)}).lastElementChild.textContent`;
+}
+
+function statNumber(label) {
+    return `Number(${statText(label)}.replace(/[^0-9]/g, ''))`;
 }
 
 async function setSlider(label, value) {

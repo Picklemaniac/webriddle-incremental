@@ -116,7 +116,6 @@ describe('save format', () => {
             heat: 100,
             bannedUntil: 90,
             proxies: [{ address: '192.0.2.1:8000', latencyMilliseconds: 60, diesAtSeconds: 360 }],
-            rateChange: -3,
             rentedAddresses: 12,
             knownRentable: 32,
             rentShare: 0.5,

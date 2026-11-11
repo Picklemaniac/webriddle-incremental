@@ -4,7 +4,7 @@ import { currentSearch } from '../content/act-one/automation.ts';
 import { dirbustingScripts } from '../content/act-one/economy.ts';
 import { findingFile, findings } from '../content/act-one/findings.ts';
 import { entrance, urlOfLevel } from '../content/act-one/levels.ts';
-import { answeredRate, isBanned, requestedRate, sentRate } from '../content/act-one/network.ts';
+import { effectiveRate, isBanned, requestedRate } from '../content/act-one/network.ts';
 import { automationBootSeconds, automationElapsed } from '../content/act-one/progress.ts';
 import { riddleOrigin } from '../content/act-one/riddle.ts';
 import { currentPhase, starterWordlistName, type SearchPhase, type SearchPlan, type SlowReason } from '../content/act-one/search.ts';
@@ -18,9 +18,7 @@ import type { Panel } from './panel.ts';
 const warningNotices: ReadonlySet<NoticeId> = new Set<NoticeId>(['firstRateLimit', 'bruteForce', 'firstBan', 'firstProxyDeath']);
 const slowResponses: Readonly<Partial<Record<SlowReason, number>>> = { credentials: 401, userAgent: 403, wildcard: 200 };
 const missResponse = 404;
-const droppedResponse = 429;
 const userAgentPassesEvery = 10;
-const goldenRatio = 0.618034;
 const commandTemplates = [terminalText.curlCommand, terminalText.toolCommand, terminalText.gobusterCommand, terminalText.toolCommand, terminalText.toolCommand];
 const earlyLineMilliseconds = 1500;
 const laterLineMilliseconds = 700;
@@ -68,7 +66,7 @@ export class TerminalPanel implements Panel {
         }
         const plan = currentSearch(game);
         const { phase, spent } = currentPhase(plan, game.state.search.requestsSpent);
-        const rate = answeredRate(game);
+        const rate = effectiveRate(game);
         setText(this.rate, `${formatNumber(rate)} ${uiText.requests}`);
         const folder = new URL(urlOfLevel(game.state.currentLevel)).pathname.replace(/[^/]*$/, '');
         const command = this.commandText(phase, folder);
@@ -136,9 +134,6 @@ export class TerminalPanel implements Panel {
     }
 
     private responseCode(plan: SearchPlan): number {
-        const sent = sentRate(this.game);
-        const droppedShare = sent > 0 ? 1 - answeredRate(this.game) / sent : 0;
-        if ((this.sampleIndex * goldenRatio) % 1 < droppedShare) return droppedResponse;
         if (plan.slowedBy === 'userAgent' && this.sampleIndex % userAgentPassesEvery === 0) return missResponse;
         return (plan.slowedBy === null ? undefined : slowResponses[plan.slowedBy]) ?? missResponse;
     }
