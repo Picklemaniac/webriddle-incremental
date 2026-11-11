@@ -68,4 +68,13 @@ export const answerNames: readonly string[] = [
     'thoth', 'amun', 'bastet', 'freyr', 'njord', 'vidar', 'idun', 'bragi', 'avalon', 'thule', 'ophir',
 ];
 
+export const latinWords: readonly string[] = [
+    'aqua', 'ignis', 'caelum', 'stella', 'flumen', 'mons', 'silva', 'arbor', 'flos', 'herba', 'saxum', 'lapis', 'ventus', 'nubes', 'pluvia', 'nix',
+    'umbra', 'lux', 'nox', 'annus', 'tempus', 'hora', 'vita', 'mors', 'amor', 'pax', 'bellum', 'rex', 'regina', 'miles', 'navis', 'porta', 'pons',
+    'domus', 'urbs', 'hortus', 'ager', 'equus', 'canis', 'lupus', 'ursus', 'aquila', 'piscis', 'avis', 'corvus', 'serpens', 'manus', 'oculus',
+    'caput', 'vox', 'verbum', 'littera', 'numerus', 'nomen', 'veritas', 'sapientia', 'deus', 'templum', 'aurum', 'argentum', 'ferrum', 'gladius',
+    'scutum', 'speculum', 'fenestra', 'ianua', 'mensa', 'panis', 'vinum', 'puer', 'puella', 'mater', 'frater', 'soror', 'filius', 'amicus',
+    'hostis', 'populus', 'imperium', 'somnus', 'somnium', 'ignotus', 'clavis', 'turris', 'murus', 'fons', 'insula', 'litus', 'unda', 'sidus',
+];
+
 export const handcraftedAnswerWords: readonly string[] = ['beneath', 'lighthouse', 'midnight', 'bridge', 'rise', 'mirror', 'dusk'];

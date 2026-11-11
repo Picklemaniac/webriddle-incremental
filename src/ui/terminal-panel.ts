@@ -68,7 +68,8 @@ export class TerminalPanel implements Panel {
         const { phase, spent } = currentPhase(plan, game.state.search.requestsSpent);
         const rate = effectiveRate(game);
         setText(this.rate, `${formatNumber(rate)} ${uiText.requests}`);
-        const folder = new URL(urlOfLevel(game.state.currentLevel)).pathname.replace(/[^/]*$/, '');
+        const targetFolder = entrance(game.state.currentLevel + 1).folder;
+        const folder = targetFolder === null ? '/' : `/${targetFolder}/`;
         const command = this.commandText(phase, folder);
         setText(this.command, command);
         this.command.title = command;
@@ -109,10 +110,8 @@ export class TerminalPanel implements Panel {
     }
 
     private requestAddress(searched: SearchPhase | null, index: number, folder: string): string {
-        const target = entrance(this.game.state.currentLevel + 1);
-        const targetFolder = target.folder === null ? '/' : `/${target.folder}/`;
         const candidate = searched ? searched.candidate(Math.floor(index)) : `${wordAtRank(1 + this.sampleIndex * idleSampleSpread % idleSampleWords)}.htm`;
-        return candidate.startsWith('/') ? candidate : `${searched ? targetFolder : folder}${candidate}`;
+        return candidate.startsWith('/') || candidate.includes('://') ? candidate : `${folder}${candidate}`;
     }
 
     private emitLine(plan: SearchPlan, rate: number, seconds: number, sampledRequest: () => string): void {
@@ -156,7 +155,8 @@ export class TerminalPanel implements Panel {
             case 'levelSolved': {
                 if (event.method === 'windfall') break;
                 const method = event.method === 'hand' ? terminalText.hand : event.method === 'search' ? terminalText.indexed : '200';
-                this.queueLine(`${method}  ${new URL(urlOfLevel(event.level)).pathname}`, 'hit');
+                const solved = new URL(urlOfLevel(event.level));
+                this.queueLine(`${method}  ${solved.origin === riddleOrigin ? solved.pathname : solved.href}`, 'hit');
                 break;
             }
             case 'findingDiscovered': {

@@ -80,6 +80,8 @@ const firstNamedLevel = 4;
 const innerLayers: readonly Encoding[] = ['reversed', 'atbash', 'rot13', 'caesar'];
 const pictureCiphers: readonly Encoding[] = ['rot13', 'atbash', 'caesar'];
 const leetEncodings: readonly Encoding[] = ['reversed', 'rot13', 'atbash', 'base64', 'hex', 'binary', 'ascii', 'octal', 'morse'];
+const caseEncodings: readonly Encoding[] = ['reversed', 'base64', 'hex', 'binary', 'ascii', 'octal', 'url', 'entities'];
+const digitEncodings: readonly Encoding[] = ['reversed', 'base64', 'hex', 'binary', 'ascii', 'octal', 'morse'];
 const recentMethodCount = 20;
 const newMethodLevels = 120;
 const oldMethodLevel = 30;
@@ -200,8 +202,20 @@ export function encodedClue(text: string, encoding: Encoding, level: number, uni
     return { method: used, ...placed(encode(text, used, unit), { word: text, answer: text, level, unit, withImage: true, titleFree: true }) };
 }
 
-export function textEncodingFor(level: number, unit: number, recent: readonly string[] = []): Encoding {
-    return leastRecent(textEncodings.filter(([, fromLevel]) => fromLevel <= level).map(([encoding]) => encoding), (encoding) => encoding, recent, unit);
+export function textEncodingFor(level: number, unit: number, recent: readonly string[] = [], excluded: readonly Encoding[] = []): Encoding {
+    const allowed = textEncodings.filter(([encoding, fromLevel]) => fromLevel <= level && !excluded.includes(encoding)).map(([encoding]) => encoding);
+    return leastRecent(allowed, (encoding) => encoding, recent, unit);
+}
+
+export function caseEncodingFor(unit: number, recent: readonly string[] = []): Encoding {
+    return leastRecent(caseEncodings, (encoding) => encoding, recent, unit);
+}
+
+export function dateClue(day: number, month: number, year: number, level: number, unit: number, recent: readonly string[] = []): Clue {
+    const digits = `${String(day).padStart(2, '0')}${String(month).padStart(2, '0')}${year}`;
+    const roman: Clue = { method: 'roman', lines: [[day, month, year].map(toRomanNumerals).join(' . ')] };
+    const encoded = digitEncodings.map((encoding) => encodedClue(digits, encoding, level, unit));
+    return leastRecent([roman, ...encoded], (clue) => clue.method ?? '', recent, unit);
 }
 
 export function leetEncodingFor(unit: number, recent: readonly string[] = []): Encoding {

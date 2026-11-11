@@ -5,7 +5,7 @@ import { answerCaptcha } from './captchas.ts';
 import { assignJob, isResourceRevealed, passiveIncome, setActivity } from './economy.ts';
 import { findingDrops, findingModifiers, findingsEnabled } from './findings.ts';
 import { entrance } from './levels.ts';
-import { isBanned, network, networkCapacity, rent, replaceProxy, requestedRate, setRentedAddresses, setThrottle } from './network.ts';
+import { isBanned, network, networkCapacity, rent, replaceProxy, requestedRate, setRentBudget, setThrottle } from './network.ts';
 import { canonicalUrl, resolvePage } from './pages.ts';
 import { automationElapsed, automationLevel, isUpgradeRevealed, owns, solveLevel } from './progress.ts';
 import { homeUrl, startUrl } from './riddle.ts';
@@ -24,11 +24,20 @@ const earlyOfferLimit = 3;
 const laterOfferLimit = 6;
 const firstFindingSeconds = 360;
 const rememberedPages = 100;
+const firstJobUpgrade = 'otherRiddles';
 
 const reveals: GameSystem = {
     update(game) {
         const { state } = game;
-        if (!state.flags.automated || state.elapsedSeconds < nextRevealAt(game)) return;
+        if (!state.flags.automated) return;
+        if (!state.flags.scriptsRevealed && game.stat('scriptSlots') >= 2) {
+            state.flags.scriptsRevealed = true;
+            state.flags.machineRevealed = true;
+            revealUpgrade(game, firstJobUpgrade);
+            reserveReveal(game);
+            return;
+        }
+        if (state.elapsedSeconds < nextRevealAt(game)) return;
         const seconds = automationElapsed(state);
         if (!isUpgradeRevealed(state, 'curlBatch')) {
             if (seconds >= firstOfferSeconds) revealBeforeCurrency(game, 'curlBatch');
@@ -38,9 +47,6 @@ const reveals: GameSystem = {
             state.flags.insightRevealed = true;
         } else if (!state.flags.moneyRevealed && seconds >= moneyIntroductionSeconds && owns(state, 'curlBatch')) {
             if (!revealWithCurrency(game, 'ram', 'moneyRevealed')) return;
-        } else if (!state.flags.scriptsRevealed && game.stat('scriptSlots') >= 2) {
-            state.flags.scriptsRevealed = true;
-            state.flags.machineRevealed = true;
         } else if (!state.flags.dataRevealed && state.flags.wordlistExhausted === true) {
             if (!revealWithCurrency(game, 'english10k', 'dataRevealed')) return;
         } else if (!revealNextOffer(game, seconds)) {
@@ -66,10 +72,10 @@ function revealNextOffer(game: Game, seconds: number): boolean {
     const shownLimit = seconds < introductionSeconds ? earlyOfferLimit : laterOfferLimit;
     if (offers.filter((item) => isUpgradeRevealed(state, item.id)).length >= shownLimit) return false;
     const candidates = offers.filter((item) => !isUpgradeRevealed(state, item.id) && readyForUpgrade(game, item));
-    const { slowedBy } = currentSearch(game);
-    const fixesWall = (item: Upgrade): number => Number(item.fixes !== undefined && item.fixes === slowedBy);
+    const { missing } = currentSearch(game);
+    const fixesWall = (item: Upgrade): number => Number(missing.includes(item.id));
     const capped = requestedRate(game) > networkCapacity(game);
-    candidates.sort((first, second) => fixesWall(second) - fixesWall(first) ||
+    candidates.sort((first, second) => fixesWall(second) - fixesWall(first) || Number(second.onNeed) - Number(first.onNeed) ||
         Number(capped && capacityUpgrades.has(second.id)) - Number(capped && capacityUpgrades.has(first.id)) ||
         Number(second.id === 'ram') - Number(first.id === 'ram'));
     const next = candidates[0];
@@ -109,7 +115,8 @@ function reserveReveal(game: Game): void {
 const pacedNetwork: GameSystem = {
     update(game, seconds) {
         const revealed = game.state.flags.networkRevealed;
-        if (!revealed && requestedRate(game) > networkCapacity(game) && game.state.elapsedSeconds < nextRevealAt(game)) return;
+        const scriptsPending = !game.state.flags.scriptsRevealed && game.stat('scriptSlots') >= 2;
+        if (!revealed && requestedRate(game) > networkCapacity(game) && (scriptsPending || game.state.elapsedSeconds < nextRevealAt(game))) return;
         network.update(game, seconds);
         if (!revealed && game.state.flags.networkRevealed) reserveReveal(game);
     },
@@ -135,7 +142,7 @@ export const actOneContent: GameContent = {
     startUrl,
     resources: [{ id: 'insight', name: labels.insight }, { id: 'money', name: labels.money }, { id: 'data', name: labels.data }],
     baseStats: { requestsPerThread: 2, threadsPerScript: 1, scriptSlots: 1, riddleRate: 0.3, workRate: 1, scourRate: 1024,
-        ticketBotRate: 0.7, riddleBotRate: 0.3, scraperRate: 1024, proxySlots: 0, proxyLifetime: 1, rentableAddresses: 0, addressRent: 0.17, searchEfficiency: 1, dorkChance: 0 },
+        ticketBotRate: 0.7, riddleBotRate: 0.3, scraperRate: 1024, proxySlots: 0, proxyLifetime: 1, rentableAddresses: 0, addressRent: 0.24, searchEfficiency: 1, dorkChance: 0 },
     purchasables: upgrades.map((item) => ({
         ...item, isAvailable: (state) => isUpgradeRevealed(state, item.id) && item.isAvailable(state),
     })),
@@ -165,7 +172,7 @@ export const actOneContent: GameContent = {
                 return true;
             case 'setActivity': return setActivity(game, action.activity);
             case 'setThrottle': return setThrottle(game, action.enabled);
-            case 'setRentedAddresses': return setRentedAddresses(game, action.count);
+            case 'setRentBudget': return setRentBudget(game, action.share);
             case 'assignJob': return assignJob(game, action.jobId, action.change);
             case 'replaceProxy': return replaceProxy(game, action.proxyIndex);
             case 'answerCaptcha': return answerCaptcha(game, action.answer);

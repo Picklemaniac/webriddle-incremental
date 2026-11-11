@@ -1,4 +1,5 @@
-export const riddleOrigin = 'http://www.notfinite.net';
+export const riddleDomain = 'notfinite.net';
+export const riddleOrigin = `http://www.${riddleDomain}`;
 export const startUrl = `${riddleOrigin}/beginning.htm`;
 export const riddleHomeUrl = `${riddleOrigin}/`;
 export const rulesUrl = `${riddleOrigin}/rules.htm`;
@@ -39,6 +40,8 @@ export const salts = {
     hint: 26,
     method: 27,
     hintShown: 28,
+    month: 29,
+    day: 30,
     shuffle: 1000,
     firstLetterFiller: 2000,
     capitalFiller: 2100,
@@ -51,6 +54,14 @@ export const salts = {
 
 export const firstYear = 1000;
 export const yearCount = 1100;
+
+export function isRiddleAddress(address: string): boolean {
+    try {
+        return new URL(address).hostname.endsWith(`.${riddleDomain}`);
+    } catch {
+        return false;
+    }
+}
 
 export function textSeed(text: string): number {
     return [...text].reduce((hash, character) => Math.imul(hash ^ character.charCodeAt(0), 16777619), 2166136261) >>> 0;

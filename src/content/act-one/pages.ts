@@ -6,7 +6,7 @@ import { contentType, doctype, formatSource } from './html-source.ts';
 import { imagePath } from './images.ts';
 import { drawPicture, type Picture } from './drawings.ts';
 import { entrance, inWildcardFolder, levelPage, urlOfLevel, type LevelFile, type LevelPage } from './levels.ts';
-import { nextSeed, riddleOrigin, textSeed } from './riddle.ts';
+import { isRiddleAddress, nextSeed, riddleOrigin, textSeed } from './riddle.ts';
 import { soundData, type Sound } from './sounds.ts';
 import { startPage } from './start-pages.ts';
 import { captchaText, errorPages, fill, pageText } from './text.ts';
@@ -74,7 +74,8 @@ function emphasisHtml(line: readonly { readonly text: string; readonly bold: boo
 
 function relativeLink(from: string, to: string): string {
     const folder = from.slice(0, from.lastIndexOf('/') + 1);
-    return to.startsWith(folder) ? to.slice(folder.length) : new URL(to).pathname;
+    if (to.startsWith(folder)) return to.slice(folder.length);
+    return new URL(from).origin === new URL(to).origin ? new URL(to).pathname : to;
 }
 
 function renderLevel(level: number): Page {
@@ -163,20 +164,25 @@ function levelSource(page: LevelPage, link: string | null): string {
     return page.farComment === null ? source : `${source}${'\n'.repeat(80)}<!-- ${page.farComment.replaceAll('-->', '--&gt;')} -->`;
 }
 
+// The server ignores capitals, except in a file name that is written entirely in capitals.
 export function canonicalUrl(url: string): string {
     try {
         const parsed = new URL(url, `${riddleOrigin}/`);
-        return `${parsed.origin}${decodeURIComponent(parsed.pathname).toLowerCase()}`;
+        const path = decodeURIComponent(parsed.pathname);
+        const folderEnd = path.lastIndexOf('/') + 1;
+        const [name = '', ...endings] = path.slice(folderEnd).split('.');
+        const inCapitals = name === name.toUpperCase() && name !== name.toLowerCase();
+        return `${parsed.origin}${path.slice(0, folderEnd).toLowerCase()}${[inCapitals ? name : name.toLowerCase(), ...endings.map((ending) => ending.toLowerCase())].join('.')}`;
     } catch { return url; }
 }
 
 export function resolvePage(url: string, state: GameState): Page {
     const address = canonicalUrl(url);
     const banned = state.captcha !== null && state.network.bannedUntil > state.elapsedSeconds;
-    if (banned && address.startsWith(`${riddleOrigin}/`)) return captchaPage(state.captcha!, state.flags.captchaRejected === true);
+    if (banned && isRiddleAddress(address)) return captchaPage(state.captcha!, state.flags.captchaRejected === true);
     const start = startPage(address);
     if (start !== null) return start;
-    if (!address.startsWith(`${riddleOrigin}/`)) return errorPage('unavailable');
+    if (!isRiddleAddress(address)) return errorPage('unavailable');
     if (address === `${riddleOrigin}/present.gif`) return imageFilePage('present.gif', pictureTag(drawPicture({ kind: 'gift', text: entrance(7).answer }), 'present.gif'), gifStyle);
     const known = state.visitedLevels[address];
     if (known !== undefined) return renderLevel(known);
@@ -187,6 +193,7 @@ export function resolvePage(url: string, state: GameState): Page {
     if (address === next.url && next.credentials !== null) return { ...errorPage('unauthorized'), loginRealm: next.folder ?? 'riddle' };
     const finding = findings.find((candidate) => address === `${riddleOrigin}/${candidate.path}` && state.findings[candidate.id]);
     if (finding) return textFilePage(finding.path, findingFile(finding, state));
+    if (!address.startsWith(`${riddleOrigin}/`)) return errorPage('unavailable');
     if (inWildcardFolder(address)) return documentPage('', `<p>${pageText.wildcardPage}</p>`, 200, levelStyle);
     return errorPage('notFound');
 }

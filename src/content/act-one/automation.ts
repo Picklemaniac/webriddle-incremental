@@ -2,10 +2,11 @@ import type { GameSystem } from '../../core/content.ts';
 import type { Game } from '../../core/game.ts';
 import { entrance, type EntranceKind } from './levels.ts';
 import { effectiveRate } from './network.ts';
-import { automationBootSeconds, automationElapsed, increment, noticeOnce, solveLevel } from './progress.ts';
+import { automationBootSeconds, automationElapsed, increment, markNeeded, noticeOnce, solveLevel } from './progress.ts';
 import { capabilitySignature, planSearch, searchCapabilities, type SearchPlan } from './search.ts';
 const wordlistKinds: ReadonlySet<EntranceKind> = new Set<EntranceKind>(['word', 'extension', 'credentials']);
 const plans = new Map<string, SearchPlan>();
+const dragSeconds = 60;
 
 export function currentSearch(game: Game): SearchPlan {
     const capabilities = searchCapabilities(game.state);
@@ -35,6 +36,8 @@ export const dirbuster: GameSystem = {
             }
             const plan = currentSearch(game);
             if (plan.speed === 0) break;
+            for (const id of plan.missing) markNeeded(state, id);
+            if (state.elapsedSeconds - (state.statistics.lastSolveAt ?? 0) >= dragSeconds) for (const id of plan.boosters) markNeeded(state, id);
             if (state.search.configuration !== plan.signature) {
                 state.search.configuration = plan.signature;
                 state.search.requestsSpent = 0;

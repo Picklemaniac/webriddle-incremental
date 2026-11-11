@@ -3,8 +3,8 @@ import {
     activities, activityRate, assignedScripts, dirbustingScripts, incomePerSecond, isJobUnlocked, isResourceRevealed, jobs, scriptSlots, type ActivityId, type JobId,
 } from '../content/act-one/economy.ts';
 import { entrance, entranceAction } from '../content/act-one/levels.ts';
-import { effectiveRate, isThrottled, liveProxies, networkCapacity, rentPerSecond, requestedRate, requestsPerAddress } from '../content/act-one/network.ts';
-import { automationLevel, isUpgradeRevealed, owns } from '../content/act-one/progress.ts';
+import { effectiveRate, isThrottled, networkCapacity, rentPerSecond, requestedRate } from '../content/act-one/network.ts';
+import { automationLevel, isNeeded, isUpgradeRevealed, owns } from '../content/act-one/progress.ts';
 import { currentPhase } from '../content/act-one/search.ts';
 import { capacityUpgrades, offeredUpgrades, upgrades, type Upgrade } from '../content/act-one/upgrades.ts';
 import type { Game } from '../core/game.ts';
@@ -29,9 +29,8 @@ const solveSecondsPerRootLevel = 3;
 const stuckSearchSeconds = 180;
 const minimumIncomePerSecond = 0.001;
 const longestWaitSeconds = 3600;
-const savingRentShare = 0.35;
-const burnSeconds = 300;
-const rentStepShare = 0.05;
+const savingRentBudget = 0.4;
+const idleRentBudget = 0.75;
 
 export function actOneStrategy(decisionIntervalSeconds: number, style: PlayStyle = 'attentive'): Strategy {
     const memories = new WeakMap<Game, DecisionMemory>();
@@ -83,11 +82,11 @@ function decisionMemory(memories: WeakMap<Game, DecisionMemory>, game: Game, dec
 
 function buyUpgrades(game: Game): { readonly acted: boolean; readonly offered: readonly Upgrade[] } {
     const { state } = game;
-    const { slowedBy } = currentSearch(game);
+    const { missing } = currentSearch(game);
     const capped = requestedRate(game) >= networkCapacity(game);
     const needsMoreScripts = networkCapacity(game) > requestsPerScript(game);
     const priority = (item: Upgrade): number => {
-        if ((item.fixes !== undefined && item.fixes === slowedBy) || (capped && capacityUpgrades.has(item.id))) return urgentPriority;
+        if (missing.includes(item.id) || item.onNeed || (capped && capacityUpgrades.has(item.id))) return urgentPriority;
         const stats = (item.modifiers?.(1) ?? []).map((modifier) => modifier.statId);
         return stats.some((statId) => incomeStats.has(statId) || (needsMoreScripts && requestStats.has(statId))) ? incomePriority : 0;
     };
@@ -106,17 +105,10 @@ function buyUpgrades(game: Game): { readonly acted: boolean; readonly offered: r
 }
 
 function chooseRent(game: Game, offered: readonly Upgrade[]): boolean {
-    const { state } = game;
-    const rentable = game.stat('rentableAddresses');
-    if (rentable === 0) return false;
-    const money = state.resources.money ?? 0;
-    const income = incomePerSecond(game, 'money');
+    if (game.stat('rentableAddresses') === 0) return false;
+    const money = game.state.resources.money ?? 0;
     const saving = offered.some((item) => (item.price.money ?? 0) > money);
-    const budget = saving ? income * savingRentShare : income + money / burnSeconds;
-    const useful = maximumSearchers(game) * requestsPerScript(game) / requestsPerAddress - 1 - liveProxies(game);
-    const target = Math.max(0, Math.min(rentable, Math.floor(budget / game.stat('addressRent')), Math.ceil(useful)));
-    if (Math.abs(target - state.network.rentedAddresses) < Math.max(1, rentable * rentStepShare) && target !== rentable && target !== 0) return false;
-    return game.dispatch({ type: 'setRentedAddresses', count: target });
+    return game.dispatch({ type: 'setRentBudget', share: saving ? savingRentBudget : idleRentBudget });
 }
 
 function requestsPerScript(game: Game): number {
@@ -146,7 +138,7 @@ function jobTargets(game: Game, free: number): Record<JobId, number> {
     const targets: Record<JobId, number> = { scraping: 0, ticketing: 0, riddles: 0 };
     const unlocked = jobs.filter((job) => isJobUnlocked(game, job.id));
     if (unlocked.length === 0 || free <= 0) return targets;
-    const goals = upgrades.filter((item) => !owns(state, item.id) && item.level <= state.currentLevel + lookaheadLevels);
+    const goals = upgrades.filter((item) => !owns(state, item.id) && (item.onNeed ? isNeeded(state, item.id) : item.level <= state.currentLevel + lookaheadLevels));
     const shortfall = (resource: string): number => Math.max(0, goals.reduce((sum, item) => sum + (item.price[resource] ?? 0), 0) - (state.resources[resource] ?? 0));
     const waits = unlocked.map((job) => shortfall(job.resource) / game.stat(job.rateStat));
     const total = waits.reduce((sum, wait) => sum + wait, 0);
@@ -179,7 +171,7 @@ function secondsUntilAffordable(game: Game, item: Upgrade): number {
 }
 
 function spareIncome(game: Game, resource: string): number {
-    return incomePerSecond(game, resource) - (resource === 'money' ? rentPerSecond(game) * game.state.network.rentShare : 0);
+    return incomePerSecond(game, resource) - (resource === 'money' ? rentPerSecond(game) : 0);
 }
 
 function chooseActivity(game: Game, offered: readonly Upgrade[]): ActivityId | undefined {

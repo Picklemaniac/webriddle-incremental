@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { actOneContent } from '../content/act-one/index.ts';
 import { urlOfLevel } from '../content/act-one/levels.ts';
 import { automationElapsed, isUpgradeRevealed } from '../content/act-one/progress.ts';
+import { planSearch, searchCapabilities } from '../content/act-one/search.ts';
 import { Game } from '../core/game.ts';
 import { createInitialState } from '../core/state.ts';
 import { actOneStrategy } from './act-one-strategy.ts';
@@ -51,12 +52,13 @@ describe('Act I onboarding', () => {
         const game = startAutomation();
         const robot = new AutoPlayer(actOneStrategy(4));
         const systems = new Set(['insightRevealed', 'moneyRevealed', 'dataRevealed', 'scriptsRevealed', 'networkRevealed', 'findingsRevealed']);
+        const firstJobCard = 'seen:otherRiddles';
         const observed = new Set<string>();
         const introductions: { seconds: number; id: string }[] = [];
         for (let second = 0; second < 600; second++) {
             robot.playStep(game, 1);
             const introduced = Object.keys(game.state.flags).filter((flag) => game.state.flags[flag] &&
-                (systems.has(flag) || flag.startsWith('seen:')) && !observed.has(flag));
+                (systems.has(flag) || flag.startsWith('seen:')) && flag !== firstJobCard && !observed.has(flag));
             expect(introduced.length).toBeLessThanOrEqual(1);
             for (const id of introduced) {
                 introductions.push({ seconds: automationElapsed(game.state), id });
@@ -68,12 +70,34 @@ describe('Act I onboarding', () => {
         expect(introductions[0]).toEqual({ seconds: 76, id: 'seen:curlBatch' });
         expect(introductions[1]).toEqual({ seconds: 82, id: 'insightRevealed' });
         expect(introductions.some(({ id }) => id === 'moneyRevealed')).toBe(true);
-        expect(introductions.some(({ id }) => id === 'networkRevealed')).toBe(true);
+        expect(introductions.some(({ id }) => id === 'scriptsRevealed')).toBe(true);
+        expect(game.state.flags[firstJobCard]).toBe(true);
         for (let index = 1; index < introductions.length; index++) {
             const { seconds, id } = introductions[index]!;
             const followsItsFirstPrice = id === 'insightRevealed' || id === 'moneyRevealed' || id === 'dataRevealed';
             expect(seconds - introductions[index - 1]!.seconds).toBeGreaterThanOrEqual(followsItsFirstPrice ? 6 : 30);
         }
+    });
+
+    it('shows the Scripts panel with its first job before the server limit starts to matter', () => {
+        const game = startAutomation();
+        Object.assign(game.state.flags, { 'seen:curlBatch': true, insightRevealed: true, 'seen:ram': true, moneyRevealed: true });
+        game.advance(200);
+        game.state.purchases.curlBatch = 1;
+        game.state.purchases.ram = 1;
+        game.invalidateStats();
+        game.advance(1);
+        expect(game.state.flags.scriptsRevealed).toBe(true);
+        expect(isUpgradeRevealed(game.state, 'otherRiddles')).toBe(true);
+        expect(game.state.flags.networkRevealed).not.toBe(true);
+        let seconds = 0;
+        while (game.state.flags.networkRevealed !== true && seconds < 120) {
+            game.advance(1);
+            seconds++;
+        }
+        expect(seconds).toBeGreaterThanOrEqual(30);
+        expect(seconds).toBeLessThan(120);
+        expect(game.state.network.heat).toBeLessThan(5);
     });
 
     it('introduces data only once DirBuster runs out of words.txt', () => {
@@ -82,7 +106,8 @@ describe('Act I onboarding', () => {
         game.state.purchases.fakeUserAgent = 1;
         game.advance(60);
         expect(isUpgradeRevealed(game.state, 'english10k')).toBe(false);
-        game.state.currentLevel = 80;
+        const needsList = Array.from({ length: 200 }, (_, index) => index + 30).find((level) => planSearch(level, searchCapabilities(game.state)).missing.includes('english10k'))!;
+        game.state.currentLevel = needsList - 1;
         let cardSecond: number | undefined;
         let second = 0;
         for (; second < 60 && game.state.flags.dataRevealed !== true; second++) {

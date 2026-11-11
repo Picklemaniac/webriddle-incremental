@@ -3,7 +3,8 @@ import {
     activities, activityRate, assignedScripts, backlogSeconds, dirbustingScripts, incomePerSecond, isAway, isJobUnlocked, isResourceRevealed, scriptSlots, type ActivityId, type JobId,
 } from '../content/act-one/economy.ts';
 import {
-    addressCount, effectiveRate, isBanned, isThrottled, liveProxies, networkCapacity, ownAddress, rentedBlocks, rentedInUse, rentPerSecond, requestedRate, requestsPerAddress,
+    addressCount, effectiveRate, highestRentBudget, isBanned, isRentCapped, isThrottled, liveProxies, networkCapacity, ownAddress, rentBudgetStep, rentedAddresses, rentedBlocks, rentPerSecond,
+    requestedRate, requestsPerAddress,
 } from '../content/act-one/network.ts';
 import { owns } from '../content/act-one/progress.ts';
 import { activityText, connectionNames, fill, labels, toolNames, uiText } from '../content/act-one/text.ts';
@@ -38,7 +39,8 @@ export class StatusPanel implements Panel {
     private readonly sending = addStat(this.networkElement, labels.sending);
     private readonly allowed = addStat(this.networkElement, labels.rateLimit);
     private readonly ips = addStat(this.networkElement, labels.ips);
-    private readonly rented = addSlider(this.networkElement, labels.rentedAddresses, (count) => this.game.dispatch({ type: 'setRentedAddresses', count }));
+    private readonly budget = addSlider(this.networkElement, labels.rentBudget, (steps) => this.game.dispatch({ type: 'setRentBudget', share: steps * rentBudgetStep }));
+    private readonly rented = addStat(this.networkElement, labels.rentedAddresses);
     private readonly rent = addStat(this.networkElement, labels.rent);
     private readonly status = addStat(this.networkElement, labels.heat);
     private readonly heat = createElement('div', { className: 'heat-fill' });
@@ -84,6 +86,7 @@ export class StatusPanel implements Panel {
             createElement('div', { className: 'proxy-list' }, [ownRow.element, this.proxyList, this.blockList]),
         ]);
         this.networkElement.append(createElement('div', { className: 'heat-track' }, [this.heat]), this.throttleRow, this.proxySummaryRow, addressList);
+        this.budget.slider.max = String(Math.round(highestRentBudget / rentBudgetStep));
         this.element.append(this.you, this.scripts);
         game.subscribe((event) => { if (event.type === 'stateReplaced') this.permanentAddresses = undefined; });
     }
@@ -102,7 +105,7 @@ export class StatusPanel implements Panel {
         for (const [id, row] of this.resources) {
             row.element.hidden = !isResourceRevealed(game, id);
             setText(row.value, formatValue(id, game.state.resources[id] ?? 0));
-            const income = incomePerSecond(game, id) - (id === 'money' ? rentPerSecond(game) * game.state.network.rentShare : 0);
+            const income = incomePerSecond(game, id) - (id === 'money' ? rentPerSecond(game) : 0);
             const waiting = isAway(game.state) && incomePerSecond(game, id) > 0;
             setText(row.rate, waiting ? uiText.jobsWaiting : income === 0 ? '' : `${income > 0 ? '+' : '−'}${formatRate(id, Math.abs(income))}`);
             row.rate.classList.toggle('negative', !waiting && income < 0);
@@ -158,21 +161,21 @@ export class StatusPanel implements Panel {
     private renderRent(): void {
         const game = this.game;
         const rentable = game.stat('rentableAddresses');
-        const { rentedAddresses, rentShare } = game.state.network;
+        const rented = rentedAddresses(game);
+        const { rentBudget } = game.state.network;
         setText(this.ips.value, formatNumber(addressCount(game)));
-        setTitle(this.ips, fill(uiText.ipBreakdown, { proxies: liveProxies(game), rented: formatNumber(rentedInUse(game)) }));
+        setTitle(this.ips, fill(uiText.ipBreakdown, { proxies: liveProxies(game), rented: formatNumber(rented) }));
         const permanentAddresses = rentable + game.stat('proxySlots');
         if (this.permanentAddresses !== undefined && permanentAddresses > this.permanentAddresses) for (const stat of [this.ips, this.allowed, this.rented]) flash(stat.value);
         this.permanentAddresses = permanentAddresses;
-        this.rented.row.hidden = rentable === 0;
-        this.rent.row.hidden = rentable === 0;
-        this.rented.slider.max = String(rentable);
-        this.rented.slider.value = String(rentedAddresses);
-        setText(this.rented.value, fill(uiText.rentedCount, { rented: formatNumber(rentedAddresses), available: formatNumber(rentable) }));
+        for (const row of [this.budget.row, this.rented.row, this.rent.row]) row.hidden = rentable === 0;
+        this.budget.slider.value = String(Math.round(rentBudget / rentBudgetStep));
+        setText(this.budget.value, fill(uiText.rentBudget, { share: Math.round(rentBudget * 100) }));
+        setText(this.rented.value, fill(uiText.rentedCount, { rented: formatNumber(rented), available: formatNumber(rentable) }));
+        const capped = isRentCapped(game);
+        this.rented.value.classList.toggle('over-limit', capped);
+        setTitle(this.rented, capped ? uiText.allRented : '');
         setText(this.rent.value, formatRate('money', rentPerSecond(game)));
-        const unpaid = rentShare < 1 && rentedAddresses > 0;
-        this.rent.value.classList.toggle('over-limit', unpaid);
-        setTitle(this.rent, unpaid ? fill(uiText.unpaidRent, { paid: formatNumber(rentedInUse(game)) }) : '');
     }
 
     private renderAddresses(): void {

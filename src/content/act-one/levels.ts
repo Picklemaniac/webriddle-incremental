@@ -2,14 +2,15 @@ import type { Action } from '../../core/actions.ts';
 import type { Drawing } from './drawings.ts';
 import { encode, toLeet } from './encodings.ts';
 import { imageWithWord, levelImageCount } from './images.ts';
-import { encodedClue, leetEncodingFor, textEncodingFor, wordClue, yearClue, type Clue } from './methods.ts';
-import { firstYear, pickByUnit, ramp, riddleOrigin, salts, startUrl, unitHash, yearCount } from './riddle.ts';
+import { caseEncodingFor, dateClue, encodedClue, leetEncodingFor, textEncodingFor, wordClue, yearClue, type Clue } from './methods.ts';
+import { firstYear, pickByUnit, ramp, riddleDomain, riddleOrigin, salts, startUrl, unitHash, yearCount } from './riddle.ts';
 import type { Sound } from './sounds.ts';
 import { alternateFiles, clueLines, fill, handcraftedText, linkedFiles, pageText, riddleName } from './text.ts';
 import { rankOfWord, vocabularySize, wordAtRank } from './vocabulary.ts';
-import { answerNames, folderNames } from './word-lists.ts';
+import { answerNames, folderNames, latinWords } from './word-lists.ts';
 
-export type EntranceKind = 'fixed' | 'word' | 'extension' | 'name' | 'leet' | 'number' | 'credentials' | 'twoWords' | 'phrase';
+export type EntranceKind = 'fixed' | 'word' | 'extension' | 'name' | 'leet' | 'number' | 'credentials' | 'twoWords' | 'phrase'
+    | 'capitals' | 'reversed' | 'backup' | 'date' | 'latin' | 'subdomain';
 type GeneratedKind = Exclude<EntranceKind, 'fixed'>;
 
 interface Credentials {
@@ -86,13 +87,16 @@ const untitledShare = 0.3;
 
 const wildcardFolders = new Set(['basalt', 'ember']);
 const unlistedNames = answerNames.filter((name) => wordAtRank(rankOfWord(name)) !== name);
-const longNameLevel = 600;
 const recentLevels = 20;
 const alwaysHintedLevels = 60;
 const laterLineShare = 0.4;
 const firstExtensionLevel = 150;
 const firstCredentialsLevel = 500;
+const firstBackupLevel = 450;
+const firstSubdomainLevel = 660;
+const longestMonthDays = 28;
 export const otherExtensions: readonly string[] = ['html', 'php', 'asp', 'txt'];
+export const backupEndings: readonly string[] = ['bak', 'old', 'orig'];
 
 const handcraftedEntrances: Readonly<Record<number, HandcraftedEntrance>> = {
     2: { kind: 'fixed', answer: 'level2', clue: { imageLink: true, lines: [handcraftedText.level1] } },
@@ -171,7 +175,11 @@ export function levelPage(level: number): LevelPage {
         hiddenText: clue.hiddenText ?? null,
         belowFold: clue.belowFold ?? [],
         meta: clue.meta ?? null,
-        comments: [clue.comment, next.folder !== null && next.folder !== folderFor(level) ? fill(pageText.folderComment, { folder: next.folder }) : undefined].filter((comment) => comment !== undefined),
+        comments: [
+            clue.comment,
+            next.folder !== null && next.folder !== folderFor(level) ? fill(pageText.folderComment, { folder: next.folder }) : undefined,
+            entrance(level).kind === 'subdomain' && next.kind !== 'subdomain' ? fill(pageText.returnComment, { address: next.url.slice(0, next.url.lastIndexOf('/') + 1).replace(/^http:\/\//, '') }) : undefined,
+        ].filter((comment) => comment !== undefined),
         farComment: clue.farComment ?? null,
         files: levelFiles(level, clue, imageName, url, next.url),
     };
@@ -209,7 +217,8 @@ function levelFiles(level: number, clue: Clue, imageName: string, url: string, n
 
 function scriptAddress(from: string, to: string): string {
     const folder = (address: string): string => address.slice(0, address.lastIndexOf('/') + 1);
-    return folder(from) === folder(to) ? 'password + ".htm"' : `"${new URL(folder(to)).pathname}" + password + ".htm"`;
+    if (folder(from) === folder(to)) return 'password + ".htm"';
+    return `"${new URL(from).origin === new URL(to).origin ? new URL(folder(to)).pathname : folder(to)}" + password + ".htm"`;
 }
 
 function defaultTitle(level: number): string {
@@ -230,11 +239,14 @@ function uniqueGeneratedEntrance(level: number): Entrance {
     const firstInFolder = Math.max(1, Math.floor(level / levelsPerFolder) * levelsPerFolder);
     const used = new Set<string>();
     for (let previous = firstInFolder; previous < level; previous++) {
-        used.add(entrance(previous).path);
+        used.add(entrance(previous).url);
+    }
+    for (let previous = firstSubdomainLevel; previous < firstInFolder; previous++) {
+        if (chooseKind(previous) === 'subdomain') used.add(entrance(previous).url);
     }
     for (let attempt = 0; attempt < 4096; attempt++) {
         const candidate = generatedEntrance(level, attempt);
-        if (!used.has(candidate.path)) return candidate;
+        if (!used.has(candidate.url)) return candidate;
     }
     throw new Error(`Could not generate a unique entrance for level ${level}.`);
 }
@@ -258,7 +270,7 @@ function generatedEntrance(level: number, attempt: number): Entrance {
             return buildEntrance(level, { kind, answer: word, extension, clue, folder });
         }
         case 'name': {
-            const name = pickByUnit(unlistedNames.filter((candidate) => candidate.length <= (level < longNameLevel ? 4 : 5)), unit(salts.rank));
+            const name = pickByUnit(unlistedNames, unit(salts.rank));
             return buildEntrance(level, { kind, answer: name, clue: wordClue(level, name, wordPageName, true, recent), folder });
         }
         case 'leet': {
@@ -287,6 +299,42 @@ function generatedEntrance(level: number, attempt: number): Entrance {
             const clue = encodedClue(`${first} ${second}`, textEncodingFor(level, unit(salts.encoding), recent), level, unit(salts.clue));
             return buildEntrance(level, { kind, answer: `${first}${second}`, words: [first, second], clue, folder });
         }
+        case 'capitals': {
+            const word = sampleWord(level, unit(salts.rank));
+            const answer = word.toUpperCase();
+            return buildEntrance(level, { kind, answer, words: [word], clue: encodedClue(answer, caseEncodingFor(unit(salts.encoding), recent), level, unit(salts.clue)), folder });
+        }
+        case 'reversed': {
+            const word = reversibleWord(level, unit(salts.rank));
+            const answer = [...word].reverse().join('');
+            const clue = encodedClue(answer, textEncodingFor(level, unit(salts.encoding), recent, ['reversed', 'upsideDown']), level, unit(salts.clue));
+            return buildEntrance(level, { kind, answer, words: [word], clue, folder });
+        }
+        case 'backup': {
+            const word = sampleWord(level, unit(salts.rank));
+            const extension = `htm.${pickByUnit(backupEndings, unit(salts.extension))}`;
+            const wordHint = wordClue(level, word, wordPageName, false, recent);
+            const ending = showsLine(level, firstBackupLevel) ? [pickByUnit(clueLines.backup, unit(salts.ending))] : [];
+            const clue: Clue = { ...wordHint, imageName: `${wordHint.imageName?.replace(/\.jpg$/, '') ?? level}.${extension}.jpg`, lines: [...(wordHint.lines ?? []), ...ending] };
+            return buildEntrance(level, { kind, answer: word, extension, clue, folder });
+        }
+        case 'date': {
+            const year = firstYear + Math.floor(unit(salts.year) * yearCount);
+            const month = 1 + Math.floor(unit(salts.month) * 12);
+            const day = 1 + Math.floor(unit(salts.day) * longestMonthDays);
+            const answer = `${String(day).padStart(2, '0')}${String(month).padStart(2, '0')}${year}`;
+            return buildEntrance(level, { kind, answer, words: [], clue: dateClue(day, month, year, level, unit(salts.clue), recent), folder });
+        }
+        case 'latin': {
+            const word = pickByUnit(latinWords, unit(salts.rank));
+            return buildEntrance(level, { kind, answer: word, clue: encodedClue(word, textEncodingFor(level, unit(salts.encoding), recent), level, unit(salts.clue)), folder });
+        }
+        case 'subdomain': {
+            const word = sampleWord(level, unit(salts.rank));
+            const hint = encodedClue(word, textEncodingFor(level, unit(salts.encoding), recent), level, unit(salts.clue));
+            const lines = showsLine(level, firstSubdomainLevel) ? [pickByUnit(clueLines.subdomain, unit(salts.ending))] : [];
+            return buildEntrance(level, { kind, answer: word, clue: { ...hint, lines: [...(hint.lines ?? []), ...lines] }, folder });
+        }
         case 'phrase': {
             const wordCount = 3 + Math.floor(unit(salts.phraseLength) * 2);
             const phraseSalts = [salts.rank, salts.secondWord, salts.thirdWord, salts.fourthWord];
@@ -309,14 +357,14 @@ interface EntranceParts {
 
 function buildEntrance(level: number, { kind, answer, clue, folder, extension = 'htm', words = [answer], credentials = null }: EntranceParts): Entrance {
     const folderPath = folder === null ? '/' : `/${folder}/`;
-    const path = kind === 'credentials' ? `${folderPath}${answer}/` : `${folderPath}${answer}.${extension}`;
+    const path = kind === 'subdomain' ? '/' : kind === 'credentials' ? `${folderPath}${answer}/` : `${folderPath}${answer}.${extension}`;
     return {
         level,
         kind,
         path,
-        url: `${riddleOrigin}${path}`,
+        url: `${kind === 'subdomain' ? `http://${answer}.${riddleDomain}` : riddleOrigin}${path}`,
         folder,
-        wildcard: folder !== null && wildcardFolders.has(folder),
+        wildcard: kind !== 'subdomain' && folder !== null && wildcardFolders.has(folder),
         answer,
         extension,
         words,
@@ -347,13 +395,19 @@ function wordPageName(level: number): string | null {
 
 function chooseKind(level: number): GeneratedKind {
     const weights: readonly (readonly [GeneratedKind, number])[] = [
-        ['extension', ramp(level, 150, 400, 0.08, 0.2)],
-        ['name', ramp(level, 250, 1000, 0.015, 0.03)],
-        ['leet', ramp(level, 300, 600, 0.06, 0.16)],
-        ['number', ramp(level, 400, 700, 0.06, 0.1)],
-        ['credentials', ramp(level, 500, 800, 0.05, 0.1)],
-        ['twoWords', ramp(level, 700, 1000, 0.1, 0.25)],
         ['phrase', ramp(level, 1000, 1300, 0.15, 0.6)],
+        ['extension', ramp(level, 150, 400, 0.08, 0.14)],
+        ['name', ramp(level, 250, 1000, 0.015, 0.03)],
+        ['leet', ramp(level, 300, 600, 0.06, 0.1)],
+        ['capitals', ramp(level, 330, 600, 0.05, 0.06)],
+        ['reversed', ramp(level, 380, 650, 0.05, 0.06)],
+        ['number', ramp(level, 400, 700, 0.06, 0.06)],
+        ['backup', ramp(level, firstBackupLevel, 700, 0.05, 0.06)],
+        ['credentials', ramp(level, firstCredentialsLevel, 800, 0.05, 0.09)],
+        ['date', ramp(level, 560, 800, 0.04, 0.05)],
+        ['latin', ramp(level, 610, 850, 0.04, 0.05)],
+        ['subdomain', ramp(level, firstSubdomainLevel, 900, 0.04, 0.05)],
+        ['twoWords', ramp(level, 700, 1000, 0.08, 0.16)],
     ];
     let roll = unitHash(level, salts.kind);
     for (const [kind, weight] of weights) {
@@ -374,7 +428,17 @@ function maximumRank(level: number): number {
 }
 
 function sampleWord(level: number, unit: number): string {
-    return wordAtRank(Math.max(1, Math.floor(Math.exp(unit * Math.log(maximumRank(level))))));
+    return wordAtRank(Math.max(1, Math.floor(maximumRank(level) * unit ** 1.4)));
+}
+
+function reversibleWord(level: number, unit: number): string {
+    const rank = rankOfWord(sampleWord(level, unit));
+    for (let offset = 0; offset < vocabularySize; offset++) {
+        const word = wordAtRank(((rank + offset - 1) % vocabularySize) + 1);
+        const backwards = [...word].reverse().join('');
+        if (wordAtRank(rankOfWord(backwards)) !== backwards) return word;
+    }
+    return wordAtRank(rank);
 }
 
 function sampleCommonWord(unit: number, maximum: number, maximumLength: number, avoid?: string): string {

@@ -51,6 +51,14 @@ export function increment(state: GameState, statisticId: string, amount = 1): vo
     state.statistics[statisticId] = (state.statistics[statisticId] ?? 0) + amount;
 }
 
+export function isNeeded(state: GameState, purchasableId: string): boolean {
+    return state.flags[`needed:${purchasableId}`] === true;
+}
+
+export function markNeeded(state: GameState, purchasableId: string): void {
+    state.flags[`needed:${purchasableId}`] = true;
+}
+
 export function owns(state: GameState, purchasableId: string): boolean {
     return (state.purchases[purchasableId] ?? 0) > 0;
 }

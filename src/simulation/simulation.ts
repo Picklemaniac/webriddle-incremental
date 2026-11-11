@@ -46,7 +46,7 @@ interface AdvanceClock {
     readonly offline: boolean;
 }
 
-const upkeepActions: ReadonlySet<string> = new Set(['checkIn', 'setRentedAddresses']);
+const upkeepActions: ReadonlySet<string> = new Set(['checkIn', 'setRentBudget']);
 
 export function milestoneTiming(report: SimulationReport, milestoneId: string): MilestoneTiming | undefined {
     return report.milestoneTimings.find((timing) => timing.milestoneId === milestoneId);
