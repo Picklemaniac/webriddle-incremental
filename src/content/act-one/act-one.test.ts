@@ -471,13 +471,12 @@ describe('Act I', () => {
         expect(game.state.network.rentShare).toBe(1);
     });
 
-    it('offers an upgrade the player could soon afford, even while the money is being spent', () => {
-        const game = automatedAt(350);
-        for (const id of ['ram', 'newPc', 'secondPc', 'autoReplyMacros', 'certification', 'seniorCertification']) game.state.purchases[id] = 1;
-        game.invalidateStats();
+    it('offers a card from its level on, also when the player cannot pay for it yet', () => {
+        const game = automatedAt(147);
+        for (const id of ['certification', 'seniorCertification']) game.state.purchases[id] = 1;
+        game.state.resources.money = 0;
         expect(offeredUpgrades(game).map((item) => item.id)).not.toContain('teamLead');
-        game.state.jobs = { ticketing: 5 };
-        game.state.activity = 'riddles';
+        game.state.currentLevel = 148;
         expect(offeredUpgrades(game).map((item) => item.id)).toContain('teamLead');
     });
 

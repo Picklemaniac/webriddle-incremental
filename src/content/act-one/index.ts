@@ -71,8 +71,8 @@ function revealNextOffer(game: Game, seconds: number): boolean {
     if (seconds < regularOffersSeconds) return false;
     const offers = offeredUpgrades(game);
     const shownLimit = seconds < introductionSeconds ? earlyOfferLimit : laterOfferLimit;
-    if (offers.filter((item) => isUpgradeRevealed(state, item.id)).length >= shownLimit) return false;
-    const candidates = offers.filter((item) => !isUpgradeRevealed(state, item.id) && readyForUpgrade(game, item));
+    const listIsFull = offers.filter((item) => isUpgradeRevealed(state, item.id)).length >= shownLimit;
+    const candidates = offers.filter((item) => !isUpgradeRevealed(state, item.id) && readyForUpgrade(game, item) && (item.onNeed || !listIsFull));
     const { missing } = currentSearch(game);
     const fixesWall = (item: Upgrade): number => Number(missing.includes(item.id));
     const capped = requestedRate(game) > networkCapacity(game);

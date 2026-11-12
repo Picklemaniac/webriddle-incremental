@@ -22,7 +22,6 @@ export class PurchasesPanel implements Panel {
     private readonly game: Game;
     private readonly cards = new Map<string, HTMLButtonElement>();
     private readonly leaving = new Map<string, number>();
-    private readonly empty = createElement('p', { className: 'panel-help', text: uiText.noUpgrades });
     private readonly tooltip = createElement('div', { className: 'win-tooltip', attributes: { role: 'tooltip' } });
     private tooltipTimer: ReturnType<typeof setTimeout> | undefined;
     private purchaseLockUntil = 0;
@@ -43,7 +42,7 @@ export class PurchasesPanel implements Panel {
             list.append(card);
         }
         this.tooltip.hidden = true;
-        this.element.append(this.empty, list);
+        this.element.append(list);
         document.body.append(this.tooltip);
         game.subscribe((event) => {
             if (event.type === 'actionApplied' && event.action.type === 'purchase' && !game.isCatchingUp) {
@@ -61,7 +60,6 @@ export class PurchasesPanel implements Panel {
         for (const [id, until] of this.leaving) if (now >= until) this.leaving.delete(id);
         const offered = new Set(offeredUpgrades(this.game).filter((item) => isUpgradeRevealed(this.game.state, item.id)).map((item) => item.id));
         this.element.hidden = this.game.state.flags.upgradesRevealed !== true;
-        this.empty.hidden = offered.size > 0 || this.leaving.size > 0;
         for (const item of upgrades) {
             const card = this.cards.get(item.id)!;
             const leaving = this.leaving.has(item.id);
