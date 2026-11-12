@@ -366,7 +366,8 @@ describe('Act I', () => {
         game.state.purchases.keepAlive = 1;
         game.invalidateStats();
         game.advance(10);
-        expect(effectiveRate(game)).toBe(networkCapacity(game));
+        expect(effectiveRate(game)).toBe(requestedRate(game));
+        expect(game.state.network.heat).toBe(0);
         game.advance(50);
         expect(game.state.flags.networkRevealed).toBe(true);
         expect(effectiveRate(game)).toBe(requestedRate(game));

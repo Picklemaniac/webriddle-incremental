@@ -76,8 +76,7 @@ export function isThrottled(game: Game): boolean {
 
 export function effectiveRate(game: Game): number {
     if (isBanned(game)) return 0;
-    const capped = isThrottled(game) || game.state.flags.networkRevealed !== true;
-    return capped ? Math.min(requestedRate(game), networkCapacity(game)) : requestedRate(game);
+    return isThrottled(game) ? Math.min(requestedRate(game), networkCapacity(game)) : requestedRate(game);
 }
 
 export function setThrottle(game: Game, enabled: boolean): boolean {
