@@ -96,7 +96,7 @@ export class PurchasesPanel implements Panel {
 
     private effectText(item: Upgrade): string {
         const modifiers = item.modifiers?.(1) ?? [];
-        const shownStats = new Set(modifiers.map(({ statId }) => requestStats.has(statId) ? 'requestRate' : statId));
+        const shownStats = new Set(modifiers.flatMap(({ statId }) => (requestStats.has(statId) ? [...(statId === 'threadsPerScript' ? [statId] : []), 'requestRate'] : [statId])));
         const lines = [...shownStats].flatMap((statId) => {
             const text = statLabels[statId];
             if (text === undefined) return [];

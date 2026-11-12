@@ -187,7 +187,7 @@ export const pageText = {
 } as const;
 
 export const upgradeText = {
-    curlBatch: { name: 'Parallel requests', description: 'Your script sends four requests at a time instead of one.' },
+    curlBatch: { name: 'Parallel requests', description: 'Your script runs four threads instead of one, so it sends four times as many requests.' },
     sortByFrequency: { name: 'Sort by frequency', description: 'Your wordlists try the most common words first.' },
     keepAlive: { name: 'Keep-alive', description: 'Your script keeps its connection open, so requests go twice as fast.' },
     fakeUserAgent: { name: 'Browser user-agent', description: 'Your script tells the server that it is a web browser.' },
@@ -206,7 +206,7 @@ export const upgradeText = {
     rssFeeds: { name: 'RSS feeds', description: 'News feeds that double the data you collect.' },
     dirb: { name: 'dirb', description: 'A tool for finding hidden pages. Unlike your script, it also searches inside folders.' },
     freeProxies: { name: 'Free proxy list', description: 'Three free proxies to send requests from. They stop working after a few minutes.' },
-    threads8: { name: 'Eight threads', description: 'Your script sends eight requests at a time instead of four.' },
+    threads8: { name: 'Eight threads', description: 'Your script runs eight threads instead of four, so it sends twice as many requests.' },
     adsl: { name: 'ADSL', description: 'Broadband over your phone line, three times as fast as ISDN.' },
     secondPc: { name: 'Second PC', description: 'Another computer that runs three more scripts.' },
     extensionList: { name: 'Extension list', description: 'DirBuster also tries .html, .php, .asp and .txt pages.' },
@@ -263,6 +263,7 @@ export const upgradeText = {
 export type UpgradeId = keyof typeof upgradeText;
 
 export const statText = {
+    threadsPerScript: { label: 'Threads per script', value: '{value}' },
     requestRate: { label: 'Requests per second per script', value: '{value}' },
     scriptSlots: { label: 'Scripts', value: '{value}' },
     workRate: { label: 'Pay while you work', value: '${value}/s' },
