@@ -301,12 +301,13 @@ describe('Act I', () => {
 
     it('lists rented addresses as address blocks and fills them in order', () => {
         const game = newGame();
-        for (const id of ['rentedAddresses', 'addressBlock', 'secondAddressBlock', 'leasedRange', 'dataCenterRange', 'secondDataCenterRange']) game.state.purchases[id] = 1;
+        for (const id of ['rentedAddresses', 'addressBlock', 'secondAddressBlock', 'thirdAddressBlock', 'leasedRange', 'secondLeasedRange', 'dataCenterRange', 'secondDataCenterRange']) game.state.purchases[id] = 1;
         game.state.network.rentedAddresses = 200;
         const blocks = rentedBlocks(game);
-        expect(blocks.map((block) => block.range)).toEqual(['198.18.0.0/27', '198.18.4.0/26', '198.18.8.0/25', '198.18.12.0/24', '198.18.16.0/23', '198.18.20.0/22']);
-        expect(blocks.map((block) => block.rented)).toEqual([32, 64, 104, 0, 0, 0]);
-        expect(game.stat('rentableAddresses')).toBe(32 + 64 + 128 + 256 + 512 + 1024);
+        expect(blocks.map((block) => block.range)).toEqual(
+            ['198.18.0.0/29', '198.18.4.0/28', '198.18.8.0/27', '198.18.12.0/26', '198.18.16.0/25', '198.18.20.0/24', '198.18.24.0/23', '198.18.28.0/22']);
+        expect(blocks.map((block) => block.rented)).toEqual([8, 16, 32, 64, 80, 0, 0, 0]);
+        expect(game.stat('rentableAddresses')).toBe(8 + 16 + 32 + 64 + 128 + 256 + 512 + 1024);
     });
 
     it('keeps all generated levels solvable by hand, including credentials', () => {
@@ -391,9 +392,9 @@ describe('Act I', () => {
         game.advance(0.25);
         game.dispatch({ type: 'setRentedAddresses', count: 0 });
         expect(networkCapacity(game)).toBe(10);
-        game.dispatch({ type: 'setRentedAddresses', count: 32 });
+        game.dispatch({ type: 'setRentedAddresses', count: 8 });
         game.advance(0.25);
-        expect(networkCapacity(game)).toBe(330);
+        expect(networkCapacity(game)).toBe(90);
     });
 
     it('charges rent by the second, and leaves a player who rents more than the pay covers broke with only the paid addresses working', () => {
@@ -403,47 +404,144 @@ describe('Act I', () => {
         game.state.resources.money = 1000;
         game.dispatch({ type: 'checkIn' });
         game.advance(0.25);
-        expect(game.state.network.rentedAddresses).toBe(Math.min(16, Math.floor(incomePerSecond(game, 'money') * 0.3 / game.stat('addressRent'))));
-        expect(game.dispatch({ type: 'setRentedAddresses', count: 33 })).toBe(false);
+        expect(game.state.network.rentedAddresses).toBe(Math.min(4, Math.floor(incomePerSecond(game, 'money') * 0.3 / game.stat('addressRent'))));
+        expect(game.dispatch({ type: 'setRentedAddresses', count: 9 })).toBe(false);
         expect(game.dispatch({ type: 'setRentedAddresses', count: -1 })).toBe(false);
-        expect(game.dispatch({ type: 'setRentedAddresses', count: 20 })).toBe(true);
+        expect(game.dispatch({ type: 'setRentedAddresses', count: 8 })).toBe(true);
         expect(rentPerSecond(game)).toBeGreaterThan(incomePerSecond(game, 'money'));
         const before = game.state.resources.money!;
         game.advance(10);
         expect(game.state.resources.money).toBeCloseTo(before + 10 * (incomePerSecond(game, 'money') - rentPerSecond(game)));
-        expect(addressCount(game)).toBe(21);
+        expect(addressCount(game)).toBe(9);
         game.state.resources.money = 0;
         game.advance(10);
         expect(game.state.resources.money).toBeCloseTo(0);
         expect(game.state.network.rentShare).toBeCloseTo(incomePerSecond(game, 'money') / rentPerSecond(game));
-        expect(addressCount(game)).toBeCloseTo(1 + 20 * game.state.network.rentShare);
+        expect(addressCount(game)).toBeCloseTo(1 + 8 * game.state.network.rentShare);
         expect(game.dispatch({ type: 'setRentedAddresses', count: 2 })).toBe(true);
         game.advance(10);
         expect(game.state.network.rentShare).toBe(1);
         expect(game.state.resources.money).toBeGreaterThan(0);
     });
 
-    it('asks for the next address block once every address is rented and the server limit still holds the scripts back', () => {
+    it('asks for the next address block once every address has been rented for a minute while the server limit still holds the scripts back', () => {
         const game = automatedAt(300);
-        for (const id of ['rentedAddresses', 'throttle', 'curlBatch', 'threads8', 'keepAlive', 'isdn']) game.state.purchases[id] = 1;
+        for (const id of ['rentedAddresses', 'throttle', 'curlBatch']) game.state.purchases[id] = 1;
         game.invalidateStats();
         game.state.flags.networkRevealed = true;
         game.state.resources.money = 10_000;
         game.dispatch({ type: 'checkIn' });
         const offered = (): string[] => offeredUpgrades(game).map((item) => item.id);
-        game.dispatch({ type: 'setRentedAddresses', count: 32 });
-        game.advance(1);
+        const everyAddress = game.stat('rentableAddresses');
+        game.dispatch({ type: 'setRentedAddresses', count: everyAddress });
+        game.advance(120);
         expect(requestedRate(game) * 2).toBeLessThanOrEqual(networkCapacity(game));
         expect(offered()).not.toContain('addressBlock');
-        game.state.purchases.adsl = 1;
+        for (const id of ['threads8', 'keepAlive', 'isdn']) game.state.purchases[id] = 1;
         game.invalidateStats();
-        game.dispatch({ type: 'setRentedAddresses', count: 31 });
-        game.advance(1);
+        game.dispatch({ type: 'setRentedAddresses', count: everyAddress - 1 });
+        game.advance(120);
         expect(requestedRate(game) * 2).toBeGreaterThan(networkCapacity(game));
         expect(offered()).not.toContain('addressBlock');
-        game.dispatch({ type: 'setRentedAddresses', count: 32 });
-        game.advance(1);
+        game.dispatch({ type: 'setRentedAddresses', count: everyAddress });
+        game.advance(5);
+        game.dispatch({ type: 'setRentedAddresses', count: 0 });
+        game.advance(120);
+        expect(offered()).not.toContain('addressBlock');
+        game.dispatch({ type: 'setRentedAddresses', count: everyAddress });
+        game.advance(54);
+        expect(offered()).not.toContain('addressBlock');
+        game.advance(2);
         expect(offered()).toContain('addressBlock');
+    });
+
+    it('offers a faster connection once one script has fitted under the server limit with it for a minute, so that a sweep of the rent slider does not count', () => {
+        const game = automatedAt(120);
+        for (const id of ['curlBatch', 'keepAlive', 'threads8', 'isdn', 'throttle', 'rentedAddresses', 'addressBlock']) game.state.purchases[id] = 1;
+        game.invalidateStats();
+        game.state.resources.money = 10_000;
+        game.dispatch({ type: 'checkIn' });
+        const offered = (): string[] => offeredUpgrades(game).map((item) => item.id);
+        const everyAddress = game.stat('rentableAddresses');
+        const withAdsl = upgrades.find((item) => item.id === 'adsl')!.modifiers!(1);
+        game.advance(0.25);
+        game.dispatch({ type: 'setRentedAddresses', count: 0 });
+        game.advance(120);
+        expect(offered()).not.toContain('adsl');
+        game.dispatch({ type: 'setRentedAddresses', count: everyAddress });
+        game.advance(10);
+        expect(game.statWith('requestsPerThread', withAdsl) * game.stat('threadsPerScript')).toBeLessThanOrEqual(networkCapacity(game));
+        game.dispatch({ type: 'setRentedAddresses', count: 0 });
+        game.advance(120);
+        expect(offered()).not.toContain('adsl');
+        game.dispatch({ type: 'setRentedAddresses', count: everyAddress });
+        game.advance(49);
+        expect(offered()).not.toContain('adsl');
+        game.advance(2);
+        expect(offered()).toContain('adsl');
+    });
+
+    it('offers the speed cards one at a time, so that two of them cannot add up to more than the server limit takes', () => {
+        const game = automatedAt(40);
+        for (const id of ['curlBatch', 'freeProxies', 'throttle']) game.state.purchases[id] = 1;
+        game.invalidateStats();
+        game.dispatch({ type: 'checkIn' });
+        const offered = (): string[] => offeredUpgrades(game).map((item) => item.id);
+        const buy = (id: string): void => {
+            game.state.purchases[id] = 1;
+            game.invalidateStats();
+        };
+        game.advance(61);
+        expect(networkCapacity(game)).toBe(40);
+        expect(offered()).toContain('keepAlive');
+        expect(offered()).not.toContain('isdn');
+        expect(offered()).not.toContain('threads8');
+        buy('keepAlive');
+        game.advance(61);
+        expect(offered()).toContain('isdn');
+        expect(offered()).not.toContain('threads8');
+        buy('isdn');
+        game.advance(61);
+        expect(offered()).not.toContain('threads8');
+    });
+
+    it('offers the checked proxy list once six proxies have stopped working, and not after the first', () => {
+        const game = automatedAt(20);
+        game.state.purchases.freeProxies = 1;
+        game.invalidateStats();
+        game.dispatch({ type: 'checkIn' });
+        const offered = (): string[] => offeredUpgrades(game).map((item) => item.id);
+        const deaths = (): number => game.state.statistics.proxyDeaths ?? 0;
+        const playUntilDeaths = (count: number): void => {
+            for (let ticks = 0; deaths() < count && ticks < 20_000; ticks++) {
+                game.advance(0.25);
+                game.state.network.proxies.forEach((proxy, proxyIndex) => {
+                    if (proxy.diesAtSeconds <= game.state.elapsedSeconds - 1) game.dispatch({ type: 'replaceProxy', proxyIndex });
+                });
+            }
+        };
+        playUntilDeaths(1);
+        expect(game.state.flags['notice:firstProxyDeath']).toBe(true);
+        expect(offered()).not.toContain('proxyUptime');
+        playUntilDeaths(5);
+        expect(deaths()).toBe(5);
+        expect(offered()).not.toContain('proxyUptime');
+        playUntilDeaths(6);
+        expect(offered()).toContain('proxyUptime');
+    });
+
+    it('offers a card that doubles an income only when a card on screen is minutes out of reach', () => {
+        const game = automatedAt(120);
+        for (const id of ['wgetMirror', 'fakeUserAgent']) game.state.purchases[id] = 1;
+        Object.assign(game.state.flags, { dataRevealed: true, 'needed:english10k': true, 'seen:english10k': true });
+        game.dispatch({ type: 'checkIn' });
+        const offered = (): string[] => offeredUpgrades(game).map((item) => item.id);
+        game.advance(1);
+        expect(offered()).toContain('english10k');
+        expect(offered()).not.toContain('rssFeeds');
+        Object.assign(game.state.flags, { 'needed:dictWords': true, 'seen:dictWords': true });
+        game.advance(1);
+        expect(offered()).toContain('rssFeeds');
     });
 
     it('stops paying for jobs after ten minutes without the player, and then pays the rent from what the jobs would earn', () => {
@@ -459,7 +557,7 @@ describe('Act I', () => {
         game.state.purchases.rentedAddresses = 1;
         game.invalidateStats();
         game.advance(0.25);
-        game.state.network.rentedAddresses = 20;
+        game.state.network.rentedAddresses = 8;
         const saved = game.state.resources.money!;
         game.advance(600);
         expect(game.state.resources.money).toBe(saved);

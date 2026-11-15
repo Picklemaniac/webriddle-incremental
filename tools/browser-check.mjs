@@ -226,9 +226,9 @@ try {
     await waitFor(`document.querySelector('.throttle-switch').textContent === 'Off' && document.querySelector('.stat-row .over-limit') !== null`);
     await evaluate(`document.querySelector('.throttle-switch').click()`);
     await waitFor(`document.querySelector('.throttle-switch').textContent === 'On' && document.querySelector('.stat-row .over-limit') === null`);
-    await setSlider('Rented IPs', 32);
-    await waitFor(`${sliderText('Rented IPs')}.startsWith('32 of ') && ${statText('Rent')} === '$7.68/s'`);
-    await waitFor(`${statNumber('IP addresses')} >= 33 && ${statNumber('Server limit')} === ${statNumber('IP addresses')} * 10`);
+    await setSlider('Rented IPs', 8);
+    await waitFor(`${sliderText('Rented IPs')}.startsWith('8 of ') && ${statText('Rent')} === '$1.92/s'`);
+    await waitFor(`${statNumber('IP addresses')} >= 9 && ${statNumber('Server limit')} === ${statNumber('IP addresses')} * 10`);
     await screenshot('network-levers', false);
     const broke = game.clone();
     broke.state.resources.money = 0;
@@ -279,7 +279,7 @@ try {
     await waitFor(`!/, 0 dead/.test(document.querySelector('.proxy-summary').textContent)`);
     await evaluate(`document.querySelector('.proxy-details').open = true`);
     assert.ok(await evaluate(`document.querySelector('.proxy-details').textContent.includes('203.0.113.24')`), 'The IP list shows your own address');
-    if (game.state.purchases.rentedAddresses) assert.ok(await evaluate(`document.querySelector('.proxy-details').textContent.includes('198.18.0.0/27')`), 'The IP list shows rented addresses');
+    if (game.state.purchases.rentedAddresses) assert.ok(await evaluate(`document.querySelector('.proxy-details').textContent.includes('198.18.0.0/29')`), 'The IP list shows rented addresses');
     await evaluate(`document.querySelectorAll('.proxy-row.dead button').forEach((button) => button.click())`);
     await waitFor(`/, 0 dead/.test(document.querySelector('.proxy-summary').textContent)`);
     await evaluate(`document.querySelector('.proxy-details').open = false`);

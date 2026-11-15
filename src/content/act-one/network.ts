@@ -2,15 +2,14 @@ import type { GameSystem } from '../../core/content.ts';
 import type { Game } from '../../core/game.ts';
 import { createCaptcha } from './captchas.ts';
 import { dirbustingScripts, incomePerSecond, incomeWhileEarning, isAway, scriptSlots } from './economy.ts';
-import { increment, markNeeded, noticeOnce, owns } from './progress.ts';
-import { laterAddressBlocks, upgrades } from './upgrades.ts';
+import { increment, noticeOnce, owns } from './progress.ts';
+import { upgrades } from './upgrades.ts';
 
 export const requestsPerAddress = 10;
 export const ownAddress = '203.0.113.24';
 const banSeconds = 300;
 const heatPerExcessRatio = 3;
 const coolingPerSecond = 3;
-const newBlockRentedShare = 0.5;
 const startingRentShareOfIncome = 0.3;
 const proxySeconds = 180;
 
@@ -103,17 +102,17 @@ export function replaceProxy(game: Game, proxyIndex: number): boolean {
     return true;
 }
 
-function rentPartOfNewBlocks(game: Game): void {
+function rentNewBlocks(game: Game): void {
     const { network } = game.state;
     const rentable = game.stat('rentableAddresses');
     if (rentable <= network.knownRentable) return;
-    const newlyOffered = Math.round((rentable - network.knownRentable) * newBlockRentedShare);
+    const newlyOffered = rentable - network.knownRentable;
     const affordable = Math.floor(incomeWhileEarning(game, 'money') * startingRentShareOfIncome / game.stat('addressRent'));
-    network.rentedAddresses += Math.max(0, Math.min(newlyOffered, affordable - network.rentedAddresses));
+    network.rentedAddresses += Math.max(0, Math.min(newlyOffered, affordable - network.rentedAddresses, rentable - network.rentedAddresses));
     network.knownRentable = rentable;
 }
 
-function rentsEveryAddress(game: Game): boolean {
+export function rentsEveryAddress(game: Game): boolean {
     const { rentedAddresses, rentShare } = game.state.network;
     return rentedAddresses > 0 && rentedAddresses === game.stat('rentableAddresses') && rentShare === 1;
 }
@@ -121,11 +120,7 @@ function rentsEveryAddress(game: Game): boolean {
 export const rent: GameSystem = {
     update(game, deltaSeconds) {
         const { state } = game;
-        rentPartOfNewBlocks(game);
-        if (rentsEveryAddress(game) && limitHoldsBack(game)) {
-            const nextBlock = laterAddressBlocks.find((id) => !owns(state, id));
-            if (nextBlock !== undefined) markNeeded(state, nextBlock);
-        }
+        rentNewBlocks(game);
         const due = rentPerSecond(game) * deltaSeconds;
         if (due === 0) {
             state.network.rentShare = 1;
@@ -148,6 +143,7 @@ export const network: GameSystem = {
             if (!proxy || (owns(state, 'proxyChecker') && proxy.diesAtSeconds + 10 <= state.elapsedSeconds)) {
                 replaceProxy(game, index);
             } else if (proxy.diesAtSeconds <= state.elapsedSeconds && proxy.diesAtSeconds > state.elapsedSeconds - deltaSeconds) {
+                increment(state, 'proxyDeaths');
                 noticeOnce(game, 'firstProxyDeath');
                 game.announce({ type: 'proxyDied' });
             }

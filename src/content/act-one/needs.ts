@@ -1,39 +1,66 @@
 import type { GameSystem } from '../../core/content.ts';
 import type { Game } from '../../core/game.ts';
-import { limitHoldsBack, networkCapacity } from './network.ts';
-import { isNeeded, isUpgradeRevealed, markNeeded, owns } from './progress.ts';
+import { incomeWhileEarning } from './economy.ts';
+import { limitHoldsBack, networkCapacity, rentsEveryAddress } from './network.ts';
+import { increment, isNeeded, isUpgradeRevealed, markNeeded, owns } from './progress.ts';
 import type { UpgradeId } from './text.ts';
 import { offeredUpgrades, upgrades, type Upgrade } from './upgrades.ts';
 
-type Trigger = (game: Game, item: Upgrade) => boolean;
+type Condition = (game: Game, item: Upgrade) => boolean;
 
-const oneScriptStillFits: Trigger = (game, item) => {
+// What has to be going on before a card that unlocks with whenUseful is offered. A condition that a sweep of the rent slider can set off has to hold for a while in total.
+interface Trigger {
+    readonly holds: Condition;
+    readonly forSeconds?: number;
+}
+
+const settledSeconds = 60;
+const proxyDeathsBeforeLongerLives = 6;
+const longWaitSeconds = 180;
+
+const oneScriptStillFits: Condition = (game, item) => {
     const modifiers = item.modifiers?.(1) ?? [];
     return game.statWith('threadsPerScript', modifiers) * game.statWith('requestsPerThread', modifiers) <= networkCapacity(game);
 };
-const aProxyHasDied: Trigger = (game) => game.state.flags['notice:firstProxyDeath'] === true;
-const stoppedWhileAway: Trigger = (game) => game.state.flags.offlineCapReached === true;
-const waitingFor = (resource: string): Trigger => (game) =>
-    offeredUpgrades(game).some((item) => isUpgradeRevealed(game.state, item.id) && (item.price[resource] ?? 0) > (game.state.resources[resource] ?? 0));
+const everyAddressIsInUse: Condition = (game) => rentsEveryAddress(game) && limitHoldsBack(game);
+const proxiesKeepDying: Condition = (game) => (game.state.statistics.proxyDeaths ?? 0) >= proxyDeathsBeforeLongerLives;
+const stoppedWhileAway: Condition = (game) => game.state.flags.offlineCapReached === true;
+// A card on screen costs more than the player has and would earn in the next few minutes.
+const shortOf = (resource: string): Condition => (game) => {
+    const withinReach = (game.state.resources[resource] ?? 0) + incomeWhileEarning(game, resource) * longWaitSeconds;
+    return offeredUpgrades(game).some((item) => isUpgradeRevealed(game.state, item.id) && (item.price[resource] ?? 0) > withinReach);
+};
 
-// What has to be going on before a card that unlocks with whenUseful is offered.
+const whenTheLimitHoldsBack: Trigger = { holds: limitHoldsBack };
+const whenEveryAddressIsInUse: Trigger = { holds: everyAddressIsInUse, forSeconds: settledSeconds };
+const whenOneScriptStillFits: Trigger = { holds: oneScriptStillFits, forSeconds: settledSeconds };
+const whenShortOfData: Trigger = { holds: shortOf('data') };
+const whenShortOfInsight: Trigger = { holds: shortOf('insight') };
+
 const triggers: Readonly<Partial<Record<UpgradeId, Trigger>>> = {
-    freeProxies: limitHoldsBack,
-    proxyPool: limitHoldsBack,
-    rentedAddresses: limitHoldsBack,
-    proxyUptime: aProxyHasDied,
-    keepAlive: oneScriptStillFits,
-    isdn: oneScriptStillFits,
-    threads8: oneScriptStillFits,
-    adsl: oneScriptStillFits,
-    cable: oneScriptStillFits,
-    fiber: oneScriptStillFits,
-    rssFeeds: waitingFor('data'),
-    archives: waitingFor('data'),
-    webCrawler: waitingFor('data'),
-    riddleForum: waitingFor('insight'),
-    forumModerator: waitingFor('insight'),
-    leavePcOn: stoppedWhileAway,
+    freeProxies: whenTheLimitHoldsBack,
+    proxyPool: whenTheLimitHoldsBack,
+    rentedAddresses: whenTheLimitHoldsBack,
+    addressBlock: whenEveryAddressIsInUse,
+    secondAddressBlock: whenEveryAddressIsInUse,
+    thirdAddressBlock: whenEveryAddressIsInUse,
+    leasedRange: whenEveryAddressIsInUse,
+    secondLeasedRange: whenEveryAddressIsInUse,
+    dataCenterRange: whenEveryAddressIsInUse,
+    secondDataCenterRange: whenEveryAddressIsInUse,
+    proxyUptime: { holds: proxiesKeepDying },
+    keepAlive: whenOneScriptStillFits,
+    isdn: whenOneScriptStillFits,
+    threads8: whenOneScriptStillFits,
+    adsl: whenOneScriptStillFits,
+    cable: whenOneScriptStillFits,
+    fiber: whenOneScriptStillFits,
+    rssFeeds: whenShortOfData,
+    archives: whenShortOfData,
+    webCrawler: whenShortOfData,
+    riddleForum: whenShortOfInsight,
+    forumModerator: whenShortOfInsight,
+    leavePcOn: { holds: stoppedWhileAway },
 };
 
 const triggered = upgrades.flatMap((item) => {
@@ -42,12 +69,18 @@ const triggered = upgrades.flatMap((item) => {
 });
 
 export const needs: GameSystem = {
-    update(game) {
+    update(game, deltaSeconds) {
         const { state } = game;
         if (state.flags.automated !== true) return;
         for (const { item, trigger } of triggered) {
             if (isNeeded(state, item.id) || owns(state, item.id) || state.currentLevel < item.level) continue;
-            if (item.requires.every((required) => owns(state, required)) && trigger(game, item)) markNeeded(state, item.id);
+            if (!item.requires.every((required) => owns(state, required)) || !trigger.holds(game, item)) continue;
+            if (trigger.forSeconds !== undefined) {
+                const held = `heldSeconds:${item.id}`;
+                increment(state, held, deltaSeconds);
+                if (state.statistics[held]! < trigger.forSeconds) continue;
+            }
+            markNeeded(state, item.id);
         }
     },
 };
