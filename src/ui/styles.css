@@ -101,6 +101,7 @@ strong { font-weight: 600; }
 .terminal-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 19px; }
 .terminal-line.miss { color: #8a8a8a; }
 .terminal-line.hit { color: var(--found); }
+.terminal-line.indexed { color: var(--link); }
 .terminal-line.finding { color: var(--treasure); }
 .terminal-line.warning { color: var(--problem); }
 .terminal-line.live { flex-shrink: 0; color: #c8c8c8; }

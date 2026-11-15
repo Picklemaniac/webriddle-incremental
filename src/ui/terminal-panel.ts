@@ -16,6 +16,8 @@ import { createElement, createTitleBar, setText } from './dom.ts';
 import type { Panel } from './panel.ts';
 
 const warningNotices: ReadonlySet<NoticeId> = new Set<NoticeId>(['firstRateLimit', 'firstBan', 'firstProxyDeath']);
+// Solved levels that queue up one after another are printed as one line, the latest. A level found by a search engine does not join the others, so that it is not lost among them.
+const solvedLineStyles: ReadonlySet<string> = new Set(['hit', 'indexed']);
 const hitResponse = 200;
 const loginResponse = 401;
 const slowResponses: Readonly<Partial<Record<SlowReason, number>>> = { credentials: loginResponse, userAgent: 403, wildcard: hitResponse };
@@ -185,9 +187,10 @@ export class TerminalPanel implements Panel {
                 break;
             case 'levelSolved': {
                 if (event.method === 'windfall') break;
-                const method = event.method === 'hand' ? terminalText.hand : event.method === 'search' ? terminalText.indexed : '200';
+                const indexed = event.method === 'search';
+                const method = event.method === 'hand' ? terminalText.hand : indexed ? terminalText.indexed : '200';
                 const solved = new URL(urlOfLevel(event.level));
-                this.queueLine(`${method}  ${solved.origin === riddleOrigin ? solved.pathname : solved.href}`, 'hit');
+                this.queueLine(`${method}  ${solved.origin === riddleOrigin ? solved.pathname : solved.href}`, indexed ? 'indexed' : 'hit');
                 break;
             }
             case 'findingDiscovered': {
@@ -200,7 +203,7 @@ export class TerminalPanel implements Panel {
 
     private queueLine(text: string, style: string): void {
         const previous = this.pendingLines.at(-1);
-        if (style === 'hit' && previous?.style === 'hit') previous.text = text;
+        if (solvedLineStyles.has(style) && previous?.style === style) previous.text = text;
         else this.pendingLines.push({ text, style });
         if (this.pendingLines.length > queuedLineLimit) this.pendingLines.shift();
     }
