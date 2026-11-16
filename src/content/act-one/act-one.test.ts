@@ -258,7 +258,7 @@ describe('Act I', () => {
         ['number', /^0000-9999$/],
         ['date', /^dates 1000-2099$/],
         ['latin', /^latin\.txt$/],
-        ['twoWords', /^words\.txt × (words|english-10k)\.txt, likely pairs first$/],
+        ['twoWords', /^words\.txt × (words|english-10k)\.txt$/],
     ])('comes to every %s answer in the pass that tries such names', (kind, label) => {
         const capabilities = searchCapabilities(stockedAt(10).state);
         const levels = generatedLevels().filter((level) => level <= 1000 && entrance(level).kind === kind);
@@ -590,7 +590,7 @@ describe('Act I', () => {
         expect(offeredUpgrades(game).map((item) => item.id)).toContain('teamLead');
     });
 
-    it('keeps the search progress when a purchase adds a pass, and starts the pass over when a purchase changes its order', () => {
+    it('keeps the search progress when a purchase adds a pass', () => {
         const game = automatedAt(29);
         game.state.purchases.fakeUserAgent = 1;
         const level = Array.from({ length: 30 }, (_, index) => index + 30).find((candidate) => planSearch(candidate, searchCapabilities(game.state)).hitAt > 300)!;
@@ -601,9 +601,6 @@ describe('Act I', () => {
         game.state.purchases.rockyou = 1;
         game.advance(1);
         expect(game.state.search.requestsSpent).toBeGreaterThan(spent);
-        game.state.purchases.likelyPairs = 1;
-        game.advance(1);
-        expect(game.state.search.requestsSpent).toBeLessThan(spent);
     });
 
     it('puts the passes of a card bought in the middle of a level last, and gives them their own place from the next level on', () => {
@@ -682,9 +679,9 @@ describe('Act I', () => {
         expect([...fixes].sort()).toEqual(['moreLeaks', 'mutationRules', 'rockyou']);
     });
 
-    it('shortens logins and two-word answers with the lists made for them', () => {
+    it('shortens logins with the lists made for them', () => {
         const state = newGame().state;
-        for (const item of upgrades) if (!['usernames', 'passwords', 'likelyPairs', 'crackHtpasswd'].includes(item.id)) state.purchases[item.id] = 1;
+        for (const item of upgrades) if (!['usernames', 'passwords', 'crackHtpasswd'].includes(item.id)) state.purchases[item.id] = 1;
         const capabilities = (owned: readonly string[]): SearchCapabilities => searchCapabilities({ ...state, purchases: { ...state.purchases, ...Object.fromEntries(owned.map((id) => [id, 1])) } });
         const cost = (kind: string, owned: readonly string[]): number => {
             let total = 0;
@@ -693,7 +690,6 @@ describe('Act I', () => {
         };
         expect(cost('credentials', ['usernames'])).toBeLessThan(cost('credentials', []) * 0.6);
         expect(cost('credentials', ['usernames', 'passwords'])).toBeLessThan(cost('credentials', ['usernames']) * 0.7);
-        expect(cost('twoWords', ['likelyPairs'])).toBeLessThan(cost('twoWords', []) * 0.75);
         const login = firstLevelOfKind('credentials');
         const loginPass = (owned: readonly string[]): SearchPhase => stagePlans(login, capabilities(owned)).at(-1)!.phases[0]!;
         expect(loginPass([]).label).toBe('usernames × passwords');
@@ -701,9 +697,6 @@ describe('Act I', () => {
         expect(loginPass(['usernames']).booster).toBe('passwords');
         expect(loginPass(['usernames', 'passwords']).label).toBe('usernames.txt × passwords.txt');
         expect(loginPass(['usernames', 'passwords']).booster).toBeUndefined();
-        const pairPasses = (owned: readonly string[]): SearchPhase[] => planSearch(login, capabilities(owned)).phases.filter((phase) => phase.label.includes(' × words.txt') || phase.label.includes(' × english'));
-        expect(pairPasses([]).map((phase) => phase.booster)).toEqual(['likelyPairs', 'likelyPairs']);
-        expect(pairPasses(['likelyPairs']).map((phase) => phase.booster)).toEqual([undefined, undefined]);
     });
 
     it('does not allocate more workers than the machine has', () => {

@@ -109,7 +109,6 @@ export const upgrades: readonly Upgrade[] = [
     whenUseful('forumModerator', { money: 22000 }, 680, ['riddleForum'], [multiply('riddleRate', 2), multiply('riddleBotRate', 2)]),
     whenUseful('dataCenterRange', { money: 16000 }, 100, ['secondLeasedRange'], [add('rentableAddresses', 512)]),
     whenNeeded('combinator', { insight: 300, money: 5000 }, 704),
-    whenNeeded('likelyPairs', { insight: 400 }, 720),
     upgrade('volumeDiscount', { money: 41000 }, 370, ['resellerAccount'], [multiply('addressRent', 0.8)]),
     upgrade('serverRack', { money: 47000 }, 400, ['dedicatedServer'], [add('scriptSlots', 6)]),
     upgrade('distributedFuzzing', { insight: 4100, money: 50000 }, 425, ['customFuzzer'], [multiply('searchEfficiency', 1.5)]),

@@ -56,7 +56,6 @@ export interface SearchPlan extends Route {
 export interface SearchCapabilities {
     readonly cards: readonly LearnedCard[];
     readonly met: readonly LearnedCard[];
-    readonly likelyPairs: boolean;
     readonly usernames: boolean;
     readonly passwords: boolean;
     readonly clusterBomb: boolean;
@@ -113,7 +112,6 @@ const listedMonthDays = 31;
 const listedYearDays = 12 * listedMonthDays;
 const mutationsPerWord = 6;
 const rockyouShare = 0.67;
-const likelyPairsDivisor = 3;
 const usernamesList: NamedList = { fileName: 'usernames.txt', size: 500 };
 const passwordsList: NamedList = { fileName: 'passwords.txt', size: 4_000 };
 const commonUsernames: NamedList = { fileName: searchText.usernames, size: 1_000 };
@@ -180,13 +178,13 @@ export function currentPhase(plan: Route, requestsSpent: number): { readonly pha
     return { phase, spent };
 }
 
-// When a purchase changes the search in the middle of a level, the passes DirBuster has finished are not made again. The pass it is in carries on, or starts over when its order has changed.
+// When a purchase changes the search in the middle of a level, the passes DirBuster has finished are not made again, and the pass it is in carries on.
 export function requestsKept(previousSignature: string, plan: SearchPlan, requestsSpent: number): number {
-    const [previousOrdering, ...previousIds] = previousSignature.split('|');
+    const previousIds = previousSignature.split('|');
     let kept = 0;
     for (const [index, phase] of plan.phases.entries()) {
         if (phase.id !== previousIds[index]) break;
-        if (kept + phase.size > requestsSpent) return plan.signature.split('|')[0] === previousOrdering ? requestsSpent : kept;
+        if (kept + phase.size > requestsSpent) return requestsSpent;
         kept += phase.size;
     }
     return kept;
@@ -198,7 +196,6 @@ export function searchCapabilities(state: GameState): SearchCapabilities {
     return {
         cards: cardsLearnedFromAnswers.filter((card) => (card === 'dirb' ? searchesFolders : owned(card))),
         met: cardsLearnedFromAnswers.filter((card) => isNeeded(state, card)),
-        likelyPairs: owned('likelyPairs'),
         usernames: owned('usernames'),
         passwords: owned('passwords'),
         clusterBomb: owned('clusterBomb'),
@@ -237,14 +234,13 @@ export function planSearch(targetLevel: number, capabilities: SearchCapabilities
     if (atLogin && !capabilities.clusterBomb && !capabilities.cracked) walls.push({ fix: 'clusterBomb', reason: 'credentials', slowdown: 20 });
     const home = inFolder ? pageHome : folderHome[0]!;
     const route = atLogin ? loginRoute(target, base, capabilities) : listedRoute(home, searchOrder(capabilities, resumedSignature), guessesNeeded(home, target, capabilities));
-    const ordering = atLogin ? 'login' : String(Number(capabilities.likelyPairs));
     return {
         ...route,
         base,
         finds: !inFolder ? 'folder' : target.kind === 'credentials' && !atLogin ? 'login' : 'level',
         slowedBy: walls[0]?.reason ?? null,
         speed: walls.reduce((speed, wall) => speed / wall.slowdown, 1),
-        signature: [ordering, ...route.phases.filter((phase) => phase.guessing === undefined).map((phase) => phase.id)].join('|'),
+        signature: route.phases.filter((phase) => phase.guessing === undefined).map((phase) => phase.id).join('|'),
         missing: walls.map((wall) => wall.fix),
         learns: [...folderHome, pageHome].flatMap((sought) => missingCards(sought, capabilities)),
     };
@@ -257,11 +253,11 @@ function searchOrder(capabilities: SearchCapabilities, resumedSignature: string)
     for (const list of wordlists.filter((candidate) => candidate.id === 'words' || owned(candidate.id))) {
         const forms = list.coverage <= ruleWordRanks ? rules.filter((form) => owned(form.card)) : [];
         for (const form of [pages, ...forms]) passes.push(wordlistPass(list, form));
-        if (owned('combinator') && list.coverage <= ruleWordRanks) passes.push(pairPass(list, capabilities));
+        if (owned('combinator') && list.coverage <= ruleWordRanks) passes.push(pairPass(list));
     }
     passes.push(...kindLists.filter((list) => owned(list.id)));
     passes.sort((first, second) => first.size - second.size);
-    const resumedIds = resumedSignature.split('|').slice(1);
+    const resumedIds = resumedSignature.split('|');
     return [...resumedIds.flatMap((id) => passes.find((pass) => pass.id === id) ?? []), ...passes.filter((pass) => !resumedIds.includes(pass.id))];
 }
 
@@ -327,7 +323,7 @@ function homeOf(target: Entrance, capabilities: SearchCapabilities): Home | null
         case 'twoWords': {
             const list = listWith(second);
             const pair = (placeIn(starterWordlist, unit) - 1) * entriesAdded(list) + placeIn(list, (unit * 7.31) % 1);
-            return { pass: pairId(list), cards: ['combinator', ...cardsFor(list)], position: capabilities.likelyPairs ? Math.ceil(pair / likelyPairsDivisor) : pair };
+            return { pass: pairId(list), cards: ['combinator', ...cardsFor(list)], position: pair };
         }
     }
 }
@@ -379,16 +375,14 @@ function wordlistPass(list: Wordlist, form: Form): SearchPhase {
 }
 
 // Every word of words.txt followed by every word that a list adds.
-function pairPass(second: Wordlist, capabilities: SearchCapabilities): SearchPhase {
+function pairPass(second: Wordlist): SearchPhase {
     const firstEntry = listBefore(second)?.size ?? 0;
     const seconds = entriesAdded(second);
-    const label = fill(searchText.wordPairs, { first: starterWordlist.fileName, second: second.fileName });
     return {
         id: pairId(second),
-        label: capabilities.likelyPairs ? fill(searchText.likelyPairs, { list: label }) : label,
+        label: fill(searchText.wordPairs, { first: starterWordlist.fileName, second: second.fileName }),
         size: starterWordlist.size * seconds,
         candidate: (index) => page(`${listEntry(Math.floor(index / seconds))}${listEntry(firstEntry + index % seconds)}`),
-        ...(capabilities.likelyPairs ? {} : { booster: 'likelyPairs' }),
     };
 }
 
