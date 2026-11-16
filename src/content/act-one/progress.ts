@@ -18,9 +18,15 @@ export function isUpgradeRevealed(state: GameState, purchasableId: string): bool
 }
 
 export function solveLevel(game: Game, method: SolveMethod): void {
+    reachLevel(game, game.state.currentLevel + 1, method);
+}
+
+// A page that a search engine has indexed can be several levels on. The levels before it are skipped, and their addresses stay unknown.
+export function reachLevel(game: Game, level: number, method: SolveMethod): void {
     const { state } = game;
     const previousUrl = urlOfLevel(state.currentLevel);
-    state.currentLevel += 1;
+    increment(state, 'levelsSkipped', level - state.currentLevel - 1);
+    state.currentLevel = level;
     state.search = { stage: 0, requestsSpent: 0, configuration: state.search.configuration };
     state.visitedLevels[urlOfLevel(state.currentLevel)] = state.currentLevel;
     state.statistics.lastSolveAt = state.elapsedSeconds;

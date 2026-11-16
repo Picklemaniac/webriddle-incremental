@@ -11,9 +11,11 @@ export type GameEvent =
     | { readonly type: 'levelSolved'; readonly level: number; readonly method: SolveMethod }
     | { readonly type: 'findingDiscovered'; readonly findingId: string; readonly count: number }
     | { readonly type: 'notice'; readonly noticeId: string }
+    | { readonly type: 'upgradeRevealed'; readonly purchasableId: string }
     | { readonly type: 'banned' }
     | { readonly type: 'unbanned'; readonly byCaptcha: boolean }
     | { readonly type: 'proxyDied' }
+    | { readonly type: 'searchQuery' }
     | { readonly type: 'captchaFailed' };
 
 export type GameEventListener = (event: GameEvent) => void;

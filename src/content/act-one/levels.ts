@@ -30,7 +30,6 @@ export interface Entrance {
     readonly words: readonly string[];
     readonly credentials: Credentials | null;
     readonly clue: Clue;
-    readonly indexUnit: number;
     readonly positionUnit: number;
 }
 
@@ -99,16 +98,17 @@ const longestMonthDays = 28;
 export const otherExtensions: readonly string[] = ['html', 'php', 'asp', 'txt'];
 export const backupEndings: readonly string[] = ['bak', 'old', 'orig'];
 
+// The first words DirBuster looks for are early in words.txt, so that its first finds come quickly.
 const handcraftedEntrances: Readonly<Record<number, HandcraftedEntrance>> = {
     2: { kind: 'fixed', answer: 'level2', clue: { imageLink: true, lines: [handcraftedText.level1] } },
     3: { kind: 'fixed', answer: 'level3', clue: { lines: [handcraftedText.level2] } },
     4: { kind: 'word', answer: 'beneath', clue: { lines: [handcraftedText.level3], comment: handcraftedText.level3Comment } },
     5: { kind: 'word', answer: 'lighthouse', clue: { lines: [handcraftedText.level4], hiddenText: 'lighthouse' } },
     6: { kind: 'word', answer: 'midnight', positionUnit: 0.08, clue: { method: 'binary', title: handcraftedText.level5Title, lines: binaryLines('midnight') } },
-    7: { kind: 'word', answer: 'bridge', clue: { lines: [handcraftedText.level6], imageName: 'present.jpg' } },
-    8: { kind: 'word', answer: 'rise', clue: { method: 'morse', imageTitle: encode('rise', 'morse') } },
-    9: { kind: 'word', answer: 'mirror', clue: { method: 'rot13', title: handcraftedText.level8Title, lines: [encode('mirror', 'rot13')] } },
-    10: { kind: 'word', answer: 'dusk', clue: { method: 'reversed', lines: [encode('dusk', 'reversed')] } },
+    7: { kind: 'word', answer: 'bridge', positionUnit: 0.12, clue: { lines: [handcraftedText.level6], imageName: 'present.jpg' } },
+    8: { kind: 'word', answer: 'rise', positionUnit: 0.18, clue: { method: 'morse', imageTitle: encode('rise', 'morse') } },
+    9: { kind: 'word', answer: 'mirror', positionUnit: 0.25, clue: { method: 'rot13', title: handcraftedText.level8Title, lines: [encode('mirror', 'rot13')] } },
+    10: { kind: 'word', answer: 'dusk', positionUnit: 0.35, clue: { method: 'reversed', lines: [encode('dusk', 'reversed')] } },
 };
 
 const handcraftedPageImageWords: Readonly<Record<number, string>> = {
@@ -382,7 +382,6 @@ function buildEntrance(level: number, { kind, answer, clue, folder, extension = 
         words,
         credentials,
         clue,
-        indexUnit: level < firstGeneratedLevel ? 1 : unitHash(level, salts.index),
         positionUnit: unitHash(level, salts.position),
     };
 }

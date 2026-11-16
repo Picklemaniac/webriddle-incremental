@@ -1,6 +1,7 @@
 import { actOneContent } from '../src/content/act-one/index.ts';
 import { entrance } from '../src/content/act-one/levels.ts';
 import { offeredUpgrades, upgrades } from '../src/content/act-one/upgrades.ts';
+import { canAfford } from '../src/core/purchasing.ts';
 import { isUpgradeRevealed, owns } from '../src/content/act-one/progress.ts';
 import { Game } from '../src/core/game.ts';
 import { createInitialState } from '../src/core/state.ts';
@@ -8,6 +9,7 @@ import { formatDuration, formatNumber } from '../src/format.ts';
 import { actOneStrategy, type PlayStyle } from '../src/simulation/act-one-strategy.ts';
 import { AutoPlayer } from '../src/simulation/auto-player.ts';
 import { withHabits, type Habits } from '../src/simulation/habits.ts';
+import { actOneStaringBands, StaringMeter, staringStretchSeconds } from '../src/simulation/staring.ts';
 import { readFileSync } from 'node:fs';
 import { readArgument } from './shared.ts';
 
@@ -26,23 +28,17 @@ interface Run {
     readonly longestPurchaseWait: number;
     readonly nothingOnOffer: number;
     readonly slowLevels: readonly { readonly level: number; readonly seconds: number }[];
-    readonly clicks: readonly Moment[];
-    readonly levels: readonly Moment[];
-}
-
-// A click, or the first time a level was reached.
-interface Moment {
-    readonly at: number;
-    readonly level: number;
+    readonly staring: StaringMeter;
+    // Seconds per band of levels with no card on the list, and with cards but none the player can pay for.
+    readonly emptyList: readonly number[];
+    readonly nothingAffordable: readonly number[];
 }
 
 const seed = Number(readArgument('--seed') ?? '1');
 const longestRunSeconds = 10 * 3600;
 const slowLevelSeconds = 240;
 const marks: readonly number[] = [100, 500, 1000];
-// Staring is a stretch of this many seconds or more in which the player clicks nothing: there is nothing to buy, replace, assign or answer.
-const stareSeconds = 30;
-const stareBands: readonly number[] = [5, 25, 50, 100, 250, 500, 1000];
+const seenEvents: ReadonlySet<string> = new Set(['levelSolved', 'upgradeRevealed', 'notice', 'proxyDied', 'banned', 'unbanned']);
 
 const players: readonly Player[] = [
     { name: 'attentive robot', habits: {} },
@@ -72,12 +68,12 @@ function play(player: Player): Run {
     let lastSolveAt = 0;
     let longestPurchaseWait = 0;
     let nothingOnOffer = 0;
-    const clicks: Moment[] = [];
-    const levels: Moment[] = [];
+    const staring = new StaringMeter();
+    const emptyList = actOneStaringBands.map(() => 0);
+    const nothingAffordable = actOneStaringBands.map(() => 0);
     game.subscribe((event) => {
         const { elapsedSeconds } = game.state;
-        if (event.type === 'actionApplied' && event.action.type !== 'checkIn') clicks.push({ at: elapsedSeconds, level: game.state.currentLevel });
-        if (event.type === 'levelSolved') levels.push({ at: elapsedSeconds, level: event.level });
+        if (seenEvents.has(event.type) || (event.type === 'actionApplied' && event.action.type !== 'checkIn')) staring.observe(elapsedSeconds, game.state.currentLevel);
         if (event.type === 'banned') bans++;
         if (event.type === 'actionApplied' && event.action.type === 'purchase') {
             purchases++;
@@ -92,22 +88,29 @@ function play(player: Player): Run {
     while (game.state.currentLevel < 1000 && game.state.elapsedSeconds < longestRunSeconds) {
         robot.playStep(game, 1);
         for (const mark of marks) if (reached[mark] === undefined && game.state.currentLevel >= mark) reached[mark] = game.state.elapsedSeconds;
-        if (game.state.flags.upgradesRevealed === true && !offeredUpgrades(game).some((item) => isUpgradeRevealed(game.state, item.id))) nothingOnOffer++;
+        if (game.state.flags.automated !== true) continue;
+        const listed = offeredUpgrades(game).filter((item) => isUpgradeRevealed(game.state, item.id));
+        const band = actOneStaringBands.findLastIndex((level) => level <= game.state.currentLevel);
+        if (listed.length === 0) {
+            emptyList[band]!++;
+            if (game.state.flags.upgradesRevealed === true) nothingOnOffer++;
+        } else if (!listed.some((item) => canAfford(game.state, item.price))) nothingAffordable[band]!++;
     }
-    return { game, reached, bans, purchases, longestPurchaseWait, nothingOnOffer, slowLevels, clicks, levels };
+    staring.observe(game.state.elapsedSeconds, game.state.currentLevel);
+    return { game, reached, bans, purchases, longestPurchaseWait, nothingOnOffer, slowLevels, staring, emptyList, nothingAffordable };
 }
 
 function row(cells: readonly (string | number)[], widths: readonly number[]): string {
     return cells.map((cell, index) => String(cell).padEnd(widths[index] ?? 0)).join(' ');
 }
 
-function reportPlayers(): Run {
+function reportPlayers(): readonly Run[] {
     const widths = [24, 9, 9, 9, 7, 6, 12, 20, 13, 9];
     console.log(row(['player', 'L100', 'L500', 'L1000', 'cards', 'bans', 'longest wait', 'levels over 4 min', 'nothing to buy', 'money left'], widths));
-    let attentive: Run | undefined;
+    const runs: Run[] = [];
     for (const player of players) {
         const run = play(player);
-        attentive ??= run;
+        runs.push(run);
         const time = (level: number): string => (run.reached[level] === undefined ? `L${run.game.state.currentLevel}` : formatDuration(run.reached[level]));
         const slowest = run.slowLevels.reduce((longest, entry) => Math.max(longest, entry.seconds), 0);
         console.log(row([
@@ -116,38 +119,33 @@ function reportPlayers(): Run {
             formatDuration(run.nothingOnOffer), `$${formatNumber(run.game.state.resources.money ?? 0)}`,
         ], widths));
     }
-    return attentive!;
+    return runs;
 }
 
-function reportStaring(name: string, clicks: readonly Moment[], levels: readonly Moment[]): void {
-    const widths = [18, 10, 10, 8, 30];
-    console.log(`\nStaring (${stareSeconds} seconds or more without a click), ${name}:`);
-    console.log(row(['levels', 'time', 'staring', 'share', 'longest stretch'], widths));
-    const reachedAt = (level: number): number | undefined => levels.find((moment) => moment.level >= level)?.at;
-    const end = levels.at(-1)?.at ?? 0;
-    for (const [index, from] of stareBands.slice(0, -1).entries()) {
-        const to = stareBands[index + 1]!;
-        const start = reachedAt(from);
-        if (start === undefined) break;
-        const stop = reachedAt(to) ?? end;
-        const moments = [start, ...clicks.map((click) => click.at).filter((at) => at > start && at < stop), stop];
-        const stretches = moments.slice(1).map((at, position) => ({ from: moments[position]!, seconds: at - moments[position]! })).filter((stretch) => stretch.seconds >= stareSeconds);
-        const staring = stretches.reduce((sum, stretch) => sum + stretch.seconds, 0);
-        const longest = stretches.reduce<{ from: number; seconds: number } | undefined>((most, stretch) => (most === undefined || stretch.seconds > most.seconds ? stretch : most), undefined);
-        const levelAt = (at: number): number => levels.findLast((moment) => moment.at <= at)?.level ?? from;
+function reportStaring(name: string, meter: StaringMeter, run?: Run): void {
+    const widths = [14, 10, 10, 8, 26, 12, 16];
+    console.log(`\nStaring (${staringStretchSeconds} seconds or more in which no level is found, no card appears, nothing breaks and nothing is clicked), ${name}:`);
+    console.log(row(['levels', 'time', 'staring', 'share', 'longest stretch', ...(run === undefined ? [] : ['no card', 'none affordable'])], widths));
+    for (const [index, band] of meter.bands(actOneStaringBands).entries()) {
+        if (band.seconds === 0) continue;
         console.log(row([
-            `${from} to ${to}`, formatDuration(stop - start), formatDuration(staring), `${Math.round(staring / Math.max(1, stop - start) * 100)}%`,
-            longest === undefined ? 'none' : `${formatDuration(longest.seconds)} at level ${levelAt(longest.from)}`,
+            `${band.fromLevel} to ${band.toLevel}`, formatDuration(band.seconds), formatDuration(band.staringSeconds), `${Math.round(band.staringSeconds / band.seconds * 100)}%`,
+            band.longestSeconds === 0 ? 'none' : `${formatDuration(band.longestSeconds)} at level ${band.longestAtLevel}`,
+            ...(run === undefined ? [] : [formatDuration(run.emptyList[index]!), formatDuration(run.nothingAffordable[index]!)]),
         ], widths));
     }
 }
 
-// The same count for a session log of a real play. Moving around in the browser is not counted as a click.
+// The same count for the session log of a real play. Logs from before 2026-11-17 do not say when a card appeared.
 function reportLoggedStaring(file: string): void {
-    const entries = readFileSync(file, 'utf8').trim().split('\n').map((line) => JSON.parse(line) as { type: string; gameSeconds: number; level: number; action?: { type: string } });
-    const clicks = entries.filter((entry) => entry.type === 'actionApplied' && entry.action?.type !== 'navigate').map((entry) => ({ at: entry.gameSeconds, level: entry.level }));
-    const levels = entries.filter((entry) => entry.type === 'levelSolved' || entry.type === 'devSetLevel').map((entry) => ({ at: entry.gameSeconds, level: entry.level }));
-    reportStaring(file, clicks, levels);
+    const entries = readFileSync(file, 'utf8').trim().split('\n').map((line) => JSON.parse(line) as { type: string; gameSeconds: number; level?: number; currentLevel?: number });
+    const meter = new StaringMeter();
+    for (const entry of entries) {
+        if (seenEvents.has(entry.type) || entry.type === 'actionApplied' || entry.type === 'devSetLevel' || entry.type === 'sessionStarted') meter.observe(entry.gameSeconds, entry.level ?? 0);
+    }
+    const last = entries.at(-1);
+    if (last !== undefined) meter.observe(last.gameSeconds, last.level ?? last.currentLevel ?? 0);
+    reportStaring(file, meter);
 }
 
 function reportSlowLevels(): void {
@@ -181,7 +179,10 @@ if (logFile !== undefined) {
     reportLoggedStaring(logFile);
     process.exit();
 }
-const attentiveRun = reportPlayers();
-reportStaring('attentive robot', attentiveRun.clicks, attentiveRun.levels);
+const runs = reportPlayers();
+for (const name of ['attentive robot', 'casual']) {
+    const run = runs[players.findIndex((player) => player.name === name)]!;
+    reportStaring(name, run.staring, run);
+}
 reportSlowLevels();
 reportBreaks();

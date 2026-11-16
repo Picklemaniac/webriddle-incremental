@@ -35,14 +35,16 @@ export class BrowserDialogs {
 
     showHistory(): void {
         const current = this.game.state.currentLevel;
+        // Levels that a search engine skipped are not listed: their addresses were never found.
+        const visited = new Set([current, ...Object.values(this.game.state.visitedLevels)]);
         const levelInput = createElement('input', { attributes: { id: 'history-level', type: 'number', min: '1', max: String(current), autocomplete: 'off' } });
         levelInput.value = String(current);
         const goToLevel = (): void => {
             const level = Math.round(Number(levelInput.value));
-            if (level >= 1 && level <= current) this.open(urlOfLevel(level));
+            if (visited.has(level)) this.open(urlOfLevel(level));
         };
         levelInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') goToLevel(); });
-        const levels = Array.from({ length: current }, (_, index) => this.levelEntry(current - index));
+        const levels = [...visited].sort((first, second) => second - first).map((level) => this.levelEntry(level));
         const recent = [...this.game.state.history].reverse().map((url) => this.historyEntry(url, [withoutProtocol(url)]));
         this.dialog.show(uiText.history, [
             createElement('h3', { text: uiText.historyLevels }),

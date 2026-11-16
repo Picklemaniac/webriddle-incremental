@@ -40,7 +40,7 @@ export const findings: readonly Finding[] = [
 
 export function findingModifiers(state: GameState): readonly Modifier[] {
     const bonus = findings.reduce((sum, finding) => sum + (finding.speed ?? 0) * Math.min(5, state.findings[finding.id] ?? 0), 0);
-    return [{ statId: 'searchEfficiency', operation: 'multiply', value: 1 + bonus }];
+    return [{ statId: 'requestsPerThread', operation: 'multiply', value: 1 + bonus }];
 }
 
 function discoverFinding(game: Game, finding: Finding): void {

@@ -213,7 +213,7 @@ export const upgradeText = {
     dictWords: { name: '/usr/share/dict/words', description: 'The Unix dictionary file, with 102,774 words.' },
     proxyChecker: { name: 'Proxy checker', description: 'Replaces dead proxies for you after 10 seconds.' },
     sizeFilter: { name: 'Response-size filter', description: 'DirBuster ignores pages that are the same size as a missing page.' },
-    dorking: { name: 'Search engine dorking', description: 'Finds levels that search engines have already indexed.' },
+    dorking: { name: 'Search engine dorking', description: 'Your script also asks a search engine for pages of the riddle. A page it finds can be several levels ahead.' },
     gobuster: { name: 'gobuster', description: 'A faster tool than dirb.' },
     seniorCertification: { name: 'Senior certification', description: 'A senior help desk certificate that doubles your pay again.' },
     archives: { name: 'Public archives', description: 'Old newsgroup and mailing list archives that double your data again.' },
@@ -228,7 +228,7 @@ export const upgradeText = {
     clusterBomb: { name: 'Cluster bomb', description: 'DirBuster tries every user name with every password.' },
     crackHtpasswd: { name: 'Crack .htpasswd', description: 'Cracks the passwords in the .htpasswd file you found.' },
     fiber: { name: 'Fiber', description: 'A fiber connection, three times as fast as cable.' },
-    addressBlock: { name: 'Address block', description: 'Lets you rent 16 more IP addresses.' },
+    addressBlock: { name: 'Address block', description: 'Lets you rent 16 more IP addresses. Every rented IP address then costs a quarter less.' },
     combinator: { name: 'Combinator', description: 'DirBuster also tries two common words joined together.' },
     indexCache: { name: 'Cached search results', description: 'Old copies of search results that list more levels.' },
     leavePcOn: { name: 'Leave the PC on', description: 'Your computer keeps working for up to 24 hours while you are away, instead of 12.' },
@@ -245,19 +245,22 @@ export const upgradeText = {
     subdomainScan: { name: 'Subdomain scan', description: 'DirBuster also tries each word as a subdomain, like light.notfinite.net.' },
     teamLead: { name: 'Team lead', description: 'A promotion to team lead that doubles your pay again.' },
     webCrawler: { name: 'Web crawler', description: 'A crawler that follows links on its own and doubles the data you collect again.' },
-    secondAddressBlock: { name: 'Second address block', description: 'Lets you rent another 32 IP addresses.' },
-    thirdAddressBlock: { name: 'Third address block', description: 'Lets you rent another 64 IP addresses.' },
+    secondAddressBlock: { name: 'Second address block', description: 'Lets you rent another 32 IP addresses. Every rented IP address then costs a quarter less.' },
+    thirdAddressBlock: { name: 'Third address block', description: 'Lets you rent another 64 IP addresses. Every rented IP address then costs a quarter less.' },
     dedicatedServer: { name: 'Dedicated server', description: 'A rented server in a data center that runs four more scripts.' },
     moreLeaks: { name: 'More leaked passwords', description: 'Another leak with 250,000 passwords. It has the words with digits that rockyou-75.txt misses.' },
-    leasedRange: { name: 'Leased address range', description: 'Lets you rent 128 more IP addresses.' },
-    secondLeasedRange: { name: 'Second leased range', description: 'Lets you rent another 256 IP addresses.' },
+    leasedRange: { name: 'Leased address range', description: 'Lets you rent 128 more IP addresses. Every rented IP address then costs a quarter less.' },
+    secondLeasedRange: { name: 'Second leased range', description: 'Lets you rent another 256 IP addresses. Every rented IP address then costs a quarter less.' },
     helpdeskManager: { name: 'Help desk manager', description: 'Another promotion that doubles your pay again.' },
     customFuzzer: { name: 'Your own fuzzer', description: 'A fuzzer you wrote yourself. It is faster than ffuf.' },
     forumModerator: { name: 'Forum moderator', description: 'A moderator account on the riddle forum that doubles your insight again.' },
-    dataCenterRange: { name: 'Data center range', description: 'Lets you rent 512 more IP addresses from a data center.' },
-    secondDataCenterRange: { name: 'Second data center range', description: 'Lets you rent another 1,024 IP addresses from a data center.' },
+    dataCenterRange: { name: 'Data center range', description: 'Lets you rent 512 more IP addresses from a data center. Every rented IP address then costs a quarter less.' },
+    secondDataCenterRange: { name: 'Second data center range', description: 'Lets you rent another 1,024 IP addresses from a data center. Every rented IP address then costs a quarter less.' },
     serverRack: { name: 'Server rack', description: 'A rack of servers that runs six more scripts.' },
-    distributedFuzzing: { name: 'Distributed fuzzing', description: 'Your fuzzer splits each wordlist between all of your scripts.' },
+    pipelining: { name: 'HTTP pipelining', description: 'Your fuzzer sends its next request without waiting for the answer to the last one, so requests go twice as fast.' },
+    regionalAllocation: { name: 'Regional allocation', description: 'Lets you rent 2,048 more IP addresses from a regional registry. Every rented IP address then costs a quarter less.' },
+    secondRegionalAllocation: { name: 'Second regional allocation', description: 'Lets you rent another 4,096 IP addresses from a regional registry. Every rented IP address then costs a quarter less.' },
+    thirdRegionalAllocation: { name: 'Third regional allocation', description: 'Lets you rent another 8,192 IP addresses from a regional registry. Every rented IP address then costs a quarter less.' },
     searchAlerts: { name: 'Search alerts', description: 'Alerts that tell you when a search engine finds a new level.' },
 } as const satisfies Record<string, { readonly name: string; readonly description: string; readonly effect?: string }>;
 
@@ -271,11 +274,10 @@ export const statText = {
     ticketBotRate: { label: 'Pay per ticket script', value: '${value}/s' },
     scourRate: { label: 'Data while you scour', value: '{value}/s' },
     scraperRate: { label: 'Data per scraping script', value: '{value}/s' },
-    searchEfficiency: { label: 'Search efficiency', value: '{value}×' },
     proxySlots: { label: 'Free proxies', value: '{value}' },
     rentableAddresses: { label: 'IP addresses you can rent', value: '{value}' },
     addressRent: { label: 'Rent per IP address', value: '${value}/s' },
-    dorkChance: { label: 'Levels found through search engines', value: '{value}%' },
+    searchFindShare: { label: 'Pages that search engines find', value: '{value} for every 100 levels' },
     riddleRate: { label: 'Insight while you solve riddles', value: '{value}/s' },
     riddleBotRate: { label: 'Insight per riddle script', value: '{value}/s' },
 } as const satisfies Record<string, { readonly label: string; readonly value: string }>;
@@ -321,7 +323,7 @@ export const findingText = {
         entry: '{name}{date}  {size}',
     },
     git: {
-        description: '+10% search efficiency per copy, up to 5 copies.',
+        description: '+10% requests per second per copy, up to 5 copies.',
         file: 'Index of /.git/\n\nHEAD\nconfig\nlogs/\nobjects/\nrefs/\n\nlogs/HEAD:\nadd levels 1-9\nadd generated levels\nanswers: dictionary words only\nmove levels 100+ into folders\nfix: credentials door',
     },
     htpasswd: {
@@ -334,7 +336,7 @@ export const findingText = {
         entry: '{size}  {date}   {name}',
     },
     env: {
-        description: '+25% search efficiency per copy, up to 5 copies.',
+        description: '+25% requests per second per copy, up to 5 copies.',
         file: 'RIDDLE_ROOT=/var/www/riddle\nANSWERS=lowercase\nWORDLIST=/usr/share/dict/words\nDEBUG=true',
     },
     walkthrough: {
@@ -402,7 +404,6 @@ export const uiText = {
     replacement: 'Replacing a proxy is free.',
     threads: 'Threads per script',
     slots: 'Script slots',
-    efficiency: 'Search efficiency',
     requests: 'requests/s',
     waiting: 'Waiting for a script',
     paused: 'No scripts are running DirBuster',
@@ -442,14 +443,21 @@ export const uiText = {
 
 export const terminalText = {
     booting: 'Starting script…',
-    curlCommand: '$ while read name; do curl -I "{folder}$name.htm"; done < {list}',
-    toolCommand: '$ {tool} -u {folder} -w {list} -t {threads}',
-    gobusterCommand: '$ gobuster dir -u {folder} -w {list} -t {threads}',
+    // One per tool, in the order of the tool cards. Brute force has no list: crunch writes every name and the tool reads them as they come.
+    commands: [
+        { list: '$ while read name; do curl -I "{folder}$name.htm"; done < {list}', bruteForce: '$ crunch 1 8 | while read name; do curl -I "{folder}$name.htm"; done' },
+        { list: '$ dirb {folder} {list}', bruteForce: '$ crunch 1 8 | dirb {folder} /dev/stdin' },
+        { list: '$ gobuster dir -u {folder} -w {list} -t {threads}', bruteForce: '$ crunch 1 8 | gobuster dir -u {folder} -w - -t {threads}' },
+        { list: '$ ffuf -u {folder}FUZZ -w {list} -t {threads}', bruteForce: '$ crunch 1 8 | ffuf -u {folder}FUZZ -w - -t {threads}' },
+        { list: '$ ./fuzz -u {folder} -w {list} -t {threads}', bruteForce: '$ crunch 1 8 | ./fuzz -u {folder} -w - -t {threads}' },
+    ],
     banned: 'Banned for {time}. Solve the captcha in the browser or wait.',
     progress: '{list}: {tried} of {total} tried, about {time} left',
     found: '+ /{path} (CODE:200|SIZE:{size})',
     hand: 'solved by hand',
     indexed: 'indexed page',
+    searchQuery: 'site:{domain}',
+    nothingNew: 'no new pages',
     identicalResponse: '[identical response]',
     testing: '--> Testing:',
     unguessable: 'This level has to be solved in the browser',
@@ -482,8 +490,6 @@ export const searchText = {
 export const connectionNames: readonly string[] = ['56k modem', 'ISDN', 'ADSL', 'Cable', 'Fiber'];
 
 export const toolNames: readonly string[] = ['bash loop', 'dirb', 'gobuster', 'ffuf', 'fuzz'];
-
-export const toolCommands: readonly string[] = ['curl', 'dirb', 'gobuster', 'ffuf', './fuzz'];
 
 export const errorPages = {
     notFoundTitle: 'The page cannot be found',

@@ -13,6 +13,8 @@ const heatPerExcessRatio = 3;
 const coolingPerSecond = 3;
 const startingRentShareOfIncome = 0.3;
 const proxySeconds = 120;
+// The first time the scripts go over the limit, the server lets a minute pass before Heat builds. The player has just met the limit and has to earn the way out of it first.
+const firstHeatDelaySeconds = 60;
 
 export function liveProxies(game: Game): number {
     return game.state.network.proxies.filter((proxy) => proxy.diesAtSeconds > game.state.elapsedSeconds).length;
@@ -42,7 +44,9 @@ export function rentedBlocks(game: Game): readonly { readonly range: string; rea
     return sizes.map((addresses, index) => {
         const rented = Math.min(addresses, unplaced);
         unplaced -= rented;
-        return { range: `198.18.${index * 4}.0/${32 - Math.log2(addresses)}`, addresses, rented };
+        // Each block is twice the size of the one before, so it starts where the blocks before it end.
+        const start = index === 0 ? 0 : addresses;
+        return { range: `198.18.${Math.floor(start / 256)}.${start % 256}/${32 - Math.log2(addresses)}`, addresses, rented };
     });
 }
 
@@ -158,9 +162,13 @@ export const network: GameSystem = {
         if (!state.flags.automated || isBanned(game)) return;
         const capacity = networkCapacity(game);
         const excess = Math.max(0, requestedRate(game) - capacity);
-        if (showsTheLimit(game)) state.flags.networkRevealed = true;
+        if (showsTheLimit(game) && state.flags.networkRevealed !== true) {
+            state.flags.networkRevealed = true;
+            state.statistics.limitShownAt = state.elapsedSeconds;
+        }
         if (excess > 0) noticeOnce(game, 'firstRateLimit');
         const overLimit = excess > 0 && !isThrottled(game);
+        if (overLimit && state.elapsedSeconds - (state.statistics.limitShownAt ?? Number.NEGATIVE_INFINITY) < firstHeatDelaySeconds) return;
         state.network.heat = Math.max(0, state.network.heat + deltaSeconds * (overLimit ? heatPerExcessRatio * excess / capacity : -coolingPerSecond));
         if (state.network.heat >= 100) {
             state.network.heat = 100;

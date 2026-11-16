@@ -9,7 +9,7 @@ import { encode } from './encodings.ts';
 import { entrance, entranceAction, firstGeneratedLevel, levelPage, ruleWordRanks, urlOfLevel } from './levels.ts';
 import { handcraftedAnswerWords, latinWords } from './word-lists.ts';
 import { canonicalUrl } from './pages.ts';
-import { hallOfFameUrl, hintsUrl, riddleHomeUrl, rulesUrl } from './riddle.ts';
+import { hallOfFameUrl, hintsUrl, riddleHomeUrl, rulesUrl, salts, unitHash } from './riddle.ts';
 import { createCaptcha } from './captchas.ts';
 import { backlogSeconds, incomePerSecond, isAway } from './economy.ts';
 import { addressCount, effectiveRate, networkCapacity, rentedBlocks, rentPerSecond, requestedRate } from './network.ts';
@@ -18,12 +18,11 @@ import { markNeeded } from './progress.ts';
 import {
     bansBeforeScriptsAreBlocked, currentPhase, guessedLength, isLightLeet, planSearch, requestsKept, searchCapabilities, type SearchCapabilities, type SearchPhase, type SearchPlan, type SlowReason,
 } from './search.ts';
-import { offeredUpgrades, upgrades } from './upgrades.ts';
+import { offeredUpgrades, ownedTier, toolTiers, upgrades } from './upgrades.ts';
 import { rankOfWord } from './vocabulary.ts';
 import { actOneStrategy } from '../../simulation/act-one-strategy.ts';
 import { AutoPlayer } from '../../simulation/auto-player.ts';
 
-const highestDorkChance = 0.3;
 
 function newGame(seed = 1): Game { return new Game(actOneContent, createInitialState(actOneContent, seed)); }
 const lastTestedLevel = 1400;
@@ -299,15 +298,24 @@ describe('Act I', () => {
         expect([...labels].sort()).toEqual(['words.txt × english-10k.txt', 'words.txt × words.txt']);
     });
 
-    it('lists rented addresses as address blocks and fills them in order', () => {
+    it('lists rented addresses as address blocks, fills them in order, and charges less for an address with every larger block', () => {
         const game = newGame();
-        for (const id of ['rentedAddresses', 'addressBlock', 'secondAddressBlock', 'thirdAddressBlock', 'leasedRange', 'secondLeasedRange', 'dataCenterRange', 'secondDataCenterRange']) game.state.purchases[id] = 1;
+        const blockCards = upgrades.filter((item) => item.modifiers!(1).some((modifier) => modifier.statId === 'rentableAddresses'));
+        expect(blockCards).toHaveLength(11);
+        const rents: number[] = [];
+        for (const card of blockCards) {
+            expect(card.requires).toEqual(rents.length === 0 ? ['proxyPool'] : [blockCards[rents.length - 1]!.id]);
+            game.state.purchases[card.id] = 1;
+            game.invalidateStats();
+            rents.push(game.stat('addressRent'));
+        }
         game.state.network.rentedAddresses = 200;
         const blocks = rentedBlocks(game);
-        expect(blocks.map((block) => block.range)).toEqual(
-            ['198.18.0.0/29', '198.18.4.0/28', '198.18.8.0/27', '198.18.12.0/26', '198.18.16.0/25', '198.18.20.0/24', '198.18.24.0/23', '198.18.28.0/22']);
-        expect(blocks.map((block) => block.rented)).toEqual([8, 16, 32, 64, 80, 0, 0, 0]);
-        expect(game.stat('rentableAddresses')).toBe(8 + 16 + 32 + 64 + 128 + 256 + 512 + 1024);
+        expect(blocks.map((block) => block.range)).toEqual(['198.18.0.0/29', '198.18.0.16/28', '198.18.0.32/27', '198.18.0.64/26', '198.18.0.128/25', '198.18.1.0/24', '198.18.2.0/23', '198.18.4.0/22',
+            '198.18.8.0/21', '198.18.16.0/20', '198.18.32.0/19']);
+        expect(blocks.map((block) => block.rented)).toEqual([8, 16, 32, 64, 80, 0, 0, 0, 0, 0, 0]);
+        expect(game.stat('rentableAddresses')).toBe(8 * (2 ** 11 - 1));
+        for (const [index, rent] of rents.entries()) expect(rent).toBeCloseTo(0.16 * 0.75 ** index);
     });
 
     it('keeps all generated levels solvable by hand, including credentials', () => {
@@ -359,7 +367,7 @@ describe('Act I', () => {
         expect(game.state.captcha).toBeNull();
     });
 
-    it('lets requests over the limit through at the cost of Heat, with a switchable Throttle', () => {
+    it('lets requests over the limit through at the cost of Heat, after a first minute without it, and with a switchable Throttle', () => {
         const game = newGame();
         game.state.currentLevel = 5;
         game.dispatch({ type: 'automate' });
@@ -373,6 +381,8 @@ describe('Act I', () => {
         expect(game.state.flags.networkRevealed).toBe(true);
         expect(effectiveRate(game)).toBe(requestedRate(game));
         expect(effectiveRate(game)).toBeGreaterThan(networkCapacity(game));
+        expect(game.state.network.heat).toBe(0);
+        game.advance(45);
         expect(game.state.network.heat).toBeGreaterThan(0);
         expect(game.dispatch({ type: 'setThrottle', enabled: true })).toBe(false);
         game.state.purchases.throttle = 1;
@@ -457,7 +467,7 @@ describe('Act I', () => {
 
     it('offers a faster connection once two scripts have fitted under the server limit with it for a minute, so that a sweep of the rent slider does not count', () => {
         const game = automatedAt(120);
-        for (const id of ['curlBatch', 'keepAlive', 'threads8', 'isdn', 'throttle', 'rentedAddresses', 'addressBlock', 'secondAddressBlock']) game.state.purchases[id] = 1;
+        for (const id of ['curlBatch', 'keepAlive', 'threads8', 'isdn', 'gobuster', 'throttle', 'rentedAddresses', 'addressBlock', 'secondAddressBlock', 'thirdAddressBlock']) game.state.purchases[id] = 1;
         game.invalidateStats();
         game.state.resources.money = 10_000;
         game.dispatch({ type: 'checkIn' });
@@ -508,6 +518,124 @@ describe('Act I', () => {
         buy('isdn');
         game.advance(61);
         expect(offered()).not.toContain('threads8');
+    });
+
+    it('offers more room once the limit has held the scripts back for half a minute in total, and not for a proxy that has just died', () => {
+        const game = automatedAt(30);
+        for (const id of ['curlBatch', 'ram', 'freeProxies', 'keepAlive', 'otherRiddles']) game.state.purchases[id] = 1;
+        game.invalidateStats();
+        game.state.flags.networkRevealed = true;
+        game.dispatch({ type: 'checkIn' });
+        game.dispatch({ type: 'assignJob', jobId: 'riddles', change: 1 });
+        const offered = (): string[] => offeredUpgrades(game).map((item) => item.id);
+        game.advance(60);
+        expect(networkCapacity(game)).toBe(40);
+        expect(requestedRate(game)).toBe(16);
+        expect(offered()).not.toContain('openWifi');
+        game.state.network.proxies[0]!.diesAtSeconds = game.state.elapsedSeconds;
+        game.advance(10);
+        expect(networkCapacity(game)).toBe(30);
+        expect(offered()).not.toContain('openWifi');
+        game.dispatch({ type: 'replaceProxy', proxyIndex: 0 });
+        game.advance(60);
+        expect(offered()).not.toContain('openWifi');
+        game.state.network.proxies[0]!.diesAtSeconds = game.state.elapsedSeconds;
+        game.advance(21);
+        expect(offered()).toContain('openWifi');
+    });
+
+    it('makes every speed card raise the requests of a script, in one chain, and lets nothing make a request count for more', () => {
+        const chain = ['curlBatch', 'keepAlive', 'isdn', 'threads8', 'gobuster', 'adsl', 'ffuf', 'cable', 'customFuzzer', 'fiber', 'pipelining'];
+        const game = newGame();
+        const rates = [game.stat('threadsPerScript') * game.stat('requestsPerThread')];
+        for (const [index, id] of chain.entries()) {
+            const card = upgrades.find((item) => item.id === id)!;
+            expect(card.requires, id).toEqual(index === 0 ? [] : [chain[index - 1]]);
+            game.state.purchases[id] = 1;
+            game.invalidateStats();
+            rates.push(game.stat('threadsPerScript') * game.stat('requestsPerThread'));
+        }
+        expect(rates).toEqual([2, 8, 16, 32, 64, 128, 384, 768, 2_304, 4_608, 13_824, 27_648]);
+        const speedStats = new Set(upgrades.filter((item) => !chain.includes(item.id)).flatMap((item) => item.modifiers!(1).map((modifier) => modifier.statId)));
+        expect([...speedStats].filter((statId) => statId === 'threadsPerScript' || statId === 'requestsPerThread' || statId === 'searchEfficiency')).toEqual([]);
+        expect(actOneContent.baseStats.searchEfficiency).toBeUndefined();
+    });
+
+    it('lets a later tool stand in for dirb', () => {
+        const game = automatedAt(150);
+        markNeeded(game.state, 'dirb');
+        expect(offeredUpgrades(game).map((item) => item.id)).toContain('dirb');
+        expect(searchCapabilities(game.state).cards).not.toContain('dirb');
+        game.state.purchases.gobuster = 1;
+        expect(offeredUpgrades(game).map((item) => item.id)).not.toContain('dirb');
+        expect(searchCapabilities(game.state).cards).toContain('dirb');
+        expect(ownedTier(game.state, toolTiers)).toBe(2);
+    });
+
+    it('asks a search engine once a minute, and jumps to a page a few levels ahead when one has been indexed', () => {
+        const game = automatedAt(60);
+        for (const id of ['curlBatch', 'dorking']) game.state.purchases[id] = 1;
+        game.invalidateStats();
+        game.dispatch({ type: 'checkIn' });
+        const seen: string[] = [];
+        game.subscribe((event) => {
+            if (event.type === 'searchQuery') seen.push('nothing new');
+            if (event.type === 'levelSolved') seen.push(event.method);
+        });
+        game.advance(0.25);
+        expect(seen).toEqual(['search']);
+        const landed = game.state.currentLevel;
+        expect(landed).toBeGreaterThanOrEqual(62);
+        expect(landed).toBeLessThanOrEqual(64);
+        expect(game.state.statistics.levelsSkipped).toBe(landed - 61);
+        for (let level = 61; level < landed; level++) expect(game.state.visitedLevels[urlOfLevel(level)]).toBeUndefined();
+        expect(game.state.visitedLevels[urlOfLevel(landed)]).toBe(landed);
+        expect(game.state.browserUrl).toBe(urlOfLevel(landed));
+
+        game.state.network.bannedUntil = game.state.elapsedSeconds + 290;
+        game.advance(290);
+        expect(game.state.currentLevel).toBe(landed);
+        expect(seen.slice(1)).toEqual(['nothing new', 'nothing new', 'nothing new', 'nothing new']);
+
+        const isIndexed = (level: number): boolean => unitHash(level, salts.indexed) < game.stat('searchFindShare');
+        let indexedSinceTheLastFind = false;
+        let finds = 0;
+        game.subscribe((event) => {
+            if (event.type !== 'levelSolved') return;
+            if (event.method === 'script') indexedSinceTheLastFind ||= isIndexed(event.level);
+            if (event.method === 'search') {
+                expect(indexedSinceTheLastFind, `level ${event.level}`).toBe(true);
+                indexedSinceTheLastFind = false;
+                finds++;
+            }
+        });
+        game.state.purchases.keepAlive = 1;
+        game.invalidateStats();
+        for (let seconds = 0; game.state.currentLevel < 140 && seconds < 6 * 3600; seconds += 10) game.advance(10);
+        expect(finds).toBeGreaterThanOrEqual(3);
+        expect(finds).toBeLessThanOrEqual(12);
+    });
+
+    it('never finds a login page or a page past the last level through a search engine, and learns of folders from a page inside one', () => {
+        const withSearch = (level: number): Game => {
+            const game = automatedAt(level);
+            for (const id of ['curlBatch', 'dorking']) game.state.purchases[id] = 1;
+            game.invalidateStats();
+            game.dispatch({ type: 'checkIn' });
+            game.advance(0.25);
+            return game;
+        };
+        const login = firstLevelOfKind('credentials');
+        for (let start = login - 4; start < login; start++) {
+            const landed = withSearch(start).state.currentLevel;
+            expect(landed, `from level ${start}`).not.toBe(login);
+            expect(landed).toBeLessThanOrEqual(start + 4);
+        }
+        for (const start of [996, 997, 998, 999, 1000, 1005]) expect(withSearch(start).state.currentLevel, `from level ${start}`).toBeLessThanOrEqual(Math.max(start, 1000));
+        const intoAmber = withSearch(98);
+        expect(intoAmber.state.currentLevel).toBeGreaterThanOrEqual(100);
+        expect(offeredUpgrades(intoAmber).map((item) => item.id)).toContain('dirb');
+        expect(offeredUpgrades(withSearch(90)).map((item) => item.id)).not.toContain('dirb');
     });
 
     it('counts the network next door as one more IP address', () => {
@@ -971,11 +1099,15 @@ function automatedAt(level: number): Game {
 }
 
 const alsoFixing: Readonly<Record<string, readonly string[]>> = { dirb: ['gobuster', 'ffuf'], sizeFilter: ['ffuf'], clusterBomb: ['crackHtpasswd'] };
+const searchEngineCards: readonly string[] = ['dorking', 'indexCache', 'searchAlerts'];
 
 // A game with every upgrade, or with every upgrade except one and the others that would do its job.
+// The search engine cards are left out, so that a test can follow DirBuster from one level to the next.
 function stockedAt(level: number, without?: string): Game {
     const game = automatedAt(level);
-    for (const item of upgrades) if (item.id !== without && !(alsoFixing[without ?? ''] ?? []).includes(item.id)) game.state.purchases[item.id] = 1;
+    for (const item of upgrades) {
+        if (item.id !== without && !(alsoFixing[without ?? ''] ?? []).includes(item.id) && !searchEngineCards.includes(item.id)) game.state.purchases[item.id] = 1;
+    }
     game.invalidateStats();
     game.state.activity = 'work';
     game.state.jobs = { ticketing: 14 };
@@ -1003,7 +1135,7 @@ function hitPhase(plan: SearchPlan): SearchPhase {
 }
 
 function firstLevelWhere(matches: (target: ReturnType<typeof entrance>) => boolean): number {
-    const plain = (level: number): boolean => entrance(level).folder === entrance(level - 1).folder && !entrance(level).wildcard && entrance(level).indexUnit > highestDorkChance;
+    const plain = (level: number): boolean => entrance(level).folder === entrance(level - 1).folder && !entrance(level).wildcard;
     return Array.from({ length: 900 }, (_, index) => index + 100).find((level) => matches(entrance(level)) && plain(level))!;
 }
 

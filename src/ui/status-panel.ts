@@ -34,7 +34,6 @@ export class StatusPanel implements Panel {
     private readonly tool = addStat(this.machineElement, labels.tool);
     private readonly slots = addStat(this.machineElement, uiText.slots);
     private readonly threads = addStat(this.machineElement, uiText.threads);
-    private readonly efficiency = addStat(this.machineElement, uiText.efficiency);
     private readonly sending = addStat(this.networkElement, labels.sending);
     private readonly allowed = addStat(this.networkElement, labels.rateLimit);
     private readonly ips = addStat(this.networkElement, labels.ips);
@@ -136,7 +135,6 @@ export class StatusPanel implements Panel {
         setText(this.tool.value, toolNames[ownedTier(game.state, toolTiers)]!);
         setText(this.slots.value, String(scriptSlots(game)));
         setText(this.threads.value, String(game.stat('threadsPerScript')));
-        setText(this.efficiency.value, `${game.stat('searchEfficiency').toFixed(1)}×`);
     }
 
     private renderNetwork(): void {

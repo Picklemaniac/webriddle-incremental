@@ -4,6 +4,7 @@ import { Game } from '../core/game.ts';
 import { createInitialState } from '../core/state.ts';
 import { AutoPlayer } from './auto-player.ts';
 import type { DailySession, PlayerProfile } from './profiles.ts';
+import { actOneStaringBands, StaringMeter, type StaringBand } from './staring.ts';
 import { progressOf } from './strategies.ts';
 
 export interface SimulationOptions {
@@ -26,6 +27,7 @@ export interface SimulationReport {
     readonly longestIdleStretchSeconds: number;
     readonly longestProgressGapSeconds: number;
     readonly longestPurchaseGapSeconds: number;
+    readonly staring: readonly StaringBand[];
     readonly firstHourUnlocks: number;
     readonly upgradesPurchased: number;
     readonly routineActions: number;
@@ -47,6 +49,7 @@ interface AdvanceClock {
 }
 
 const upkeepActions: ReadonlySet<string> = new Set(['checkIn', 'setRentedAddresses']);
+const seenEvents: ReadonlySet<GameEvent['type']> = new Set(['levelSolved', 'upgradeRevealed', 'notice', 'proxyDied', 'banned', 'unbanned', 'findingDiscovered']);
 
 export function milestoneTiming(report: SimulationReport, milestoneId: string): MilestoneTiming | undefined {
     return report.milestoneTimings.find((timing) => timing.milestoneId === milestoneId);
@@ -78,6 +81,7 @@ class PlayerSimulation {
     private meaningfulActivity = false;
     private lastPurchaseActiveSeconds: number | undefined;
     private longestPurchaseGapSeconds = 0;
+    private readonly staring = new StaringMeter();
     private clock: AdvanceClock = { realSeconds: 0, activeSeconds: 0, gameSeconds: 0, offline: false };
 
     constructor(profile: PlayerProfile, content: GameContent, options: SimulationOptions) {
@@ -109,6 +113,7 @@ class PlayerSimulation {
             longestIdleStretchSeconds: this.longestIdleStretchSeconds,
             longestProgressGapSeconds: this.longestProgressGapSeconds,
             longestPurchaseGapSeconds: this.longestPurchaseGapSeconds,
+            staring: this.staring.bands(actOneStaringBands),
             firstHourUnlocks: this.firstHourUnlockIds.size,
             upgradesPurchased: Object.keys(this.game.state.purchases).length,
             routineActions: this.routineActions,
@@ -119,6 +124,7 @@ class PlayerSimulation {
     }
 
     private observeEvent(event: GameEvent): void {
+        if (seenEvents.has(event.type) || (event.type === 'actionApplied' && event.action.type !== 'checkIn')) this.observeMoment();
         if (event.type === 'milestoneReached') {
             this.milestoneTimings.push({ milestoneId: event.milestoneId, ...this.currentTime() });
             this.meaningfulActivity = true;
@@ -129,6 +135,10 @@ class PlayerSimulation {
             if (event.action.type === 'setActivity') this.routineActions++;
             else if (!upkeepActions.has(event.action.type)) this.meaningfulActivity = true;
         }
+    }
+
+    private observeMoment(): void {
+        this.staring.observe(this.currentTime().activeSeconds, this.game.state.currentLevel);
     }
 
     private observePurchase(): void {
@@ -159,6 +169,8 @@ class PlayerSimulation {
     private play(sessionSeconds: number): void {
         this.idleStretchSeconds = 0;
         this.progressGapSeconds = 0;
+        this.setClock(false);
+        this.observeMoment();
         for (let playedSeconds = 0; playedSeconds < sessionSeconds;) {
             if (this.hasReachedGoal()) return;
             const step = Math.min(this.options.stepSeconds, sessionSeconds - playedSeconds);

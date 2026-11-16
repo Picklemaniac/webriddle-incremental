@@ -6,9 +6,9 @@ import { findingFile, findings } from '../content/act-one/findings.ts';
 import { urlOfLevel } from '../content/act-one/levels.ts';
 import { effectiveRate, isBanned, requestedRate } from '../content/act-one/network.ts';
 import { automationBootSeconds, automationElapsed } from '../content/act-one/progress.ts';
-import { riddleOrigin } from '../content/act-one/riddle.ts';
+import { riddleDomain, riddleOrigin } from '../content/act-one/riddle.ts';
 import { currentPhase, guessedLength, starterWordlistName, type SearchPhase, type SearchPlan, type SlowReason } from '../content/act-one/search.ts';
-import { automationText, fill, notices, searchText, terminalText, toolCommands, uiText, type NoticeId } from '../content/act-one/text.ts';
+import { automationText, fill, notices, searchText, terminalText, uiText, type NoticeId } from '../content/act-one/text.ts';
 import { ownedTier, toolTiers } from '../content/act-one/upgrades.ts';
 import { wordAtRank } from '../content/act-one/vocabulary.ts';
 import { formatDuration, formatNumber } from '../format.ts';
@@ -23,7 +23,6 @@ const loginResponse = 401;
 const slowResponses: Readonly<Partial<Record<SlowReason, number>>> = { credentials: loginResponse, userAgent: 403, wildcard: hitResponse };
 const missResponse = 404;
 const userAgentPassesEvery = 10;
-const commandTemplates = [terminalText.curlCommand, terminalText.toolCommand, terminalText.gobusterCommand, terminalText.toolCommand, terminalText.toolCommand];
 const earlyLineMilliseconds = 1500;
 const laterLineMilliseconds = 700;
 const earlyAutomationSeconds = 600;
@@ -91,7 +90,7 @@ export class TerminalPanel implements Panel {
         this.progress.style.width = `${pass ? Math.min(100, pass.tried / pass.total * 100) : 0}%`;
         const searched = phase !== undefined && plan.speed > 0 && !isBanned(game) && dirbustingScripts(game) > 0 && rate > 0 ? phase : null;
         const request = (index: number): string => this.requestAddress(searched, index, folder);
-        const reached = spent + this.underway(rate * game.stat('searchEfficiency') * plan.speed);
+        const reached = spent + this.underway(rate * plan.speed);
         setText(this.live, searched ? `${terminalText.testing} ${request(reached)}` : '');
         this.emitLine(plan, rate, seconds, () => request(Math.max(0, reached - 1)));
     }
@@ -125,8 +124,8 @@ export class TerminalPanel implements Panel {
     }
 
     private commandText(phase: SearchPhase | undefined, folder: string): string {
-        const tier = ownedTier(this.game.state, toolTiers);
-        return fill(commandTemplates[tier]!, { tool: toolCommands[tier]!, folder: `${riddleOrigin}${folder}`, list: phase?.label ?? starterWordlistName, threads: this.game.stat('threadsPerScript') });
+        const command = terminalText.commands[ownedTier(this.game.state, toolTiers)]!;
+        return fill(phase?.guessing === true ? command.bruteForce : command.list, { folder: `${riddleOrigin}${folder}`, list: phase?.label ?? starterWordlistName, threads: this.game.stat('threadsPerScript') });
     }
 
     private footerText(plan: SearchPlan, phase: SearchPhase | undefined, spent: number, rate: number): string {
@@ -136,7 +135,7 @@ export class TerminalPanel implements Panel {
         if (plan.speed === 0) return terminalText.unguessable;
         if (phase === undefined) return uiText.waiting;
         const pass = passProgress(phase, spent);
-        const time = formatDuration((pass.total - pass.tried) / Math.max(0.001, rate * game.stat('searchEfficiency') * plan.speed));
+        const time = formatDuration((pass.total - pass.tried) / Math.max(0.001, rate * plan.speed));
         if (plan.slowedBy !== null) return fill(terminalText.slowProgress, { reason: terminalText.slow[plan.slowedBy], time });
         return fill(terminalText.progress, { list: pass.label, tried: formatNumber(pass.tried), total: formatNumber(pass.total), time });
     }
@@ -194,6 +193,9 @@ export class TerminalPanel implements Panel {
                 this.queueLine(`${method}  ${solved.origin === riddleOrigin ? solved.pathname : solved.href}`, indexed ? 'indexed' : 'hit');
                 break;
             }
+            case 'searchQuery':
+                this.queueLine(`${fill(terminalText.searchQuery, { domain: riddleDomain })}  ${terminalText.nothingNew}`, 'query');
+                break;
             case 'findingDiscovered': {
                 const finding = findings.find((item) => item.id === event.findingId);
                 if (finding) this.queueLine(fill(terminalText.found, { path: finding.path, size: findingFile(finding, this.game.state).length }), 'finding');

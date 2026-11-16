@@ -1,6 +1,7 @@
 import type { MilestoneDefinition } from '../core/content.ts';
 import { formatDuration, formatNumber } from '../format.ts';
 import { milestoneTiming, type SimulationReport } from './simulation.ts';
+import type { StaringBand } from './staring.ts';
 
 export function formatReports(reports: readonly SimulationReport[], milestones: readonly MilestoneDefinition[]): string {
     const perReport = (describe: (report: SimulationReport) => string): string[] => reports.map(describe);
@@ -13,12 +14,18 @@ export function formatReports(reports: readonly SimulationReport[], milestones: 
         ['Longest idle stretch', ...perReport((report) => formatDuration(report.longestIdleStretchSeconds))],
         ['Longest progress gap', ...perReport((report) => formatDuration(report.longestProgressGapSeconds))],
         ['Longest wait for a purchase', ...perReport((report) => formatDuration(report.longestPurchaseGapSeconds))],
+        ...(reports[0]?.staring ?? []).map((band, index) => [`Staring, levels ${band.fromLevel} to ${band.toLevel}`, ...perReport((report) => describeStaring(report.staring[index]))]),
         ['Unlocks in first hour', ...perReport((report) => String(report.firstHourUnlocks))],
         ['Upgrades purchased', ...perReport((report) => String(report.upgradesPurchased))],
         ['Activity switches', ...perReport((report) => formatNumber(report.routineActions))],
         ['Manual solves', ...perReport((report) => formatNumber(report.handSolves))],
         ['Progress made offline', ...perReport((report) => `${Math.round(report.offlineProgressShare * 100)}%`)],
     ]);
+}
+
+function describeStaring(band: StaringBand | undefined): string {
+    if (band === undefined || band.seconds === 0) return 'not reached';
+    return `${formatDuration(band.staringSeconds)} of ${formatDuration(band.seconds)} (${Math.round(band.staringSeconds / band.seconds * 100)}%), longest ${formatDuration(band.longestSeconds)}`;
 }
 
 function describeMilestoneTiming(report: SimulationReport, milestoneId: string): string {

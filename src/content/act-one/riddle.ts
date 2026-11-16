@@ -22,7 +22,7 @@ export const salts = {
     secondWord: 8,
     thirdWord: 9,
     fourthWord: 10,
-    index: 11,
+    levelsAhead: 11,
     position: 12,
     leet: 13,
     year: 14,
@@ -42,6 +42,8 @@ export const salts = {
     hintShown: 28,
     month: 29,
     day: 30,
+    // Chosen so that the pages search engines find are spread evenly over the levels.
+    indexed: 39,
     shuffle: 1000,
     firstLetterFiller: 2000,
     capitalFiller: 2100,

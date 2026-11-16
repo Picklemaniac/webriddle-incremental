@@ -15,11 +15,11 @@ import { capacityUpgrades, offeredUpgrades, upgrades, type Upgrade } from './upg
 
 type CurrencyFlag = 'insightRevealed' | 'moneyRevealed' | 'dataRevealed';
 
-const firstRevealDelaySeconds = 45;
-const firstOfferSeconds = 75;
+const firstRevealDelaySeconds = 30;
+const firstOfferSeconds = 60;
 const currencyFollowSeconds = 6;
-const moneyIntroductionSeconds = 135;
-const regularOffersSeconds = 180;
+const regularOffersSeconds = 120;
+const emptyListSeconds = 8;
 const introductionSeconds = 600;
 const earlyOfferLimit = 3;
 const laterOfferLimit = 6;
@@ -38,15 +38,17 @@ const reveals: GameSystem = {
             reserveReveal(game);
             return;
         }
+        if (state.flags.insightRevealed === true && listIsEmpty(game)) state.statistics.nextRevealAt = Math.min(nextRevealAt(game), state.elapsedSeconds + emptyListSeconds);
         if (state.elapsedSeconds < nextRevealAt(game)) return;
         const seconds = automationElapsed(state);
         if (!isUpgradeRevealed(state, 'curlBatch')) {
-            if (seconds >= firstOfferSeconds) revealBeforeCurrency(game, 'curlBatch');
+            // The first card comes once DirBuster has shown what it does by finding a page.
+            if (seconds >= firstOfferSeconds || (state.statistics.scriptSolves ?? 0) > 0) revealBeforeCurrency(game, 'curlBatch');
             return;
         }
         if (!state.flags.insightRevealed) {
             state.flags.insightRevealed = true;
-        } else if (!state.flags.moneyRevealed && seconds >= moneyIntroductionSeconds && owns(state, 'curlBatch')) {
+        } else if (!state.flags.moneyRevealed && owns(state, 'curlBatch')) {
             if (!revealWithCurrency(game, 'ram', 'moneyRevealed')) return;
         } else if (!state.flags.dataRevealed && isNeeded(state, 'english10k')) {
             if (!revealWithCurrency(game, 'english10k', 'dataRevealed')) return;
@@ -56,6 +58,11 @@ const reveals: GameSystem = {
         reserveReveal(game);
     },
 };
+
+// With nothing left to buy, the next card does not wait for its usual turn.
+function listIsEmpty(game: Game): boolean {
+    return !offeredUpgrades(game).some((item) => isUpgradeRevealed(game.state, item.id));
+}
 
 function revealWithCurrency(game: Game, upgradeId: string, currency: CurrencyFlag): boolean {
     if (!isUpgradeRevealed(game.state, upgradeId)) {
@@ -95,8 +102,10 @@ function readyForUpgrade(game: Game, item: Upgrade): boolean {
 }
 
 function revealUpgrade(game: Game, id: string): void {
+    if (game.state.flags[`seen:${id}`] === true) return;
     game.state.flags[`seen:${id}`] = true;
     game.state.flags.upgradesRevealed = true;
+    game.announce({ type: 'upgradeRevealed', purchasableId: id });
 }
 
 function revealBeforeCurrency(game: Game, id: string): void {
@@ -119,7 +128,8 @@ const pacedNetwork: GameSystem = {
         const scriptsPending = !game.state.flags.scriptsRevealed && game.stat('scriptSlots') >= 2;
         if (!revealed && showsTheLimit(game) && (scriptsPending || game.state.elapsedSeconds < nextRevealAt(game))) return;
         network.update(game, seconds);
-        if (!revealed && game.state.flags.networkRevealed) reserveReveal(game);
+        // The card that answers the limit follows the panel that shows it.
+        if (!revealed && game.state.flags.networkRevealed) game.state.statistics.nextRevealAt = game.state.elapsedSeconds + currencyFollowSeconds;
     },
 };
 
@@ -143,7 +153,7 @@ export const actOneContent: GameContent = {
     startUrl,
     resources: [{ id: 'insight', name: labels.insight }, { id: 'money', name: labels.money }, { id: 'data', name: labels.data }],
     baseStats: { requestsPerThread: 2, threadsPerScript: 1, scriptSlots: 1, riddleRate: 0.3, workRate: 1, scourRate: 1024,
-        ticketBotRate: 0.7, riddleBotRate: 0.3, scraperRate: 1024, ownAddresses: 1, proxySlots: 0, proxyLifetime: 1, rentableAddresses: 0, addressRent: 0.24, searchEfficiency: 1, dorkChance: 0 },
+        ticketBotRate: 0.7, riddleBotRate: 0.3, scraperRate: 1024, ownAddresses: 1, proxySlots: 0, proxyLifetime: 1, rentableAddresses: 0, addressRent: 0.16, searchFindShare: 0 },
     purchasables: upgrades.map((item) => ({
         ...item, isAvailable: (state) => isUpgradeRevealed(state, item.id) && item.isAvailable(state),
     })),

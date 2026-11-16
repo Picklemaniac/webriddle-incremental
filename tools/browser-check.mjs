@@ -14,6 +14,7 @@ import { AutoPlayer } from '../src/simulation/auto-player.ts';
 import { actOneStrategy } from '../src/simulation/act-one-strategy.ts';
 import { upgrades } from '../src/content/act-one/upgrades.ts';
 import { handcraftedText } from '../src/content/act-one/text.ts';
+import { formatRate } from '../src/ui/amounts.ts';
 
 const origin = process.env.WEBRIDDLE_TEST_URL ?? 'http://127.0.0.1:5173';
 const expectsDevelopmentTools = process.env.WEBRIDDLE_TEST_PRODUCTION !== '1';
@@ -194,10 +195,10 @@ try {
     const opening = new Game(actOneContent, createInitialState(actOneContent, 1));
     for (let level = 2; level <= 5; level++) opening.dispatch({ type: 'navigate', url: urlOfLevel(level) });
     opening.dispatch({ type: 'automate' });
-    opening.advance(60);
+    opening.advance(40);
     await importGame(opening);
     assert.equal(await evaluate(`document.querySelector('.dashboard').hidden`), true);
-    opening.advance(17);
+    opening.advance(7);
     await importGame(opening);
     assert.equal(await evaluate(`document.querySelector('.dashboard').hidden`), false);
     assert.equal(await evaluate(`[...document.querySelectorAll('.upgrade-card')].filter(card=>!card.hidden).length`), 1);
@@ -213,7 +214,6 @@ try {
     player.playUntil(game, () => game.state.currentLevel >= 220, 18000);
     assert.ok(game.state.currentLevel >= 220);
     delete game.state.purchases.isdn;
-    delete game.state.purchases.resellerAccount;
     game.state.flags['seen:isdn'] = true;
     await importGame(game);
     await sleep(900);
@@ -228,7 +228,7 @@ try {
     await evaluate(`document.querySelector('.throttle-switch').click()`);
     await waitFor(`document.querySelector('.throttle-switch').textContent === 'On' && document.querySelector('.stat-row .over-limit') === null`);
     await setSlider('Rented IPs', 8);
-    await waitFor(`${sliderText('Rented IPs')}.startsWith('8 of ') && ${statText('Rent')} === '$1.92/s'`);
+    await waitFor(`${sliderText('Rented IPs')}.startsWith('8 of ') && ${statText('Rent')} === ${JSON.stringify(formatRate('money', 8 * game.stat('addressRent')))}`);
     await waitFor(`${statNumber('IP addresses')} >= 9 && ${statNumber('Server limit')} === ${statNumber('IP addresses')} * 10`);
     await screenshot('network-levers', false);
     const broke = game.clone();

@@ -14,7 +14,7 @@ const statLabels: Readonly<Record<string, { readonly label: string; readonly val
 const requestStats: ReadonlySet<string> = new Set(['threadsPerScript', 'requestsPerThread']);
 const moneyStats: ReadonlySet<string> = new Set(['workRate', 'ticketBotRate', 'addressRent']);
 const byteStats: ReadonlySet<string> = new Set(['scourRate', 'scraperRate']);
-const percentStats: ReadonlySet<string> = new Set(['dorkChance']);
+const perHundredStats: ReadonlySet<string> = new Set(['searchFindShare']);
 const tooltipDelayMilliseconds = 350;
 
 export class PurchasesPanel implements Panel {
@@ -126,7 +126,8 @@ export class PurchasesPanel implements Panel {
 
 function statNumber(statId: string, value: number): string {
     if (byteStats.has(statId)) return formatBytes(value);
-    if (percentStats.has(statId)) return formatNumber(Math.round(value * 100));
+    if (perHundredStats.has(statId)) return formatNumber(Math.round(value * 100));
     if (Number.isInteger(value)) return formatNumber(value);
-    return moneyStats.has(statId) ? value.toFixed(2) : String(Number(value.toFixed(2)));
+    if (moneyStats.has(statId)) return value.toFixed(value < 0.1 ? 3 : 2);
+    return String(Number(value.toFixed(2)));
 }
