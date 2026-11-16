@@ -51,7 +51,6 @@ export const handcraftedText = {
     level4: 'it\'s dark down here.',
     level5Title: 'bits and pieces',
     level6: 'i have a GIFT for you.',
-    level7Tooltip: 'rise',
     level8Title: 'half moon',
     easterEgg404: 'this level could not be found. (it is right here.)',
     easterEgg418: 'i am a teapot.',
@@ -459,9 +458,7 @@ export const terminalText = {
         wildcard: 'Every name returns a page',
         credentials: 'Trying common logins',
     },
-    outOfWordlists: 'No wordlist has this name',
     slowProgress: '{reason}, about {time} left',
-    guessing: '{reason}, {tried} guesses so far',
 } as const;
 
 export const searchText = {
@@ -479,6 +476,7 @@ export const searchText = {
     subdomains: '{list} (subdomains)',
     dates: 'dates 1000-2099',
     bruteForce: 'brute force',
+    bruteForceLength: 'brute force, a-z, length {length}',
 } as const;
 
 export const connectionNames: readonly string[] = ['56k modem', 'ISDN', 'ADSL', 'Cable', 'Fiber'];

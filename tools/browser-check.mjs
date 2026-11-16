@@ -213,6 +213,7 @@ try {
     player.playUntil(game, () => game.state.currentLevel >= 220, 18000);
     assert.ok(game.state.currentLevel >= 220);
     delete game.state.purchases.isdn;
+    delete game.state.purchases.resellerAccount;
     game.state.flags['seen:isdn'] = true;
     await importGame(game);
     await sleep(900);
@@ -345,9 +346,9 @@ try {
         guessedPlan.phases.slice(0, -1).map((phase) => phase.label), 'The passes are the same on a level with a name of an unknown kind as on any other level');
     puzzled.state.search = { stage: 0, requestsSpent: passRequests - 1, configuration: guessedPlan.signature };
     await importGame(puzzled);
-    await waitFor(`/^No wordlist has this name, \\S+ guesses so far$/.test(document.querySelector('.terminal-footer').textContent)`);
+    await waitFor(`/^brute force, a-z, length \\d+: \\S+ of \\S+ tried, about /.test(document.querySelector('.terminal-footer').textContent)`);
     await waitFor(saysNoWordlistMatches);
-    await waitFor(`/^--> Testing: \\/([a-z0-9]+\\/)?[a-z0-9]{3,8}\\.htm$/.test(document.querySelector('.terminal-line.live').textContent)`);
+    await waitFor(`/^--> Testing: \\/([a-z0-9]+\\/)?[a-z]+\\.htm$/.test(document.querySelector('.terminal-line.live').textContent)`);
     assert.equal(await evaluate(`[...document.querySelectorAll('.upgrade-card')].some((card) => !card.hidden && card.dataset.upgrade === 'namesList')`), false, 'A kind of answer is not known before one is found');
     await screenshot('unknown-kind', false);
 

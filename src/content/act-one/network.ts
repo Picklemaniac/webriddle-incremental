@@ -12,7 +12,7 @@ const banSeconds = 300;
 const heatPerExcessRatio = 3;
 const coolingPerSecond = 3;
 const startingRentShareOfIncome = 0.3;
-const proxySeconds = 180;
+const proxySeconds = 120;
 
 export function liveProxies(game: Game): number {
     return game.state.network.proxies.filter((proxy) => proxy.diesAtSeconds > game.state.elapsedSeconds).length;

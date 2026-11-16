@@ -140,7 +140,7 @@ strong { font-weight: 600; }
 .win-tooltip { position: fixed; z-index: 40; max-width: 300px; padding: 2px 5px; background: #ffffe1; color: #000; border: 1px solid #000; font: 11px Tahoma, Arial, sans-serif; line-height: 1.45; white-space: pre-line; pointer-events: none; }
 .heat-track { height: 12px; margin: 8px 0 12px; padding: 1px; background: #000; border: 1px solid; border-color: var(--sunken); }
 .heat-fill { height: 100%; background: var(--problem); }
-.proxy-row { display: grid; grid-template-columns: minmax(0, 1fr) 45px 65px; gap: 8px; align-items: center; margin: 5px 0; white-space: nowrap; font-size: 10px; }
+.proxy-row { display: grid; grid-template-columns: minmax(0, 1fr) 52px 65px; gap: 8px; align-items: center; margin: 5px 0; white-space: nowrap; font-size: 10px; }
 .proxy-address { font-family: 'IBM Plex Mono', monospace; }
 .proxy-row button { --pad-y: 4px; --pad-x: 4px; width: 65px; }
 .proxy-row.dead .proxy-address { color: var(--problem); text-decoration: line-through; }

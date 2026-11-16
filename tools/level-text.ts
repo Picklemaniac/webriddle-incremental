@@ -43,7 +43,7 @@ export const puzzleNames: Readonly<Record<string, string>> = {
 
 const openingPuzzles: Readonly<Record<number, string>> = {
     1: 'The picture links to the next level', 2: 'The next page has the next number', 3: 'The answer is in a source comment', 4: 'Black text on the black page',
-    5: 'Binary', 6: 'The picture as a .gif file', 7: 'The answer is the picture tooltip', 8: 'ROT13', 9: 'Reversed text', 404: 'Easter egg', 418: 'Easter egg',
+    5: 'Binary', 6: 'The picture as a .gif file', 7: 'Morse code in the picture tooltip', 8: 'ROT13', 9: 'Reversed text', 404: 'Easter egg', 418: 'Easter egg',
 };
 
 const placeHints: Readonly<Record<string, keyof typeof puzzleHints>> = {

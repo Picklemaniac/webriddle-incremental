@@ -7,8 +7,8 @@ import { urlOfLevel } from '../content/act-one/levels.ts';
 import { effectiveRate, isBanned, requestedRate } from '../content/act-one/network.ts';
 import { automationBootSeconds, automationElapsed } from '../content/act-one/progress.ts';
 import { riddleOrigin } from '../content/act-one/riddle.ts';
-import { currentPhase, starterWordlistName, type SearchPhase, type SearchPlan, type SlowReason } from '../content/act-one/search.ts';
-import { automationText, fill, notices, terminalText, toolCommands, uiText, type NoticeId } from '../content/act-one/text.ts';
+import { currentPhase, guessedLength, starterWordlistName, type SearchPhase, type SearchPlan, type SlowReason } from '../content/act-one/search.ts';
+import { automationText, fill, notices, searchText, terminalText, toolCommands, uiText, type NoticeId } from '../content/act-one/text.ts';
 import { ownedTier, toolTiers } from '../content/act-one/upgrades.ts';
 import { wordAtRank } from '../content/act-one/vocabulary.ts';
 import { formatDuration, formatNumber } from '../format.ts';
@@ -87,7 +87,8 @@ export class TerminalPanel implements Panel {
         if (guessing && !this.wasGuessing) this.queueLine(notices.bruteForce, 'warning');
         this.wasGuessing = guessing;
         this.footer.classList.toggle('warning', isBanned(game) || plan.slowedBy !== null || guessing);
-        this.progress.style.width = `${phase ? Math.min(100, spent / phase.size * 100) : 0}%`;
+        const pass = phase === undefined ? undefined : passProgress(phase, spent);
+        this.progress.style.width = `${pass ? Math.min(100, pass.tried / pass.total * 100) : 0}%`;
         const searched = phase !== undefined && plan.speed > 0 && !isBanned(game) && dirbustingScripts(game) > 0 && rate > 0 ? phase : null;
         const request = (index: number): string => this.requestAddress(searched, index, folder);
         const reached = spent + this.underway(rate * game.stat('searchEfficiency') * plan.speed);
@@ -134,10 +135,10 @@ export class TerminalPanel implements Panel {
         if (dirbustingScripts(game) === 0) return uiText.paused;
         if (plan.speed === 0) return terminalText.unguessable;
         if (phase === undefined) return uiText.waiting;
-        if (phase.guessing) return fill(terminalText.guessing, { reason: terminalText.outOfWordlists, tried: formatNumber(spent) });
-        const time = formatDuration((phase.size - spent) / Math.max(0.001, rate * game.stat('searchEfficiency') * plan.speed));
+        const pass = passProgress(phase, spent);
+        const time = formatDuration((pass.total - pass.tried) / Math.max(0.001, rate * game.stat('searchEfficiency') * plan.speed));
         if (plan.slowedBy !== null) return fill(terminalText.slowProgress, { reason: terminalText.slow[plan.slowedBy], time });
-        return fill(terminalText.progress, { list: phase.label, tried: formatNumber(spent), total: formatNumber(phase.size), time });
+        return fill(terminalText.progress, { list: pass.label, tried: formatNumber(pass.tried), total: formatNumber(pass.total), time });
     }
 
     private requestAddress(searched: SearchPhase | null, index: number, folder: string): string {
@@ -215,6 +216,13 @@ export class TerminalPanel implements Panel {
         while (this.lines.childElementCount > shownLineLimit) this.lines.firstElementChild?.remove();
         if (nearBottom) this.lines.scrollTop = this.lines.scrollHeight;
     }
+}
+
+// Brute force has no end, so it is shown one name length at a time.
+function passProgress(phase: SearchPhase, spent: number): { readonly label: string; readonly tried: number; readonly total: number } {
+    if (phase.guessing !== true) return { label: phase.label, tried: spent, total: phase.size };
+    const { length, tried, total } = guessedLength(spent);
+    return { label: fill(searchText.bruteForceLength, { length }), tried, total };
 }
 
 function sampleInterval(requestsPerSecond: number): number {

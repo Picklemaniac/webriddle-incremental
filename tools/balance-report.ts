@@ -8,6 +8,7 @@ import { formatDuration, formatNumber } from '../src/format.ts';
 import { actOneStrategy, type PlayStyle } from '../src/simulation/act-one-strategy.ts';
 import { AutoPlayer } from '../src/simulation/auto-player.ts';
 import { withHabits, type Habits } from '../src/simulation/habits.ts';
+import { readFileSync } from 'node:fs';
 import { readArgument } from './shared.ts';
 
 interface Player {
@@ -25,12 +26,23 @@ interface Run {
     readonly longestPurchaseWait: number;
     readonly nothingOnOffer: number;
     readonly slowLevels: readonly { readonly level: number; readonly seconds: number }[];
+    readonly clicks: readonly Moment[];
+    readonly levels: readonly Moment[];
+}
+
+// A click, or the first time a level was reached.
+interface Moment {
+    readonly at: number;
+    readonly level: number;
 }
 
 const seed = Number(readArgument('--seed') ?? '1');
 const longestRunSeconds = 10 * 3600;
 const slowLevelSeconds = 240;
 const marks: readonly number[] = [100, 500, 1000];
+// Staring is a stretch of this many seconds or more in which the player clicks nothing: there is nothing to buy, replace, assign or answer.
+const stareSeconds = 30;
+const stareBands: readonly number[] = [5, 25, 50, 100, 250, 500, 1000];
 
 const players: readonly Player[] = [
     { name: 'attentive robot', habits: {} },
@@ -60,8 +72,12 @@ function play(player: Player): Run {
     let lastSolveAt = 0;
     let longestPurchaseWait = 0;
     let nothingOnOffer = 0;
+    const clicks: Moment[] = [];
+    const levels: Moment[] = [];
     game.subscribe((event) => {
         const { elapsedSeconds } = game.state;
+        if (event.type === 'actionApplied' && event.action.type !== 'checkIn') clicks.push({ at: elapsedSeconds, level: game.state.currentLevel });
+        if (event.type === 'levelSolved') levels.push({ at: elapsedSeconds, level: event.level });
         if (event.type === 'banned') bans++;
         if (event.type === 'actionApplied' && event.action.type === 'purchase') {
             purchases++;
@@ -78,18 +94,20 @@ function play(player: Player): Run {
         for (const mark of marks) if (reached[mark] === undefined && game.state.currentLevel >= mark) reached[mark] = game.state.elapsedSeconds;
         if (game.state.flags.upgradesRevealed === true && !offeredUpgrades(game).some((item) => isUpgradeRevealed(game.state, item.id))) nothingOnOffer++;
     }
-    return { game, reached, bans, purchases, longestPurchaseWait, nothingOnOffer, slowLevels };
+    return { game, reached, bans, purchases, longestPurchaseWait, nothingOnOffer, slowLevels, clicks, levels };
 }
 
 function row(cells: readonly (string | number)[], widths: readonly number[]): string {
     return cells.map((cell, index) => String(cell).padEnd(widths[index] ?? 0)).join(' ');
 }
 
-function reportPlayers(): void {
+function reportPlayers(): Run {
     const widths = [24, 9, 9, 9, 7, 6, 12, 20, 13, 9];
     console.log(row(['player', 'L100', 'L500', 'L1000', 'cards', 'bans', 'longest wait', 'levels over 4 min', 'nothing to buy', 'money left'], widths));
+    let attentive: Run | undefined;
     for (const player of players) {
         const run = play(player);
+        attentive ??= run;
         const time = (level: number): string => (run.reached[level] === undefined ? `L${run.game.state.currentLevel}` : formatDuration(run.reached[level]));
         const slowest = run.slowLevels.reduce((longest, entry) => Math.max(longest, entry.seconds), 0);
         console.log(row([
@@ -98,6 +116,38 @@ function reportPlayers(): void {
             formatDuration(run.nothingOnOffer), `$${formatNumber(run.game.state.resources.money ?? 0)}`,
         ], widths));
     }
+    return attentive!;
+}
+
+function reportStaring(name: string, clicks: readonly Moment[], levels: readonly Moment[]): void {
+    const widths = [18, 10, 10, 8, 30];
+    console.log(`\nStaring (${stareSeconds} seconds or more without a click), ${name}:`);
+    console.log(row(['levels', 'time', 'staring', 'share', 'longest stretch'], widths));
+    const reachedAt = (level: number): number | undefined => levels.find((moment) => moment.level >= level)?.at;
+    const end = levels.at(-1)?.at ?? 0;
+    for (const [index, from] of stareBands.slice(0, -1).entries()) {
+        const to = stareBands[index + 1]!;
+        const start = reachedAt(from);
+        if (start === undefined) break;
+        const stop = reachedAt(to) ?? end;
+        const moments = [start, ...clicks.map((click) => click.at).filter((at) => at > start && at < stop), stop];
+        const stretches = moments.slice(1).map((at, position) => ({ from: moments[position]!, seconds: at - moments[position]! })).filter((stretch) => stretch.seconds >= stareSeconds);
+        const staring = stretches.reduce((sum, stretch) => sum + stretch.seconds, 0);
+        const longest = stretches.reduce<{ from: number; seconds: number } | undefined>((most, stretch) => (most === undefined || stretch.seconds > most.seconds ? stretch : most), undefined);
+        const levelAt = (at: number): number => levels.findLast((moment) => moment.at <= at)?.level ?? from;
+        console.log(row([
+            `${from} to ${to}`, formatDuration(stop - start), formatDuration(staring), `${Math.round(staring / Math.max(1, stop - start) * 100)}%`,
+            longest === undefined ? 'none' : `${formatDuration(longest.seconds)} at level ${levelAt(longest.from)}`,
+        ], widths));
+    }
+}
+
+// The same count for a session log of a real play. Moving around in the browser is not counted as a click.
+function reportLoggedStaring(file: string): void {
+    const entries = readFileSync(file, 'utf8').trim().split('\n').map((line) => JSON.parse(line) as { type: string; gameSeconds: number; level: number; action?: { type: string } });
+    const clicks = entries.filter((entry) => entry.type === 'actionApplied' && entry.action?.type !== 'navigate').map((entry) => ({ at: entry.gameSeconds, level: entry.level }));
+    const levels = entries.filter((entry) => entry.type === 'levelSolved' || entry.type === 'devSetLevel').map((entry) => ({ at: entry.gameSeconds, level: entry.level }));
+    reportStaring(file, clicks, levels);
 }
 
 function reportSlowLevels(): void {
@@ -126,6 +176,12 @@ function reportBreaks(): void {
     }
 }
 
-reportPlayers();
+const logFile = readArgument('--log');
+if (logFile !== undefined) {
+    reportLoggedStaring(logFile);
+    process.exit();
+}
+const attentiveRun = reportPlayers();
+reportStaring('attentive robot', attentiveRun.clicks, attentiveRun.levels);
 reportSlowLevels();
 reportBreaks();

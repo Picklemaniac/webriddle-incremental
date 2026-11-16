@@ -16,7 +16,7 @@ import { addressCount, effectiveRate, networkCapacity, rentedBlocks, rentPerSeco
 import { currentSearch } from './automation.ts';
 import { markNeeded } from './progress.ts';
 import {
-    bansBeforeScriptsAreBlocked, currentPhase, isLightLeet, planSearch, requestsKept, searchCapabilities, type SearchCapabilities, type SearchPhase, type SearchPlan, type SlowReason,
+    bansBeforeScriptsAreBlocked, currentPhase, guessedLength, isLightLeet, planSearch, requestsKept, searchCapabilities, type SearchCapabilities, type SearchPhase, type SearchPlan, type SlowReason,
 } from './search.ts';
 import { offeredUpgrades, upgrades } from './upgrades.ts';
 import { rankOfWord } from './vocabulary.ts';
@@ -185,7 +185,7 @@ describe('Act I', () => {
             const target = entrance(index + 1);
             return [target.url, target.kind, target.answer, target.clue.method ?? ''];
         });
-        expect(createHash('sha256').update(JSON.stringify(levels)).digest('hex')).toMatchInlineSnapshot(`"216cdf5715f2c67f7d0fb00ff912aa67c266c55a7ed558386e6eeecd62269bde"`);
+        expect(createHash('sha256').update(JSON.stringify(levels)).digest('hex')).toMatchInlineSnapshot(`"0b5c85bc91c208459e257bc9e7342036cf8de3fa8519b8f90a6dd1b17f3e4ead"`);
     });
 
     it('lists every handcrafted answer for the vocabulary build', () => {
@@ -500,6 +500,7 @@ describe('Act I', () => {
         game.advance(61);
         expect(offered()).not.toContain('isdn');
         buy('proxyPool');
+        for (const proxy of game.state.network.proxies) proxy.diesAtSeconds = Number.POSITIVE_INFINITY;
         game.advance(61);
         expect(networkCapacity(game)).toBe(100);
         expect(offered()).toContain('isdn');
@@ -815,9 +816,9 @@ describe('Act I', () => {
         const guesses = plan.phases.at(-1)!;
         expect(guesses.label).toBe('brute force');
         expect(guesses.guessing).toBe(true);
-        const guessed = [0, 1, 2, 3, 4, 5, 6, 7].map((index) => guesses.candidate(index));
-        for (const name of guessed) expect(name).toMatch(/^[a-z0-9]{3,8}\.htm$/);
-        expect(new Set(guessed.map((name) => name.length)).size).toBeGreaterThan(2);
+        const names = [0, 1, 25, 26, 27, 701, 702, 18_279].map((index) => guesses.candidate(index).replace(/^.*\//, ''));
+        expect(names).toEqual(['a.htm', 'b.htm', 'z.htm', 'aa.htm', 'ab.htm', 'zz.htm', 'aaa.htm', 'aaab.htm']);
+        expect(guessedLength(18_279)).toEqual({ length: 4, tried: 1, total: 456_976 });
         expect(plan.hitAt).toBeGreaterThan(passRequests(plan));
         expect(currentPhase(plan, passRequests(plan) - 1).phase!.guessing).toBeUndefined();
         expect(currentPhase(plan, passRequests(plan)).phase).toBe(guesses);

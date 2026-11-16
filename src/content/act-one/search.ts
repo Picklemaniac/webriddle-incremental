@@ -117,9 +117,7 @@ const passwordsList: NamedList = { fileName: 'passwords.txt', size: 4_000 };
 const commonUsernames: NamedList = { fileName: searchText.usernames, size: 1_000 };
 const commonPasswords: NamedList = { fileName: searchText.passwords, size: 10_000 };
 export const bansBeforeScriptsAreBlocked = 3;
-const guessedCharacters = 'abcdefghijklmnopqrstuvwxyz0123456789';
-const shortestGuess = 3;
-const longestGuess = 8;
+const guessedCharacters = 'abcdefghijklmnopqrstuvwxyz';
 const guessingTimes = 20;
 const firstGuessSeconds = 20;
 const unguessable: SearchPlan = { phases: [], hitAt: Number.POSITIVE_INFINITY, base: '/', finds: 'level', slowedBy: null, speed: 0, signature: '', missing: [], learns: [] };
@@ -416,10 +414,20 @@ function listEntry(place: number): string {
     return wordAtRank(1 + place * 7919 % vocabularySize);
 }
 
-// Guessing follows no list: a name of any length, in no order.
+// Brute force tries every name in order of length: a to z, then aa to zz, and so on.
+export function guessedLength(guesses: number): { readonly length: number; readonly tried: number; readonly total: number } {
+    let length = 1;
+    let tried = Math.max(0, Math.floor(guesses));
+    for (let total = guessedCharacters.length; tried >= total; total *= guessedCharacters.length) {
+        tried -= total;
+        length++;
+    }
+    return { length, tried, total: guessedCharacters.length ** length };
+}
+
 function guessedName(index: number): string {
-    const length = shortestGuess + Math.floor(unitHash(index, 0) * (longestGuess - shortestGuess + 1));
-    return Array.from({ length }, (_, at) => guessedCharacters[Math.floor(unitHash(index, at + 1) * guessedCharacters.length)]).join('');
+    const { length, tried } = guessedLength(index);
+    return Array.from({ length }, (_, at) => guessedCharacters[Math.floor(tried / guessedCharacters.length ** (length - 1 - at)) % guessedCharacters.length]).join('');
 }
 
 function position(share: number, size: number): number {

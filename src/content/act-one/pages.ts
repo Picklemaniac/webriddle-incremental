@@ -1,7 +1,7 @@
 import type { Page } from '../../core/content.ts';
 import type { CaptchaChallenge, GameState } from '../../core/state.ts';
 import { findingFile, findings } from './findings.ts';
-import { captchaStyle, defaultReservedHeight, errorStyle, gifStyle, imageStyle, levelStyle, noteStyle, pictureHeight, pictureWidth, scrollbarStyle, soundStyle, textFileStyle } from './page-styles.ts';
+import { captchaStyle, errorStyle, gifStyle, imageStyle, levelStyle, noteStyle, pictureHeight, pictureWidth, scrollbarStyle, soundStyle, textFileStyle } from './page-styles.ts';
 import { contentType, doctype, formatSource } from './html-source.ts';
 import { imagePath } from './images.ts';
 import { drawPicture, type Picture } from './drawings.ts';
@@ -81,22 +81,14 @@ function relativeLink(from: string, to: string): string {
 function renderLevel(level: number): Page {
     const page = levelPage(level);
     const link = page.link === null ? page.files.find((file) => file.linked === 'pictureLink')?.name ?? null : relativeLink(page.url, page.link);
-    let reserved = defaultReservedHeight + (page.grid.length === 0 ? 0 : page.grid.length * 14 + 16) + (page.spans.length === 0 ? 0 : 40);
     const embedded = page.files.map((file) => {
         if (file.linked === 'image' && 'drawing' in file.content) {
             if (file.display === 'hidden' || file.display === 'rollover') return '';
             const drawing = drawPicture(file.content.drawing);
-            if (file.display === 'squashed') {
-                reserved += 19;
-                return `<p class="drawing">${pictureTag(drawing, file.name, pictureWidth, 3, 'squashed')}</p>`;
-            }
-            reserved += drawing.height + 16;
+            if (file.display === 'squashed') return `<p class="drawing">${pictureTag(drawing, file.name, pictureWidth, 3, 'squashed')}</p>`;
             return `<p class="drawing">${pictureTag(drawing, file.name)}</p>`;
         }
-        if (file.linked === 'sound' && 'sound' in file.content) {
-            reserved += 48;
-            return `<p><audio controls src="${soundData(file.content.sound)}"></audio></p>`;
-        }
+        if (file.linked === 'sound' && 'sound' in file.content) return `<p><audio controls src="${soundData(file.content.sound)}"></audio></p>`;
         return '';
     });
     const body = [
@@ -111,8 +103,7 @@ function renderLevel(level: number): Page {
         page.hiddenText === null ? '' : `<p class="hidden">${escapeHtml(page.hiddenText)}</p>`,
         page.belowFold.length === 0 ? '' : `<div class="far">${page.belowFold.map((line) => `<p>${escapeHtml(line)}</p>`).join('')}</div>`,
     ].join('');
-    const style = reserved === defaultReservedHeight ? levelStyle : `:root{--reserved:${Math.min(reserved, 420)}px}${levelStyle}`;
-    return { ...documentPage(page.title, body, 200, style), source: levelSource(page, link) };
+    return { ...documentPage(page.title, body, 200, levelStyle), source: levelSource(page, link) };
 }
 
 function levelSource(page: LevelPage, link: string | null): string {

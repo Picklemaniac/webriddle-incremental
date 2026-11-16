@@ -70,7 +70,7 @@ export const upgrades: readonly Upgrade[] = [
     upgrade('seniorCertification', { money: 1700 }, 70, ['certification'], [multiply('workRate', 2), multiply('ticketBotRate', 2)]),
     whenNeeded('extensionList', { insight: 80 }, 156),
     whenNeeded('dictWords', { data: 512 * kilobytes }, 160),
-    upgrade('proxyChecker', { insight: 130, money: 1700 }, 90, ['proxyPool']),
+    upgrade('proxyChecker', { insight: 130, money: 1700 }, 130, ['proxyPool']),
     whenNeeded('sizeFilter', { insight: 100 }, 200),
     whenUseful('secondAddressBlock', { money: 1000 }, 100, ['addressBlock'], [add('rentableAddresses', 32)]),
     upgrade('gobuster', { insight: 200, money: 2000 }, 102, ['dirb'], [multiply('searchEfficiency', 1.4)]),

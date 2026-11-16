@@ -1,5 +1,3 @@
-export const defaultReservedHeight = 120;
-
 export const scrollbarStyle = [
     "::-webkit-scrollbar { width: 16px; height: 16px; }",
     "::-webkit-scrollbar-track { background: repeating-conic-gradient(#c0c0c0 0% 25%, #fff 0% 50%) 0 0 / 2px 2px; }",
@@ -22,7 +20,7 @@ export const pictureStyle = '.picture{position:relative;display:block;border:2px
 
 export const levelStyle = '*{box-sizing:border-box}html,body{height:100%}' +
     'body{margin:0;padding:12px 16px;background:#000;color:#ddd;font:18px "Times New Roman",Times,serif;text-align:center;display:flex;flex-direction:column;justify-content:safe center}' +
-    `.picture{width:max(240px,min(${pictureWidth + 4}px,100%,calc((100vh - var(--reserved,${defaultReservedHeight}px)) * 1.5)));margin:0 auto}${pictureStyle}` +
+    `.picture{width:max(240px,min(${pictureWidth + 4}px,100%,calc((100vh - 120px) * 1.5)));margin:0 auto}${pictureStyle}` +
     '.swatches{display:flex;justify-content:center;gap:8px;margin-top:16px}.swatches span{width:26px;height:26px;border:1px solid #555}p{margin:16px 0 0;white-space:nowrap}p+p{margin-top:6px}.hidden{color:#000}a{color:#fff}::selection{background:#3459b1;color:#fff}' +
     '.drawing img{display:block;max-width:100%;height:auto;margin:0 auto;image-rendering:pixelated}.drawing img.squashed{height:3px}audio{display:block;width:300px;height:32px;margin:0 auto;color-scheme:dark}' +
     '.picture .over{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;background:#000;opacity:0}.picture:hover .over{opacity:1}' +
