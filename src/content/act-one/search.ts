@@ -56,7 +56,6 @@ export interface SearchPlan extends Route {
 export interface SearchCapabilities {
     readonly cards: readonly LearnedCard[];
     readonly met: readonly LearnedCard[];
-    readonly sortedByFrequency: boolean;
     readonly likelyPairs: boolean;
     readonly usernames: boolean;
     readonly passwords: boolean;
@@ -115,7 +114,6 @@ const listedYearDays = 12 * listedMonthDays;
 const mutationsPerWord = 6;
 const rockyouShare = 0.67;
 const likelyPairsDivisor = 3;
-const usernameRanks = 300;
 const usernamesList: NamedList = { fileName: 'usernames.txt', size: 500 };
 const passwordsList: NamedList = { fileName: 'passwords.txt', size: 4_000 };
 const commonUsernames: NamedList = { fileName: searchText.usernames, size: 1_000 };
@@ -132,7 +130,7 @@ const unguessable: SearchPlan = { phases: [], hitAt: Number.POSITIVE_INFINITY, b
 const typicalRequestsPerSecond = (level: number): number => 150 * (level / 100) ** 2.5;
 
 const page = (name: string): string => `${name}.htm`;
-const leaked = (index: number): string => page(toLeet(listEntry(index, false), (index % 89) / 89));
+const leaked = (index: number): string => page(toLeet(listEntry(index), (index % 89) / 89));
 
 const pages: Form = { id: 'pages', count: 1, label: (list) => list, format: page };
 // A folder can be a new one for the next levels, next to the folder DirBuster is in, or one inside it that asks for a login.
@@ -200,7 +198,6 @@ export function searchCapabilities(state: GameState): SearchCapabilities {
     return {
         cards: cardsLearnedFromAnswers.filter((card) => (card === 'dirb' ? searchesFolders : owned(card))),
         met: cardsLearnedFromAnswers.filter((card) => isNeeded(state, card)),
-        sortedByFrequency: owned('sortByFrequency'),
         likelyPairs: owned('likelyPairs'),
         usernames: owned('usernames'),
         passwords: owned('passwords'),
@@ -240,7 +237,7 @@ export function planSearch(targetLevel: number, capabilities: SearchCapabilities
     if (atLogin && !capabilities.clusterBomb && !capabilities.cracked) walls.push({ fix: 'clusterBomb', reason: 'credentials', slowdown: 20 });
     const home = inFolder ? pageHome : folderHome[0]!;
     const route = atLogin ? loginRoute(target, base, capabilities) : listedRoute(home, searchOrder(capabilities, resumedSignature), guessesNeeded(home, target, capabilities));
-    const ordering = atLogin ? 'login' : `${Number(capabilities.sortedByFrequency)}${Number(capabilities.likelyPairs)}`;
+    const ordering = atLogin ? 'login' : String(Number(capabilities.likelyPairs));
     return {
         ...route,
         base,
@@ -259,7 +256,7 @@ function searchOrder(capabilities: SearchCapabilities, resumedSignature: string)
     const passes: SearchPhase[] = [];
     for (const list of wordlists.filter((candidate) => candidate.id === 'words' || owned(candidate.id))) {
         const forms = list.coverage <= ruleWordRanks ? rules.filter((form) => owned(form.card)) : [];
-        for (const form of [pages, ...forms]) passes.push(wordlistPass(list, form, capabilities.sortedByFrequency));
+        for (const form of [pages, ...forms]) passes.push(wordlistPass(list, form));
         if (owned('combinator') && list.coverage <= ruleWordRanks) passes.push(pairPass(list, capabilities));
     }
     passes.push(...kindLists.filter((list) => owned(list.id)));
@@ -329,7 +326,7 @@ function homeOf(target: Entrance, capabilities: SearchCapabilities): Home | null
         }
         case 'twoWords': {
             const list = listWith(second);
-            const pair = (placeIn(starterWordlist, word, unit, capabilities) - 1) * entriesAdded(list) + placeIn(list, second, (unit * 7.31) % 1, capabilities);
+            const pair = (placeIn(starterWordlist, unit) - 1) * entriesAdded(list) + placeIn(list, (unit * 7.31) % 1);
             return { pass: pairId(list), cards: ['combinator', ...cardsFor(list)], position: capabilities.likelyPairs ? Math.ceil(pair / likelyPairsDivisor) : pair };
         }
     }
@@ -338,7 +335,7 @@ function homeOf(target: Entrance, capabilities: SearchCapabilities): Home | null
 function wordHome(word: string, unit: number, form: Form, capabilities: SearchCapabilities, variant = Math.floor(unit * form.count)): Home {
     const list = listWith(word);
     const cards = [...cardsFor(list), ...(form.card === undefined ? [] : [form.card])];
-    return { pass: passId(list, form), cards, position: (placeIn(list, word, unit, capabilities) - 1) * form.count + variant + 1 };
+    return { pass: passId(list, form), cards, position: (placeIn(list, unit) - 1) * form.count + variant + 1 };
 }
 
 function cardsFor(list: Wordlist): readonly LearnedCard[] {
@@ -359,10 +356,8 @@ function entriesAdded(list: Wordlist): number {
 }
 
 // Where a word comes among the entries its wordlist adds, counting from one.
-function placeIn(list: Wordlist, word: string, unit: number, capabilities: SearchCapabilities): number {
-    const firstRank = listBefore(list)?.coverage ?? 0;
-    const share = capabilities.sortedByFrequency ? Math.min(1, (rankOfWord(word) - firstRank - 1 + unit) / (list.coverage - firstRank)) : unit;
-    return position(share, entriesAdded(list));
+function placeIn(list: Wordlist, unit: number): number {
+    return position(unit, entriesAdded(list));
 }
 
 function passId(list: Wordlist, form: Form): string {
@@ -373,13 +368,13 @@ function pairId(second: Wordlist): string {
     return `pairs+${second.id}`;
 }
 
-function wordlistPass(list: Wordlist, form: Form, sortedByFrequency: boolean): SearchPhase {
+function wordlistPass(list: Wordlist, form: Form): SearchPhase {
     const firstEntry = listBefore(list)?.size ?? 0;
     return {
         id: passId(list, form),
         label: form.label(list.fileName),
         size: entriesAdded(list) * form.count,
-        candidate: (index) => form.format(listEntry(firstEntry + Math.floor(index / form.count), sortedByFrequency), index % form.count),
+        candidate: (index) => form.format(listEntry(firstEntry + Math.floor(index / form.count)), index % form.count),
     };
 }
 
@@ -387,13 +382,12 @@ function wordlistPass(list: Wordlist, form: Form, sortedByFrequency: boolean): S
 function pairPass(second: Wordlist, capabilities: SearchCapabilities): SearchPhase {
     const firstEntry = listBefore(second)?.size ?? 0;
     const seconds = entriesAdded(second);
-    const entry = (index: number): string => listEntry(index, capabilities.sortedByFrequency);
     const label = fill(searchText.wordPairs, { first: starterWordlist.fileName, second: second.fileName });
     return {
         id: pairId(second),
         label: capabilities.likelyPairs ? fill(searchText.likelyPairs, { list: label }) : label,
         size: starterWordlist.size * seconds,
-        candidate: (index) => page(`${entry(Math.floor(index / seconds))}${entry(firstEntry + index % seconds)}`),
+        candidate: (index) => page(`${listEntry(Math.floor(index / seconds))}${listEntry(firstEntry + index % seconds)}`),
         ...(capabilities.likelyPairs ? {} : { booster: 'likelyPairs' }),
     };
 }
@@ -404,19 +398,16 @@ function loginRoute(target: Entrance, base: string, capabilities: SearchCapabili
     if (capabilities.cracked) return { phases: [{ id: 'cracked', label: searchText.cracked, size: 1, candidate: () => login(username, password) }], hitAt: 1 };
     const users = capabilities.usernames ? usernamesList : commonUsernames;
     const secrets = capabilities.passwords ? passwordsList : commonPasswords;
-    const place = (word: string, ranks: number, unit: number, list: NamedList): number =>
-        position(capabilities.sortedByFrequency ? Math.min(1, (rankOfWord(word) - 1 + unit) / ranks) : unit, list.size);
-    const entry = (index: number): string => listEntry(index, capabilities.sortedByFrequency);
     const booster = !capabilities.clusterBomb ? undefined : !capabilities.usernames ? 'usernames' : !capabilities.passwords ? 'passwords' : undefined;
     const phase: SearchPhase = {
         id: `${users.fileName}+${secrets.fileName}`,
         label: fill(searchText.wordPairs, { first: users.fileName, second: secrets.fileName }),
         size: users.size * secrets.size,
-        candidate: (index) => login(entry(Math.floor(index / secrets.size)), entry(index % secrets.size)),
+        candidate: (index) => login(listEntry(Math.floor(index / secrets.size)), listEntry(index % secrets.size)),
         ...(booster === undefined ? {} : { booster }),
     };
     const unit = target.positionUnit;
-    return { phases: [phase], hitAt: (place(username, usernameRanks, unit, users) - 1) * secrets.size + place(password, ruleWordRanks, (unit * 7.31) % 1, secrets) };
+    return { phases: [phase], hitAt: (position(unit, users.size) - 1) * secrets.size + position((unit * 7.31) % 1, secrets.size) };
 }
 
 function listedDate(index: number): string {
@@ -426,8 +417,9 @@ function listedDate(index: number): string {
     return `${twoDigits(dayOfYear % listedMonthDays + 1)}${twoDigits(Math.floor(dayOfYear / listedMonthDays) + 1)}${year}`;
 }
 
-function listEntry(place: number, sortedByFrequency: boolean): string {
-    return wordAtRank(1 + (sortedByFrequency ? place : place * 7919) % vocabularySize);
+// The lists are in no order that helps: a word's place says nothing about how common it is.
+function listEntry(place: number): string {
+    return wordAtRank(1 + place * 7919 % vocabularySize);
 }
 
 // Guessing follows no list: a name of any length, in no order.

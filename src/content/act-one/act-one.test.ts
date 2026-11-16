@@ -229,7 +229,7 @@ describe('Act I', () => {
     });
 
     it('makes the same passes in the same order on every level, whatever the answer is', () => {
-        for (const owned of [['english10k'], ['english10k', 'dirb', 'extensionList', 'dictWords', 'sortByFrequency'], upgrades.map((item) => item.id)]) {
+        for (const owned of [['english10k'], ['english10k', 'dirb', 'extensionList', 'dictWords'], upgrades.map((item) => item.id)]) {
             const state = newGame().state;
             for (const id of owned) state.purchases[id] = 1;
             const capabilities = searchCapabilities(state);
@@ -291,7 +291,7 @@ describe('Act I', () => {
 
     it('searches word pairs in english-10k.txt once a word is too rare for words.txt', () => {
         const state = newGame().state;
-        for (const id of ['english10k', 'sortByFrequency', 'combinator', 'fakeUserAgent', 'dirb', 'sizeFilter']) state.purchases[id] = 1;
+        for (const id of ['english10k', 'combinator', 'fakeUserAgent', 'dirb', 'sizeFilter']) state.purchases[id] = 1;
         const labels = new Set<string>();
         for (let level = 700; level <= 1000; level++) {
             if (entrance(level).kind === 'twoWords') labels.add(hitPhase(stagePlans(level, searchCapabilities(state)).at(-1)!).label);
@@ -455,9 +455,9 @@ describe('Act I', () => {
         expect(offered()).toContain('addressBlock');
     });
 
-    it('offers a faster connection once one script has fitted under the server limit with it for a minute, so that a sweep of the rent slider does not count', () => {
+    it('offers a faster connection once two scripts have fitted under the server limit with it for a minute, so that a sweep of the rent slider does not count', () => {
         const game = automatedAt(120);
-        for (const id of ['curlBatch', 'keepAlive', 'threads8', 'isdn', 'throttle', 'rentedAddresses', 'addressBlock']) game.state.purchases[id] = 1;
+        for (const id of ['curlBatch', 'keepAlive', 'threads8', 'isdn', 'throttle', 'rentedAddresses', 'addressBlock', 'secondAddressBlock']) game.state.purchases[id] = 1;
         game.invalidateStats();
         game.state.resources.money = 10_000;
         game.dispatch({ type: 'checkIn' });
@@ -470,7 +470,7 @@ describe('Act I', () => {
         expect(offered()).not.toContain('adsl');
         game.dispatch({ type: 'setRentedAddresses', count: everyAddress });
         game.advance(10);
-        expect(game.statWith('requestsPerThread', withAdsl) * game.stat('threadsPerScript')).toBeLessThanOrEqual(networkCapacity(game));
+        expect(2 * game.statWith('requestsPerThread', withAdsl) * game.stat('threadsPerScript')).toBeLessThanOrEqual(networkCapacity(game));
         game.dispatch({ type: 'setRentedAddresses', count: 0 });
         game.advance(120);
         expect(offered()).not.toContain('adsl');
@@ -498,11 +498,23 @@ describe('Act I', () => {
         expect(offered()).not.toContain('threads8');
         buy('keepAlive');
         game.advance(61);
+        expect(offered()).not.toContain('isdn');
+        buy('proxyPool');
+        game.advance(61);
+        expect(networkCapacity(game)).toBe(100);
         expect(offered()).toContain('isdn');
         expect(offered()).not.toContain('threads8');
         buy('isdn');
         game.advance(61);
         expect(offered()).not.toContain('threads8');
+    });
+
+    it('counts the network next door as one more IP address', () => {
+        const game = automatedAt(30);
+        expect(addressCount(game)).toBe(1);
+        game.state.purchases.openWifi = 1;
+        game.invalidateStats();
+        expect(addressCount(game)).toBe(2);
     });
 
     it('offers the checked proxy list once six proxies have stopped working, and not after the first', () => {
@@ -589,7 +601,7 @@ describe('Act I', () => {
         game.state.purchases.rockyou = 1;
         game.advance(1);
         expect(game.state.search.requestsSpent).toBeGreaterThan(spent);
-        game.state.purchases.sortByFrequency = 1;
+        game.state.purchases.likelyPairs = 1;
         game.advance(1);
         expect(game.state.search.requestsSpent).toBeLessThan(spent);
     });
@@ -747,7 +759,7 @@ describe('Act I', () => {
         expect([fromBasalt!.base, fromBasalt!.slowedBy]).toEqual(['/basalt/', 'wildcard']);
         expect([inCinder!.base, inCinder!.slowedBy]).toEqual(['/cinder/', null]);
         const game = automatedAt(199);
-        for (const id of ['english10k', 'dirb', 'sizeFilter', 'sortByFrequency', 'curlBatch', 'keepAlive', 'throttle']) game.state.purchases[id] = 1;
+        for (const id of ['english10k', 'dirb', 'sizeFilter', 'curlBatch', 'keepAlive', 'throttle']) game.state.purchases[id] = 1;
         game.invalidateStats();
         const bases = new Set<string>();
         for (let ticks = 0; game.state.currentLevel === 199 && ticks < 6000; ticks++) {

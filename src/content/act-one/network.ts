@@ -7,6 +7,7 @@ import { upgrades } from './upgrades.ts';
 
 export const requestsPerAddress = 10;
 export const ownAddress = '203.0.113.24';
+export const wifiAddress = '203.0.113.87';
 const banSeconds = 300;
 const heatPerExcessRatio = 3;
 const coolingPerSecond = 3;
@@ -23,7 +24,7 @@ export function rentedInUse(game: Game): number {
 }
 
 export function addressCount(game: Game): number {
-    return 1 + liveProxies(game) + rentedInUse(game);
+    return game.stat('ownAddresses') + liveProxies(game) + rentedInUse(game);
 }
 
 export function networkCapacity(game: Game): number {

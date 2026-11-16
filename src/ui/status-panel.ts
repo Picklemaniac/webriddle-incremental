@@ -3,7 +3,7 @@ import {
     activities, activityRate, assignedScripts, backlogSeconds, dirbustingScripts, incomePerSecond, isAway, isJobUnlocked, isResourceRevealed, scriptSlots, type ActivityId, type JobId,
 } from '../content/act-one/economy.ts';
 import {
-    addressCount, effectiveRate, isBanned, isThrottled, liveProxies, networkCapacity, ownAddress, rentedBlocks, rentedInUse, rentPerSecond, requestedRate, requestsPerAddress,
+    addressCount, effectiveRate, isBanned, isThrottled, liveProxies, networkCapacity, ownAddress, rentedBlocks, rentedInUse, rentPerSecond, requestedRate, requestsPerAddress, wifiAddress,
 } from '../content/act-one/network.ts';
 import { owns } from '../content/act-one/progress.ts';
 import { activityText, connectionNames, fill, labels, toolNames, uiText } from '../content/act-one/text.ts';
@@ -50,6 +50,7 @@ export class StatusPanel implements Panel {
     private readonly proxyRows: ProxyRow[] = [];
     private readonly blockList = createElement('div');
     private readonly blockRows: AddressRow[] = [];
+    private readonly wifiRow = addressRow();
     private permanentAddresses: number | undefined;
 
     constructor(game: Game) {
@@ -79,9 +80,11 @@ export class StatusPanel implements Panel {
         const ownRow = addressRow();
         setText(ownRow.address, ownAddress);
         setText(ownRow.detail, uiText.ownAddress);
+        setText(this.wifiRow.address, wifiAddress);
+        setText(this.wifiRow.detail, uiText.wifiAddress);
         const addressList = createElement('details', { className: 'proxy-details' }, [
             createElement('summary', { text: uiText.individualProxies }),
-            createElement('div', { className: 'proxy-list' }, [ownRow.element, this.proxyList, this.blockList]),
+            createElement('div', { className: 'proxy-list' }, [ownRow.element, this.wifiRow.element, this.proxyList, this.blockList]),
         ]);
         this.networkElement.append(createElement('div', { className: 'heat-track' }, [this.heat]), this.throttleRow, this.proxySummaryRow, addressList);
         this.element.append(this.you, this.scripts);
@@ -160,8 +163,8 @@ export class StatusPanel implements Panel {
         const rentable = game.stat('rentableAddresses');
         const { rentedAddresses, rentShare } = game.state.network;
         setText(this.ips.value, formatNumber(addressCount(game)));
-        setTitle(this.ips, fill(uiText.ipBreakdown, { proxies: liveProxies(game), rented: formatNumber(rentedInUse(game)) }));
-        const permanentAddresses = rentable + game.stat('proxySlots');
+        setTitle(this.ips, fill(uiText.ipBreakdown, { own: game.stat('ownAddresses'), proxies: liveProxies(game), rented: formatNumber(rentedInUse(game)) }));
+        const permanentAddresses = rentable + game.stat('proxySlots') + game.stat('ownAddresses');
         if (this.permanentAddresses !== undefined && permanentAddresses > this.permanentAddresses) for (const stat of [this.ips, this.allowed, this.rented]) flash(stat.value);
         this.permanentAddresses = permanentAddresses;
         this.rented.row.hidden = rentable === 0;
@@ -179,6 +182,7 @@ export class StatusPanel implements Panel {
         const game = this.game;
         const { proxies } = game.state.network;
         const aliveCount = liveProxies(game);
+        this.wifiRow.element.hidden = !owns(game.state, 'openWifi');
         const deadCount = proxies.length - aliveCount;
         this.proxySummaryRow.hidden = proxies.length === 0;
         this.proxySummary.classList.toggle('has-dead-proxies', deadCount > 0);

@@ -1,6 +1,6 @@
 import type { GameState } from '../core/state.ts';
 
-export const currentSaveVersion = 11;
+export const currentSaveVersion = 12;
 
 export const saveErrorText = {
     newerVersion: 'This save comes from a newer version of the game (save version {version}).',

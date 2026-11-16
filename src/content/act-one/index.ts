@@ -143,7 +143,7 @@ export const actOneContent: GameContent = {
     startUrl,
     resources: [{ id: 'insight', name: labels.insight }, { id: 'money', name: labels.money }, { id: 'data', name: labels.data }],
     baseStats: { requestsPerThread: 2, threadsPerScript: 1, scriptSlots: 1, riddleRate: 0.3, workRate: 1, scourRate: 1024,
-        ticketBotRate: 0.7, riddleBotRate: 0.3, scraperRate: 1024, proxySlots: 0, proxyLifetime: 1, rentableAddresses: 0, addressRent: 0.24, searchEfficiency: 1, dorkChance: 0 },
+        ticketBotRate: 0.7, riddleBotRate: 0.3, scraperRate: 1024, ownAddresses: 1, proxySlots: 0, proxyLifetime: 1, rentableAddresses: 0, addressRent: 0.24, searchEfficiency: 1, dorkChance: 0 },
     purchasables: upgrades.map((item) => ({
         ...item, isAvailable: (state) => isUpgradeRevealed(state, item.id) && item.isAvailable(state),
     })),

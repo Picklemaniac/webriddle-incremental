@@ -18,9 +18,11 @@ const settledSeconds = 60;
 const proxyDeathsBeforeLongerLives = 6;
 const longWaitSeconds = 180;
 
-const oneScriptStillFits: Condition = (game, item) => {
+// A faster script is only of use when the limit leaves room to run more than one of them.
+const scriptsThatMustFit = 2;
+const twoScriptsStillFit: Condition = (game, item) => {
     const modifiers = item.modifiers?.(1) ?? [];
-    return game.statWith('threadsPerScript', modifiers) * game.statWith('requestsPerThread', modifiers) <= networkCapacity(game);
+    return scriptsThatMustFit * game.statWith('threadsPerScript', modifiers) * game.statWith('requestsPerThread', modifiers) <= networkCapacity(game);
 };
 const everyAddressIsInUse: Condition = (game) => rentsEveryAddress(game) && limitHoldsBack(game);
 const proxiesKeepDying: Condition = (game) => (game.state.statistics.proxyDeaths ?? 0) >= proxyDeathsBeforeLongerLives;
@@ -33,12 +35,13 @@ const shortOf = (resource: string): Condition => (game) => {
 
 const whenTheLimitHoldsBack: Trigger = { holds: limitHoldsBack };
 const whenEveryAddressIsInUse: Trigger = { holds: everyAddressIsInUse, forSeconds: settledSeconds };
-const whenOneScriptStillFits: Trigger = { holds: oneScriptStillFits, forSeconds: settledSeconds };
+const whenTwoScriptsStillFit: Trigger = { holds: twoScriptsStillFit, forSeconds: settledSeconds };
 const whenShortOfData: Trigger = { holds: shortOf('data') };
 const whenShortOfInsight: Trigger = { holds: shortOf('insight') };
 
 const triggers: Readonly<Partial<Record<UpgradeId, Trigger>>> = {
     freeProxies: whenTheLimitHoldsBack,
+    openWifi: whenTheLimitHoldsBack,
     proxyPool: whenTheLimitHoldsBack,
     rentedAddresses: whenTheLimitHoldsBack,
     addressBlock: whenEveryAddressIsInUse,
@@ -49,12 +52,12 @@ const triggers: Readonly<Partial<Record<UpgradeId, Trigger>>> = {
     dataCenterRange: whenEveryAddressIsInUse,
     secondDataCenterRange: whenEveryAddressIsInUse,
     proxyUptime: { holds: proxiesKeepDying },
-    keepAlive: whenOneScriptStillFits,
-    isdn: whenOneScriptStillFits,
-    threads8: whenOneScriptStillFits,
-    adsl: whenOneScriptStillFits,
-    cable: whenOneScriptStillFits,
-    fiber: whenOneScriptStillFits,
+    keepAlive: whenTwoScriptsStillFit,
+    isdn: whenTwoScriptsStillFit,
+    threads8: whenTwoScriptsStillFit,
+    adsl: whenTwoScriptsStillFit,
+    cable: whenTwoScriptsStillFit,
+    fiber: whenTwoScriptsStillFit,
     rssFeeds: whenShortOfData,
     archives: whenShortOfData,
     webCrawler: whenShortOfData,

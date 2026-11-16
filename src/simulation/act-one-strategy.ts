@@ -113,7 +113,7 @@ function chooseRent(game: Game, offered: readonly Upgrade[]): boolean {
     const income = incomePerSecond(game, 'money');
     const saving = offered.some((item) => (item.price.money ?? 0) > money && secondsUntilAffordable(game, item) < savingSeconds);
     const budget = saving ? income * savingRentShare : income + money / burnSeconds;
-    const useful = maximumSearchers(game) * requestsPerScript(game) / requestsPerAddress - 1 - liveProxies(game);
+    const useful = maximumSearchers(game) * requestsPerScript(game) / requestsPerAddress - game.stat('ownAddresses') - liveProxies(game);
     const target = Math.max(0, Math.min(rentable, Math.floor(budget / game.stat('addressRent')), Math.ceil(useful)));
     if (Math.abs(target - state.network.rentedAddresses) < Math.max(1, rentable * rentStepShare) && target !== rentable && target !== 0) return false;
     return game.dispatch({ type: 'setRentedAddresses', count: target });

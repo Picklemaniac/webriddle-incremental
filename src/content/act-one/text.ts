@@ -153,9 +153,9 @@ export const riddleHomeText = {
     start: 'Start',
     rulesHeading: 'Rules',
     rules: [
-        'Do not post answers anywhere. Hints are fine.',
-        'Do not cheat or look up answers. You are only cheating yourself.',
-        'Do not brute force or hack the server. You do not need to.',
+        'Don\'t cheat or look up answers.',
+        'Don\'t post solutions anywhere.',
+        'Don\'t try to impress others if you solved something',
         'Have fun!',
     ],
     hintsHeading: 'Hints',
@@ -188,7 +188,7 @@ export const pageText = {
 
 export const upgradeText = {
     curlBatch: { name: 'Parallel requests', description: 'Your script runs four threads instead of one, so it sends four times as many requests.' },
-    sortByFrequency: { name: 'Sort by frequency', description: 'Your wordlists try the most common words first.' },
+    openWifi: { name: 'Wi-Fi card', description: 'Your computer connects to the network next door, so you get an additional IP address.' },
     keepAlive: { name: 'Keep-alive', description: 'Your script keeps its connection open, so requests go twice as fast.' },
     fakeUserAgent: { name: 'Browser user-agent', description: 'Your script tells the server that it is a web browser.' },
     throttle: { name: 'Throttle', description: 'Keeps your scripts under the server limit, so your Heat goes down.' },
@@ -392,8 +392,9 @@ export const uiText = {
     off: 'Off',
     individualProxies: 'IP list',
     ownAddress: 'you',
+    wifiAddress: 'Wi-Fi',
     blockSize: '{rented} of {count} IPs',
-    ipBreakdown: 'Your own: 1\nFree proxies: {proxies}\nRented: {rented}',
+    ipBreakdown: 'Your own: {own}\nFree proxies: {proxies}\nRented: {rented}',
     limitBreakdown: '{ips} IP addresses × {perAddress} requests per second',
     requestedRate: 'Your scripts ask for {rate}/s',
     rentedCount: '{rented} of {available}',

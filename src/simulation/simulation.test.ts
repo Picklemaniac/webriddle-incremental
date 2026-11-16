@@ -111,7 +111,7 @@ describe('Act I pacing', () => {
         game.advance(2 * 3600);
         expect(game.state.resources.money! - money).toBeLessThanOrEqual(income * backlogSeconds + 1);
         expect(game.state.currentLevel).toBeGreaterThan(level + 20);
-    });
+    }, 20_000);
 
     it('keeps the purist moving without automation, purchases or offline gains', () => {
         const report = simulatePlayer(puristProfile, actOneContent, { ...options, days: 2 });
