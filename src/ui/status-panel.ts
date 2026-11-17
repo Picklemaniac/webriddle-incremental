@@ -23,7 +23,8 @@ interface AddressRow { element: HTMLElement; address: HTMLElement; detail: HTMLE
 export class StatusPanel implements Panel {
     readonly element = createElement('div', { className: 'status-panels' });
     readonly networkElement = section(labels.networkPanel);
-    readonly machineElement = createElement('details', { className: 'panel machine-details' }, [createElement('summary', { text: uiText.machineDetails })]);
+    private readonly machineTitle = createElement('summary', { text: uiText.machineDetails });
+    readonly machineElement = createElement('details', { className: 'panel machine-details' }, [this.machineTitle]);
     private readonly game: Game;
     private readonly you = section(labels.youPanel);
     private readonly resources = new Map<string, ResourceRow>();
@@ -131,6 +132,7 @@ export class StatusPanel implements Panel {
     private renderMachine(): void {
         const game = this.game;
         this.machineElement.hidden = !game.state.flags.machineRevealed;
+        setText(this.machineTitle, owns(game.state, 'dedicatedServer') ? uiText.serverDetails : uiText.machineDetails);
         setText(this.connection.value, connectionNames[ownedTier(game.state, connectionTiers)]!);
         setText(this.tool.value, toolNames[ownedTier(game.state, toolTiers)]!);
         setText(this.slots.value, String(scriptSlots(game)));

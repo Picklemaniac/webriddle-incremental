@@ -11,7 +11,7 @@ const kinds: Readonly<Partial<Record<UpgradeId, SetupKind>>> = {
     wgetMirror: 'install', autoReplyMacros: 'install', dirb: 'install', gobuster: 'install', ffuf: 'install', proxyChecker: 'install', crackHtpasswd: 'install',
     english10k: 'download', dictWords: 'download', scrabble: 'download', rockyou: 'download', freeProxies: 'download',
     customFuzzer: 'install', namesList: 'download', moreLeaks: 'download', proxyUptime: 'download', usernames: 'download', passwords: 'download', latinList: 'download',
-    ram: 'hardware', newPc: 'hardware', secondPc: 'hardware', server: 'hardware', dedicatedServer: 'hardware', serverRack: 'hardware',
+    ram: 'hardware', moreRam: 'hardware', newPc: 'hardware', dualCore: 'hardware', dedicatedServer: 'hardware', headlessLinux: 'install', xeon: 'hardware', dualProcessorBoard: 'hardware', sixtyFourBit: 'install', serverRack: 'hardware',
     isdn: 'connection', adsl: 'connection', cable: 'connection', fiber: 'connection',
 };
 
