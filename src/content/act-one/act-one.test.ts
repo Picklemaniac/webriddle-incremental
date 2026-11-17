@@ -367,7 +367,7 @@ describe('Act I', () => {
         expect(game.state.captcha).toBeNull();
     });
 
-    it('lets requests over the limit through at the cost of Heat, after a first minute without it, and with a switchable Throttle', () => {
+    it('lets requests over the limit through at the cost of Heat, with a switchable Throttle', () => {
         const game = newGame();
         game.state.currentLevel = 5;
         game.dispatch({ type: 'automate' });
@@ -381,8 +381,6 @@ describe('Act I', () => {
         expect(game.state.flags.networkRevealed).toBe(true);
         expect(effectiveRate(game)).toBe(requestedRate(game));
         expect(effectiveRate(game)).toBeGreaterThan(networkCapacity(game));
-        expect(game.state.network.heat).toBe(0);
-        game.advance(45);
         expect(game.state.network.heat).toBeGreaterThan(0);
         expect(game.dispatch({ type: 'setThrottle', enabled: true })).toBe(false);
         game.state.purchases.throttle = 1;
@@ -609,7 +607,7 @@ describe('Act I', () => {
                 finds++;
             }
         });
-        game.state.purchases.keepAlive = 1;
+        for (const id of ['keepAlive', 'throttle']) game.state.purchases[id] = 1;
         game.invalidateStats();
         for (let seconds = 0; game.state.currentLevel < 140 && seconds < 6 * 3600; seconds += 10) game.advance(10);
         expect(finds).toBeGreaterThanOrEqual(3);

@@ -21,6 +21,7 @@ export class PurchasesPanel implements Panel {
     readonly element = section(labels.upgradesPanel);
     private readonly game: Game;
     private readonly cards = new Map<string, HTMLButtonElement>();
+    private readonly fills = new Map<string, HTMLElement>();
     private readonly leaving = new Map<string, number>();
     private readonly tooltip = createElement('div', { className: 'win-tooltip', attributes: { role: 'tooltip' } });
     private tooltipTimer: ReturnType<typeof setTimeout> | undefined;
@@ -36,6 +37,9 @@ export class PurchasesPanel implements Panel {
             const cost = Object.entries(item.price).map(([id, amount]) => formatAmount(id, amount)).join(', ');
             card.append(createElement('div', { className: 'upgrade-heading' }, [createElement('strong', { text: item.name }), createElement('span', { className: 'upgrade-cost', text: cost })]),
                 createElement('div', { className: 'upgrade-description', text: item.description }));
+            const fill = createElement('div', { className: 'upgrade-progress-fill' });
+            card.append(createElement('div', { className: 'upgrade-progress' }, [fill]));
+            this.fills.set(item.id, fill);
             for (const show of ['mouseenter', 'focus']) card.addEventListener(show, () => this.scheduleTooltip(item, card));
             for (const hide of ['mouseleave', 'blur']) card.addEventListener(hide, () => this.hideTooltip());
             this.cards.set(item.id, card);
@@ -69,7 +73,13 @@ export class PurchasesPanel implements Panel {
             card.disabled = leaving || !affordable || now < this.purchaseLockUntil;
             card.classList.toggle('unaffordable', !affordable && !leaving);
             card.classList.toggle('leaving', leaving);
+            this.fills.get(item.id)!.style.width = `${affordable ? 0 : this.shareSaved(item) * 100}%`;
         }
+    }
+
+    // How far the player is towards the price, by the resource they are furthest from.
+    private shareSaved(item: Upgrade): number {
+        return Math.min(...Object.entries(item.price).map(([resource, amount]) => Math.min(1, (this.game.state.resources[resource] ?? 0) / amount)));
     }
 
     private scheduleTooltip(item: Upgrade, card: HTMLButtonElement): void {

@@ -165,7 +165,7 @@ export const riddleHomeText = {
         'Turn on the lights.',
         'There are only 10 kinds of people.',
         'Some gifts come in a different format.',
-        'Point at the picture and wait.',
+        'Beep boop.',
         'Half the alphabet.',
         'Hold it up to a mirror.',
     ],

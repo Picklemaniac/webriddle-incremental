@@ -13,8 +13,6 @@ const heatPerExcessRatio = 3;
 const coolingPerSecond = 3;
 const startingRentShareOfIncome = 0.3;
 const proxySeconds = 120;
-// The first time the scripts go over the limit, the server lets a minute pass before Heat builds. The player has just met the limit and has to earn the way out of it first.
-const firstHeatDelaySeconds = 60;
 
 export function liveProxies(game: Game): number {
     return game.state.network.proxies.filter((proxy) => proxy.diesAtSeconds > game.state.elapsedSeconds).length;
@@ -162,13 +160,9 @@ export const network: GameSystem = {
         if (!state.flags.automated || isBanned(game)) return;
         const capacity = networkCapacity(game);
         const excess = Math.max(0, requestedRate(game) - capacity);
-        if (showsTheLimit(game) && state.flags.networkRevealed !== true) {
-            state.flags.networkRevealed = true;
-            state.statistics.limitShownAt = state.elapsedSeconds;
-        }
+        if (showsTheLimit(game)) state.flags.networkRevealed = true;
         if (excess > 0) noticeOnce(game, 'firstRateLimit');
         const overLimit = excess > 0 && !isThrottled(game);
-        if (overLimit && state.elapsedSeconds - (state.statistics.limitShownAt ?? Number.NEGATIVE_INFINITY) < firstHeatDelaySeconds) return;
         state.network.heat = Math.max(0, state.network.heat + deltaSeconds * (overLimit ? heatPerExcessRatio * excess / capacity : -coolingPerSecond));
         if (state.network.heat >= 100) {
             state.network.heat = 100;

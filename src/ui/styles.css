@@ -134,6 +134,9 @@ strong { font-weight: 600; }
 .dashboard .worker-row button { --pad-y: 0px; --pad-x: 0px; width: 26px; height: 23px; font-size: 13px; }
 .upgrade-list { display: flex; flex-direction: column; gap: 8px; max-height: 660px; overflow-y: auto; padding-right: 2px; }
 .dashboard .upgrade-card { display: block; width: 100%; text-align: left; animation: reveal .4s ease; }
+.dashboard .upgrade-card { position: relative; }
+.upgrade-progress { position: absolute; left: 3px; right: 3px; bottom: 2px; height: 2px; pointer-events: none; }
+.upgrade-progress-fill { height: 100%; background: #000080; }
 .upgrade-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 4px; white-space: nowrap; }
 .upgrade-heading strong { font: bold 12px Tahoma, Arial, sans-serif; }
 .upgrade-cost { font-size: 11px; }
