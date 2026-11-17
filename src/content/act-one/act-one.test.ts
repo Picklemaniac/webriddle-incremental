@@ -721,7 +721,7 @@ describe('Act I', () => {
         const game = automatedAt(6);
         const offered = (): string[] => offeredUpgrades(game).map((item) => item.id);
         const payCards = ['typingCourse', 'certification', 'nightShifts', 'seniorCertification', 'secondLineSupport', 'teamLead', 'onCallBonus', 'helpdeskManager'];
-        const scriptCards = ['ram', 'newPc', 'dualCore', 'dedicatedServer', 'headlessLinux', 'xeon', 'dualProcessorBoard', 'hyperThreading', 'sixtyFourBit', 'serverRack'];
+        const scriptCards = ['ram', 'newPc', 'dualCore', 'dedicatedServer', 'headlessLinux', 'xeon', 'dualProcessorBoard', 'quadCore', 'sixtyFourBit', 'serverRack'];
         for (const chain of [payCards, scriptCards]) {
             chain.forEach((id, index) => {
                 expect(offered()).toContain(id);
@@ -757,6 +757,19 @@ describe('Act I', () => {
         const later = openedAt(700, ['curlBatch', 'otherRiddles', 'wgetMirror', 'autoReplyMacros', 'moreRam', 'newPc']);
         later.advance(1);
         expect(isListed(later, 'certification')).toBe(true);
+    });
+
+    it('offers the card for longer absences once DirBuster has stopped while the player was away, at any level', () => {
+        const game = automatedAt(20);
+        const offered = (): string[] => offeredUpgrades(game).map((item) => item.id);
+        game.advance(1);
+        expect(offered()).not.toContain('leaveItRunning');
+        expect(actOneContent.offlineCapSeconds(game.state)).toBe(12 * 3600);
+        game.state.flags.offlineCapReached = true;
+        game.advance(1);
+        expect(offered()).toContain('leaveItRunning');
+        game.state.purchases.leaveItRunning = 1;
+        expect(actOneContent.offlineCapSeconds(game.state)).toBe(24 * 3600);
     });
 
     it('keeps the search progress when a purchase adds a pass', () => {

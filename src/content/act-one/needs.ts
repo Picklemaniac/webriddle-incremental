@@ -75,7 +75,7 @@ const triggers: Readonly<Partial<Record<UpgradeId, Trigger>>> = {
     webCrawler: whenShortOfData,
     riddleForum: whenShortOfInsight,
     forumModerator: whenShortOfInsight,
-    leavePcOn: { holds: stoppedWhileAway },
+    leaveItRunning: { holds: stoppedWhileAway },
 };
 
 const triggered = upgrades.flatMap((item) => {

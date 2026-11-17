@@ -213,7 +213,7 @@ export const actOneContent: GameContent = {
             default: return false;
         }
     },
-    offlineCapSeconds: (state) => (owns(state, 'leavePcOn') ? 24 : 12) * 3600,
+    offlineCapSeconds: (state) => (owns(state, 'leaveItRunning') ? 24 : 12) * 3600,
 };
 
 function rememberVisit(state: Game['state'], url: string): void {
