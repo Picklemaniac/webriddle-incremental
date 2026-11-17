@@ -24,8 +24,7 @@ interface Run {
     readonly game: Game;
     readonly reached: Readonly<Record<number, number>>;
     readonly bans: number;
-    readonly purchases: number;
-    readonly longestPurchaseWait: number;
+    readonly purchaseTimes: readonly number[];
     readonly nothingOnOffer: number;
     readonly slowLevels: readonly { readonly level: number; readonly seconds: number }[];
     readonly staring: StaringMeter;
@@ -37,6 +36,8 @@ interface Run {
 const seed = Number(readArgument('--seed') ?? '1');
 const longestRunSeconds = 10 * 3600;
 const slowLevelSeconds = 240;
+const purchaseWindowSeconds = 600;
+const longPurchaseGapSeconds = 300;
 const marks: readonly number[] = [100, 500, 1000];
 const seenEvents: ReadonlySet<string> = new Set(['levelSolved', 'upgradeRevealed', 'notice', 'proxyDied', 'banned', 'unbanned']);
 
@@ -63,10 +64,8 @@ function play(player: Player): Run {
     const reached: Record<number, number> = {};
     const slowLevels: { level: number; seconds: number }[] = [];
     let bans = 0;
-    let purchases = 0;
-    let lastPurchaseAt: number | undefined;
+    const purchaseTimes: number[] = [];
     let lastSolveAt = 0;
-    let longestPurchaseWait = 0;
     let nothingOnOffer = 0;
     const staring = new StaringMeter();
     const emptyList = actOneStaringBands.map(() => 0);
@@ -75,11 +74,7 @@ function play(player: Player): Run {
         const { elapsedSeconds } = game.state;
         if (seenEvents.has(event.type) || (event.type === 'actionApplied' && event.action.type !== 'checkIn')) staring.observe(elapsedSeconds, game.state.currentLevel);
         if (event.type === 'banned') bans++;
-        if (event.type === 'actionApplied' && event.action.type === 'purchase') {
-            purchases++;
-            if (lastPurchaseAt !== undefined) longestPurchaseWait = Math.max(longestPurchaseWait, elapsedSeconds - lastPurchaseAt);
-            lastPurchaseAt = elapsedSeconds;
-        }
+        if (event.type === 'actionApplied' && event.action.type === 'purchase') purchaseTimes.push(elapsedSeconds);
         if (event.type === 'levelSolved') {
             if (elapsedSeconds - lastSolveAt >= slowLevelSeconds && event.level > 10) slowLevels.push({ level: event.level, seconds: elapsedSeconds - lastSolveAt });
             lastSolveAt = elapsedSeconds;
@@ -97,7 +92,11 @@ function play(player: Player): Run {
         } else if (!listed.some((item) => canAfford(game.state, item.price))) nothingAffordable[band]!++;
     }
     staring.observe(game.state.elapsedSeconds, game.state.currentLevel);
-    return { game, reached, bans, purchases, longestPurchaseWait, nothingOnOffer, slowLevels, staring, emptyList, nothingAffordable };
+    return { game, reached, bans, purchaseTimes, nothingOnOffer, slowLevels, staring, emptyList, nothingAffordable };
+}
+
+function purchaseGaps(run: Run): number[] {
+    return run.purchaseTimes.slice(1).map((time, index) => time - run.purchaseTimes[index]!);
 }
 
 function row(cells: readonly (string | number)[], widths: readonly number[]): string {
@@ -114,7 +113,7 @@ function reportPlayers(): readonly Run[] {
         const time = (level: number): string => (run.reached[level] === undefined ? `L${run.game.state.currentLevel}` : formatDuration(run.reached[level]));
         const slowest = run.slowLevels.reduce((longest, entry) => Math.max(longest, entry.seconds), 0);
         console.log(row([
-            player.name, time(100), time(500), time(1000), run.purchases, run.bans, formatDuration(run.longestPurchaseWait),
+            player.name, time(100), time(500), time(1000), run.purchaseTimes.length, run.bans, formatDuration(Math.max(0, ...purchaseGaps(run))),
             run.slowLevels.length === 0 ? 'none' : `${run.slowLevels.length}, longest ${formatDuration(slowest)}`,
             formatDuration(run.nothingOnOffer), `$${formatNumber(run.game.state.resources.money ?? 0)}`,
         ], widths));
@@ -134,6 +133,16 @@ function reportStaring(name: string, meter: StaringMeter, run?: Run): void {
             ...(run === undefined ? [] : [formatDuration(run.emptyList[index]!), formatDuration(run.nothingAffordable[index]!)]),
         ], widths));
     }
+}
+
+// How often something is bought. This is the measure for a change that turns one card into several smaller ones.
+function reportPurchases(name: string, run: Run): void {
+    const gaps = purchaseGaps(run).sort((first, second) => first - second);
+    const perWindow = Array.from({ length: Math.ceil(run.game.state.elapsedSeconds / purchaseWindowSeconds) }, (_, window) =>
+        run.purchaseTimes.filter((time) => Math.floor(time / purchaseWindowSeconds) === window).length);
+    console.log(`\nPurchases, ${name}: ${run.purchaseTimes.length} in ${formatDuration(run.game.state.elapsedSeconds)}`);
+    console.log(`  per ${purchaseWindowSeconds / 60} minutes: ${perWindow.join(' ')}`);
+    console.log(`  more than ${longPurchaseGapSeconds / 60} minutes after the one before: ${gaps.filter((gap) => gap > longPurchaseGapSeconds).length}; half come within ${formatDuration(gaps[Math.floor(gaps.length / 2)] ?? 0)}`);
 }
 
 // The same count for the session log of a real play. Logs from before 2026-11-17 do not say when a card appeared.
@@ -183,6 +192,7 @@ const runs = reportPlayers();
 for (const name of ['attentive robot', 'casual']) {
     const run = runs[players.findIndex((player) => player.name === name)]!;
     reportStaring(name, run.staring, run);
+    reportPurchases(name, run);
 }
 reportSlowLevels();
 reportBreaks();
