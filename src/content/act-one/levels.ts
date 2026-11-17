@@ -2,7 +2,7 @@ import type { Action } from '../../core/actions.ts';
 import type { Drawing } from './drawings.ts';
 import { encode, toLeet } from './encodings.ts';
 import { imageWithWord, levelImageCount } from './images.ts';
-import { caseEncodingFor, credentialsClue, dateClue, encodedClue, leetEncodingFor, textEncodingFor, wordClue, yearClue, type Clue } from './methods.ts';
+import { caseEncodingFor, credentialsClue, dateClue, encodedClue, leetEncodingFor, textEncodingFor, wordClue, yearClue, type Clue, type Recent } from './methods.ts';
 import { firstYear, pickByUnit, ramp, riddleDomain, riddleOrigin, salts, startUrl, unitHash, yearCount } from './riddle.ts';
 import type { Sound } from './sounds.ts';
 import { alternateFiles, clueLines, fill, handcraftedText, linkedFiles, pageText, riddleName } from './text.ts';
@@ -100,7 +100,7 @@ const untitledShare = 0.3;
 
 const wildcardFolders = new Set(['basalt', 'ember']);
 const unlistedNames = answerNames.filter((name) => wordAtRank(rankOfWord(name)) !== name);
-const recentLevels = 20;
+const recentLevels = 240;
 const alwaysHintedLevels = 60;
 const laterLineShare = 0.4;
 const firstExtensionLevel = 150;
@@ -293,7 +293,7 @@ function generatedEntrance(level: number, attempt: number): Entrance {
     const kind = chooseKind(level);
     const unit = (salt: number): number => unitHash(level, salt + attempt * 97);
     const folder = folderFor(level);
-    const recent = recentMethods(level);
+    const recent = recentUse(level);
     switch (kind) {
         case 'word': {
             const word = unit(salts.common) < commonWordShare ? sampleCommonWord(unit(salts.rank), commonWordRanks, 10) : sampleWord(level, unit(salts.rank));
@@ -412,13 +412,15 @@ function buildEntrance(level: number, { kind, answer, clue, folder, extension = 
     };
 }
 
-function recentMethods(level: number): string[] {
+function recentUse(level: number): Recent {
     const methods: string[] = [];
+    const places: string[] = [];
     for (let previous = level - 1; previous >= Math.max(2, level - recentLevels); previous--) {
-        const method = entrance(previous).clue.method;
+        const { method, parts = [] } = entrance(previous).clue;
         if (method !== undefined) methods.push(method);
+        places.push(...parts.map((part) => part.place));
     }
-    return methods;
+    return { methods, places };
 }
 
 function showsLine(level: number, firstLevel: number): boolean {

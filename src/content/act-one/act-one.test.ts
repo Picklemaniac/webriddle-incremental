@@ -187,7 +187,7 @@ describe('Act I', () => {
             const target = entrance(index + 1);
             return [target.url, target.kind, target.answer, target.clue.method ?? ''];
         });
-        expect(createHash('sha256').update(JSON.stringify(levels)).digest('hex')).toMatchInlineSnapshot(`"b59d2f02471976cb2fa8c72eaaa5242a1fa39326e864aec251acc7d5734e4352"`);
+        expect(createHash('sha256').update(JSON.stringify(levels)).digest('hex')).toMatchInlineSnapshot(`"3bfb660a23d746e2bb016e8dc6c1cc1e5543e72ee958c0304822ff293653b297"`);
     });
 
     it('lists every handcrafted answer for the vocabulary build', () => {

@@ -3,13 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { decode } from './encodings.ts';
 import { entrance, firstGeneratedLevel, levelPage, urlOfLevel, type Entrance, type LevelPage } from './levels.ts';
 import { methodLevels, type Part, type Step } from './methods.ts';
-import { hidingPlaces } from './spots.ts';
+import { placeLevels } from './spots.ts';
 import { clueLines, puzzleHints } from './text.ts';
 
 const lastLevel = 1200;
 const levels = Array.from({ length: lastLevel - firstGeneratedLevel + 1 }, (_, index) => firstGeneratedLevel + index);
 const targets = levels.map((level) => entrance(level));
 const methodNames = [...methodLevels.keys()];
+const hidingPlaces = [...placeLevels.keys()];
 const alphabet = 'abcdefghijklmnopqrstuvwxyz';
 
 // What the clue of a level spells out: the answer, or the words that the address is made of.
@@ -197,21 +198,54 @@ describe('puzzle methods', () => {
         expect(late, late.map((name) => `${name} ${methodLevels.get(name)} to ${first.get(name)}`).join(', ')).toEqual([]);
     });
 
+    it('shows a method the first time with as little to undo as it ever has, and in a place that the first levels teach', () => {
+        const first = new Map<string, number>();
+        const fewest = new Map<string, number>();
+        for (const target of targets) {
+            const method = target.clue.method!;
+            const count = stepCount(target.clue.parts!);
+            fewest.set(method, Math.min(fewest.get(method) ?? count, count));
+            if (first.has(method)) continue;
+            first.set(method, count);
+            for (const part of target.clue.parts!) {
+                expect(placeLevels.get(part.place) ?? 0, `level ${target.level}: ${method} in ${part.place}`).toBe(0);
+                expect(['rolloverPicture', 'hiddenPicture'], `level ${target.level}: ${method}`).not.toContain(part.place);
+            }
+        }
+        expect(methodNames.filter((name) => first.get(name) !== fewest.get(name))).toEqual([]);
+    });
+
+    it('uses a hiding place for the first time within forty levels of where it opens', () => {
+        const first = new Map<string, number>();
+        for (const target of targets) for (const part of target.clue.parts!) if (!first.has(part.place)) first.set(part.place, target.level);
+        const late = hidingPlaces.filter((place) => placeLevels.get(place)! > 0 && first.get(place)! - placeLevels.get(place)! > 40);
+        expect(late, late.map((place) => `${place} ${placeLevels.get(place)} to ${first.get(place)}`).join(', ')).toEqual([]);
+    });
+
+    it('brings a method back within sixty levels of its first time, and leaves hardly any out for long', () => {
+        const uses = new Map<string, number[]>();
+        for (const target of targets) uses.set(target.clue.method!, [...(uses.get(target.clue.method!) ?? []), target.level]);
+        const once = methodNames.filter((name) => methodLevels.get(name)! <= lastLevel - 100 && !(uses.get(name)![1]! - uses.get(name)![0]! <= 60));
+        expect(once).toEqual([]);
+        const leftOut = methodNames.filter((name) => methodLevels.get(name)! < 250 && !uses.get(name)!.some((level) => level >= 250 && level <= 500));
+        expect(leftOut.length, leftOut.join(', ')).toBeLessThanOrEqual(3);
+    });
+
     it.each([
-        [11, 60, 0, 0.1, 0, 0],
-        [60, 150, 0.15, 0.4, 0, 0],
-        [150, 250, 0.35, 0.6, 0, 0],
-        [250, 350, 0.45, 0.65, 0.04, 0],
+        [11, 59, 0, 0.1, 0, 0],
+        [60, 149, 0.15, 0.4, 0, 0],
+        [150, 249, 0.35, 0.6, 0, 0],
+        [250, 349, 0.45, 0.65, 0.04, 0],
         [350, 500, 0.6, 0.8, 0.07, 0],
-        [500, 1000, 0.65, 0.85, 0.15, 0.02],
+        [501, 1000, 0.65, 0.85, 0.15, 0.02],
     ])('combines methods in levels %i to %i as often as it is meant to', (from, to, fewest, most, fewestOfThree, fewestOfFour) => {
-        const counts = targets.filter((target) => target.level >= from && target.level < to).map((target) => stepCount(target.clue.parts!));
+        const counts = targets.filter((target) => target.level >= from && target.level <= to).map((target) => stepCount(target.clue.parts!));
         const share = (steps: number): number => counts.filter((count) => count >= steps).length / counts.length;
         expect(share(2)).toBeGreaterThanOrEqual(fewest);
         expect(share(2)).toBeLessThanOrEqual(most);
         expect(share(3)).toBeGreaterThanOrEqual(fewestOfThree);
         expect(share(4)).toBeGreaterThanOrEqual(fewestOfFour);
-        if (to <= 250) expect(share(3)).toBe(0);
+        if (to < 250) expect(share(3)).toBe(0);
         if (to <= 500) expect(share(4)).toBe(0);
     });
 

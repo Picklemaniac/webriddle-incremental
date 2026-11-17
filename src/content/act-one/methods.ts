@@ -1,4 +1,4 @@
-import { lineUp, shownTexts, variant, withLine, type AlternateExtension, type Clue, type ClueContext, type HintKey, type Part, type Step } from './clues.ts';
+import { lineUp, shownTexts, variant, withLine, type AlternateExtension, type Clue, type ClueContext, type HintKey, type Part, type Recent, type Step } from './clues.ts';
 import type { DrawingKind } from './drawings.ts';
 import { carries, encode, keyboardShift, type Encoding } from './encodings.ts';
 import {
@@ -9,7 +9,7 @@ import type { Sound } from './sounds.ts';
 import { placed, placedAt } from './spots.ts';
 import { wordAtRank } from './vocabulary.ts';
 
-export type { Clue, Part, Step } from './clues.ts';
+export type { Clue, Part, Recent, Step } from './clues.ts';
 
 interface Hint {
     readonly place: 'title' | 'line';
@@ -61,15 +61,16 @@ const layersOf: Readonly<Record<Family, readonly Encoding[]>> = { letters: lette
 const openChains: Readonly<Record<number, readonly (readonly Family[])[]>> = {
     1: [['letters'], ['code'], ['bytes']],
     2: [['code', 'letters'], ['bytes', 'letters'], ['bytes', 'code']],
-    3: [['bytes', 'code', 'letters'], ['bytes', 'bytes', 'letters'], ['bytes', 'bytes', 'code']],
+    3: [['bytes', 'code', 'letters'], ['code', 'letters', 'letters'], ['bytes', 'letters', 'letters'], ['bytes', 'bytes', 'letters'], ['bytes', 'bytes', 'code']],
 };
 const letterChains: Readonly<Record<number, readonly (readonly Family[])[]>> = { 1: [['letters']], 2: [['letters', 'letters']] };
 // Two ciphers that swap letters make one cipher that nobody would look for, and so do two that move them. Under one of these goes at most one of the other kind.
 const swapsLetters: ReadonlySet<Encoding> = new Set<Encoding>(['rot13', 'caesar', 'shift', 'atbash', 'keyboard', 'qwertyAlphabet', 'trithemius', 'dvorak', 'colemak', 'vigenere', 'gronsfeld',
     'beaufort', 'autokey', 'keyedAlphabet', 'affine']);
 const movesLetters: ReadonlySet<Encoding> = new Set<Encoding>(['reversed', 'upsideDown', 'railFence', 'scytale', 'swappedPairs', 'columnar']);
+// The ciphers that look the same whatever they hold, so that a code or another of them can go under one. ROT47 is not one of them: over digits it comes out as plain letters.
 const byteCiphers: ReadonlySet<Encoding> = new Set<Encoding>(['binary', 'octal', 'hex', 'ascii', 'ternary', 'roman', 'arithmetic', 'dna', 'url', 'entities', 'hexEntities', 'unicodeEscapes',
-    'hexEscapes', 'octalEscapes', 'quotedPrintable', 'codepoints', 'base64', 'base32', 'ascii85', 'uuencode', 'rot47', 'ebcdic', 'utf16', 'xor']);
+    'hexEscapes', 'octalEscapes', 'quotedPrintable', 'codepoints', 'base64', 'base32', 'ascii85', 'uuencode', 'ebcdic', 'utf16', 'xor']);
 // Encodings that can be told for what they are without a hint. The clues for answers that are not one plain word use these.
 const plainlyRead: ReadonlySet<Encoding> = new Set<Encoding>(['reversed', 'a1z26', 'rot13', 'atbash', 'morse', 'nato', 'shift', 'binary', 'upsideDown', 'phone', 'polybius', 'tap', 'hex', 'ascii',
     'bacon', 'url', 'octal', 'rot47', 'base64', 'ableBaker', 'primes', 'squares', 'spelledNumbers', 'romanLetters', 'ditDah', 'morseBits', 'hexEntities', 'base32', 'quotedPrintable',
@@ -80,17 +81,18 @@ const digitEncodings: readonly Encoding[] = ['reversed', 'base64', 'hex', 'binar
 const keyPlaces: readonly string[] = ['imageTitle', 'comment', 'meta'];
 const affineSlopes: readonly number[] = [3, 5, 7, 9, 11, 15, 17, 19, 21, 23, 25];
 const recentMethodCount = 20;
-const newMethodLevels = 40;
 const oldMethodLevel = 30;
 const hintedLevels = 120;
 const laterHintShare = 0.5;
 const longestText = 200;
 const chainAttempts = 3;
-// A key stands in the title for the first levels of its cipher. Later it can be anywhere, and from this level it can be under a cipher of its own.
+// A key stands in the title as it is for the first levels of its cipher. Later it can be anywhere. From this level a key in the title is under a cipher of its own,
+// and so is a share of the keys that are somewhere else.
 const openKeyLevels = 60;
 const firstEncodedKeyLevel = 350;
 const encodedKeyShare = 0.4;
-const fourStepsFromLevel = 500;
+// Up to this level a clue has three things to undo at the most.
+const lastThreeStepLevel = 500;
 const essentialHints: ReadonlySet<HintKey> = new Set<HintKey>(['keyboardRight', 'keyboardLeft', 'earlierAnswers', 'spectrogram', 'pollux', 'shares', 'halves', 'everyThird', 'diagonal', 'mayan',
     'whitespace', 'zeroWidth', 'affine', 'keyedAlphabet', 'beaufort', 'autokey', 'columnar', 'nihilist', 'xor']);
 
@@ -234,7 +236,7 @@ const methods: readonly Method[] = [
     keyed('columnar', 395, (context) => keyWord(context), onLine('columnar')),
     cipher('ebcdic', 402, inTitle('ebcdic')),
     cipher('pollux', 410, inTitle('pollux')),
-    keyed('autokey', 424, (context) => keyWord(context), onLine('autokey')),
+    keyed('autokey', 424, shortKeyWord, onLine('autokey')),
     drawn('shares', 430, { hint: onLine('shares'), takes: pixelLetters }),
     lettered('delayed', 445, inTitle('delayed')),
     cipher('ascii85', 540),
@@ -257,16 +259,19 @@ export const methodLevels: ReadonlyMap<string, number> = new Map(methods.map((me
 const firstLevels = new Map(methods.flatMap((method) => (method.encoding !== undefined && method.encoding === method.name ? [[method.encoding, method.fromLevel] as const] : [])));
 const textEncodings = [...firstLevels].filter(([encoding]) => plainlyRead.has(encoding) && carries('ab cd', encoding));
 
-export function wordClue(level: number, answer: string, pageName: (level: number) => string | null, withImage = true, recent: readonly string[] = []): Clue {
+export function wordClue(level: number, answer: string, pageName: (level: number) => string | null, withImage: boolean, recent: Recent): Clue {
     const pool = methods.filter((method) => method.fromLevel <= level && (withImage || method.htmOnly !== true));
     const unit = unitHash(level, salts.clue);
     const wanted = stepsAt(level);
     for (const method of methodOrder(pool, level, recent)) {
         const fewest = method.bare === true ? 1 : 0;
-        for (let layers = method.exact === true ? 0 : Math.max(wanted - (method.ownSteps ?? 1), fewest); layers >= fewest; layers--) {
+        // A method is shown on its own the first time, before anything is put under it.
+        const debut = isNew(method, level, recent);
+        const most = method.exact === true || debut ? fewest : Math.max(wanted - (method.ownSteps ?? 1), fewest);
+        for (let layers = most; layers >= fewest; layers--) {
             const chain = chained(answer, level, method, layers);
             if (chain === null) continue;
-            const context: ClueContext = { ...chain, answer, level, unit, withImage, titleFree: method.hint?.place !== 'title', pageName };
+            const context: ClueContext = { ...chain, answer, level, unit, withImage, titleFree: method.hint?.place !== 'title', pageName, recent, debut };
             const clue = method.clue(context);
             if (clue !== null && !revealsAnswer(clue, answer) && !isTooLong(clue)) return { method: method.name, ...withHint(clue, method, context) };
         }
@@ -276,7 +281,8 @@ export function wordClue(level: number, answer: string, pageName: (level: number
 
 export function encodedClue(text: string, encoding: Encoding, level: number, unit: number): Clue {
     const hidden = enciphered(text, encoding, level, unit);
-    return { method: hidden.ciphers[0]!.cipher, ...placed(hidden.text, { word: text, answer: text, inner: [], level, unit, withImage: true, titleFree: true }, hidden.ciphers) };
+    const context: ClueContext = { word: text, answer: text, inner: [], level, unit, withImage: true, titleFree: true, debut: hasJustArrived(encoding, level) };
+    return { method: hidden.ciphers[0]!.cipher, ...placed(hidden.text, context, hidden.ciphers) };
 }
 
 // The clue for a page behind a login: the user name and the password, in a comment.
@@ -285,27 +291,27 @@ export function credentialsClue(username: string, password: string, encoding: En
     return { method: hidden.ciphers[0]!.cipher, imageLink: true, lines, comment: hidden.text, parts: [{ place: 'comment', text: hidden.text, ciphers: hidden.ciphers }] };
 }
 
-export function textEncodingFor(level: number, unit: number, recent: readonly string[] = [], excluded: readonly Encoding[] = []): Encoding {
+export function textEncodingFor(level: number, unit: number, recent: Recent, excluded: readonly Encoding[] = []): Encoding {
     const allowed = textEncodings.filter(([encoding, fromLevel]) => fromLevel <= level && !excluded.includes(encoding)).map(([encoding]) => encoding);
     return leastRecent(allowed, (encoding) => encoding, recent, unit);
 }
 
-export function caseEncodingFor(unit: number, recent: readonly string[] = []): Encoding {
+export function caseEncodingFor(unit: number, recent: Recent): Encoding {
     return leastRecent(caseEncodings, (encoding) => encoding, recent, unit);
 }
 
-export function dateClue(day: number, month: number, year: number, level: number, unit: number, recent: readonly string[] = []): Clue {
+export function dateClue(day: number, month: number, year: number, level: number, unit: number, recent: Recent): Clue {
     const digits = `${String(day).padStart(2, '0')}${String(month).padStart(2, '0')}${year}`;
     const roman = numberClue('roman', digits, 'romanDate', unit);
     const encoded = digitEncodings.map((encoding) => encodedClue(digits, encoding, level, unit));
     return leastRecent([roman, ...encoded], (clue) => clue.method ?? '', recent, unit);
 }
 
-export function leetEncodingFor(unit: number, recent: readonly string[] = []): Encoding {
+export function leetEncodingFor(unit: number, recent: Recent): Encoding {
     return leastRecent(leetEncodings, (encoding) => encoding, recent, unit);
 }
 
-export function yearClue(year: number, level: number, unit: number, recent: readonly string[] = []): Clue {
+export function yearClue(year: number, level: number, unit: number, recent: Recent): Clue {
     const digits = String(year);
     const options: readonly (readonly [number, () => Clue])[] = [
         [0, () => numberClue('roman', digits, 'romanNumeral', unit)],
@@ -327,7 +333,7 @@ function numberClue(method: string, digits: string, cipher: Encoding, unit: numb
 // A text under a cipher and, where the level asks for it, under more ciphers below that one.
 function enciphered(text: string, encoding: Encoding, level: number, unit: number): { readonly text: string; readonly ciphers: readonly Step[] } {
     const method = cipher(encoding, 0);
-    for (let layers = stepsAt(level) - 1; layers >= 0; layers--) {
+    for (let layers = hasJustArrived(encoding, level) ? 0 : stepsAt(level) - 1; layers >= 0; layers--) {
         const chain = chained(text, level, method, layers);
         if (chain === null) continue;
         const encoded = encode(chain.word, encoding, unit);
@@ -336,13 +342,19 @@ function enciphered(text: string, encoding: Encoding, level: number, unit: numbe
     return { text: encode(text, 'hex'), ciphers: [{ cipher: 'hex' }] };
 }
 
+// Whether a cipher has only just become a method of its own. A clue that is given its cipher does not know what the levels before it used, so it goes by the level:
+// for that long it shows the cipher as a new method is shown, with nothing under it and in a place that the first levels teach.
+function hasJustArrived(encoding: Encoding, level: number): boolean {
+    return level - (firstLevels.get(encoding) ?? 0) < recentMethodCount;
+}
+
 // How many things a clue at this level is meant to have to undo: the method itself, and the ciphers under it.
 function stepsAt(level: number): number {
     const roll = unitHash(level, salts.layer);
-    const later = level >= fourStepsFromLevel;
-    const second = later ? ramp(level, fourStepsFromLevel, 1000, 0.65, 0.85) : ramp(level, 60, fourStepsFromLevel, 0.1, 0.65);
-    const third = later ? ramp(level, fourStepsFromLevel, 1000, 0.25, 0.5) : ramp(level, 250, fourStepsFromLevel, 0.05, 0.25);
-    const fourth = ramp(level, fourStepsFromLevel, 1000, 0.1, 0.4);
+    const later = level > lastThreeStepLevel;
+    const second = later ? ramp(level, lastThreeStepLevel, 1000, 0.75, 0.9) : ramp(level, 60, lastThreeStepLevel, 0.1, 0.75);
+    const third = later ? ramp(level, lastThreeStepLevel, 1000, 0.25, 0.5) : ramp(level, 250, lastThreeStepLevel, 0.05, 0.25);
+    const fourth = later ? ramp(level, lastThreeStepLevel, 1000, 0.1, 0.4) : 0;
     return 1 + Number(roll < second) + Number(roll < third) + Number(roll < fourth);
 }
 
@@ -389,24 +401,41 @@ function revealsAnswer(clue: Clue, answer: string): boolean {
     return shownTexts(clue).some((text) => text.trim().toLowerCase() === answer);
 }
 
-function methodOrder(pool: readonly Method[], level: number, recent: readonly string[]): Method[] {
-    const excluded = new Set(recent.slice(0, Math.min(recentMethodCount, Math.floor(pool.length * 0.6))));
-    // A method that has not been used since it arrived goes first, the oldest of them before the others, so that each gets its turn.
-    const debut = (method: Method): number => (level - method.fromLevel < recent.length && !recent.includes(method.name) ? method.fromLevel : Number.POSITIVE_INFINITY);
-    const ranked = pool.map((method) => ({ method, key: unitHash(level, salts.method + textSeed(method.name)) ** (1 / methodWeight(method, level)) }));
-    ranked.sort((first, second) => (debut(first.method) === debut(second.method) ? 0 : debut(first.method) - debut(second.method))
+// A method that has not been used since it arrived goes first, and after those a method that has been used only the once, so that it is seen again before it is forgotten.
+// The oldest of them goes before the others, so that each gets its turn. The rest are drawn by their weight, the ones that were used lately last.
+function methodOrder(pool: readonly Method[], level: number, recent: Recent): Method[] {
+    const excluded = new Set(recent.methods.slice(0, Math.min(recentMethodCount, Math.floor(pool.length * 0.6))));
+    const ranked = pool.map((method) => ({
+        method,
+        turn: isNew(method, level, recent) ? 0 : isDueAgain(method, level, recent) ? 1 : 2,
+        key: unitHash(level, salts.method + textSeed(method.name)) ** (1 / methodWeight(method, level, recent)),
+    }));
+    ranked.sort((first, second) => first.turn - second.turn || (first.turn < 2 ? first.method.fromLevel - second.method.fromLevel : 0)
         || Number(excluded.has(first.method.name)) - Number(excluded.has(second.method.name)) || second.key - first.key);
     return ranked.map(({ method }) => method);
 }
 
-function methodWeight(method: Method, level: number): number {
-    const novelty = 1 + 2 * Math.max(0, 1 - (level - method.fromLevel) / newMethodLevels);
-    const age = method.fromLevel < oldMethodLevel ? Math.max(0.3, 1 - Math.max(0, level - 200) / 500) : 1;
-    return novelty * age;
+// Whether a method has arrived within the levels that `recent` looks back on and has not been used in them.
+function isNew(method: Method, level: number, recent: Recent): boolean {
+    return level - method.fromLevel < recent.methods.length && !recent.methods.includes(method.name);
 }
 
-function leastRecent<Item>(items: readonly Item[], name: (item: Item) => string, recent: readonly string[], unit: number): Item {
-    const age = (item: Item): number => { const index = recent.indexOf(name(item)); return index === -1 ? Number.POSITIVE_INFINITY : index; };
+// Whether a method that arrived within those levels has been used once in them, long enough ago to come again.
+function isDueAgain(method: Method, level: number, recent: Recent): boolean {
+    const uses = recent.methods.filter((name) => name === method.name).length;
+    return level - method.fromLevel < recent.methods.length && uses === 1 && recent.methods.indexOf(method.name) >= recentMethodCount;
+}
+
+// A method weighs more the longer it has not been used, so that none is left out for long. The methods of the first levels weigh less later on.
+function methodWeight(method: Method, level: number, recent: Recent): number {
+    const last = recent.methods.indexOf(method.name);
+    const wait = 1 + (last === -1 ? recent.methods.length : last);
+    const age = method.fromLevel < oldMethodLevel ? Math.max(0.3, 1 - Math.max(0, level - 200) / 500) : 1;
+    return wait * wait * age;
+}
+
+function leastRecent<Item>(items: readonly Item[], name: (item: Item) => string, recent: Recent, unit: number): Item {
+    const age = (item: Item): number => { const index = recent.methods.indexOf(name(item)); return index === -1 ? Number.POSITIVE_INFINITY : index; };
     const oldest = Math.max(...items.map(age));
     return pickByUnit(items.filter((item) => age(item) === oldest), unit);
 }
@@ -419,13 +448,13 @@ function cipher(encoding: Encoding, fromLevel: number, hint?: Hint): Method {
 }
 
 // A cipher with a key. The key is on the page as well: in the title at first, later anywhere, and later still under a cipher of its own.
-function keyed(encoding: Encoding, fromLevel: number, keyFor: (context: ClueContext) => string, hint?: Hint): Method {
+function keyed(encoding: Encoding, fromLevel: number, keyFor: (context: ClueContext) => string | null, hint?: Hint): Method {
     return {
         name: encoding, fromLevel, encoding, hint, open: byteCiphers.has(encoding), takes: (text) => carries(text, encoding),
         clue: (context) => {
             const key = keyFor(context);
-            const hidden = hiddenKey(key, fromLevel, context);
-            if (hidden === null) return null;
+            const hidden = key === null ? null : hiddenKey(key, fromLevel, context);
+            if (key === null || hidden === null) return null;
             const body = placed(encode(context.word, encoding, context.unit, key), { ...context, titleFree: context.titleFree && hidden.part.place !== 'title' },
                 [{ cipher: encoding, key, keyAt: hidden.part }, ...context.inner], {}, [hidden.part.place]);
             return { ...hidden.clue, ...body };
@@ -436,13 +465,14 @@ function keyed(encoding: Encoding, fromLevel: number, keyFor: (context: ClueCont
 function hiddenKey(key: string, fromLevel: number, context: ClueContext): { readonly clue: Clue; readonly part: Part } | null {
     const { level } = context;
     const roll = unitHash(level, salts.keyLayer);
-    const layers = level >= firstEncodedKeyLevel && roll < encodedKeyShare && letters(key) ? letterLayers.filter((layer) => encode(key, layer) !== key) : [];
-    const layer = layers.length === 0 ? undefined : pickByUnit(layers, roll / encodedKeyShare);
-    const shown = layer === undefined ? key : encode(key, layer);
-    const places = context.titleFree && level < fromLevel + openKeyLevels ? ['title'] : [...(context.titleFree ? ['title'] : []), ...keyPlaces];
+    const open = level < fromLevel + openKeyLevels;
+    const layers = !open && level >= firstEncodedKeyLevel && letters(key) ? letterLayers.filter((layer) => encode(key, layer) !== key) : [];
+    const places = context.titleFree && open ? ['title'] : [...(context.titleFree ? ['title'] : []), ...keyPlaces];
     const first = Math.floor(unitHash(level, salts.keyPlace) * places.length);
     for (let turn = 0; turn < places.length; turn++) {
         const place = places[(first + turn) % places.length]!;
+        const layer = layers.length > 0 && (place === 'title' || roll < encodedKeyShare) ? pickByUnit(layers, fraction(roll * 7)) : undefined;
+        const shown = layer === undefined ? key : encode(key, layer);
         const clue = placedAt(place, shown, context);
         if (clue !== null) return { clue, part: { place, text: shown, ciphers: layer === undefined ? [] : [{ cipher: layer }] } };
     }
@@ -458,6 +488,12 @@ function keyWord(context: ClueContext, allowed = /^[a-z]{4,7}$/): string {
     return 'riddle';
 }
 
+// A key for a cipher that carries on with the message itself. It is shorter than the message, or the message would never come into it.
+function shortKeyWord(context: ClueContext): string | null {
+    const key = keyWord(context, /^[a-z]{3,4}$/);
+    return key.length < context.word.length ? key : null;
+}
+
 function numberKey({ level }: ClueContext): string {
     const length = 4 + Math.floor(unitHash(level, salts.key) * 3);
     return Array.from({ length }, (_, index) => 1 + Math.floor(unitHash(level * 31 + index, salts.key) * 9)).join('');
@@ -471,9 +507,10 @@ function drawn(kind: DrawingKind, fromLevel: number, { hint, via, raw, open, tak
     const name = `${kind}Picture`;
     return {
         name, fromLevel, hint, open, ownSteps: via === undefined ? 1 : 2, takes: taken,
-        clue: ({ word, level, inner }) => {
+        clue: ({ word, level, inner, debut }) => {
             const text = via === undefined ? word : encode(word, via);
-            const display = drawingDisplay(level);
+            // A kind of picture that is new is on the page for all to see.
+            const display = debut === true ? undefined : drawingDisplay(level);
             const part: Part = { place: display === undefined ? 'picture' : `${display}Picture`, reading: name, text, ciphers: via === undefined ? inner : [{ cipher: via }, ...inner] };
             const clue: Clue = { drawing: { kind, text: raw === true ? word : text }, drawingDisplay: display, parts: [part] };
             return display === 'hidden' ? withLine(variant('hiddenPicture', level), clue) : clue;

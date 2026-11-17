@@ -69,6 +69,12 @@ export interface Clue {
     readonly alternate?: { readonly extension: AlternateExtension; readonly text: string };
 }
 
+// What the levels just before a level used, the nearest first: their methods, and the places where they put their texts.
+export interface Recent {
+    readonly methods: readonly string[];
+    readonly places: readonly string[];
+}
+
 export interface ClueContext {
     // What the method has to carry: the answer, under the ciphers in `inner`.
     readonly word: string;
@@ -79,6 +85,9 @@ export interface ClueContext {
     readonly withImage: boolean;
     readonly titleFree: boolean;
     readonly pageName?: (level: number) => string | null;
+    readonly recent?: Recent;
+    // The method has not been used before.
+    readonly debut?: boolean;
 }
 
 export type HintKey = keyof typeof puzzleHints;
