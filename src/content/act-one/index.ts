@@ -22,7 +22,6 @@ const regularOffersSeconds = 120;
 const emptyListSeconds = 8;
 const introductionSeconds = 600;
 const earlyOfferLimit = 3;
-const laterOfferLimit = 6;
 const firstFindingSeconds = 360;
 const rememberedPages = 100;
 const firstJobUpgrade = 'otherRiddles';
@@ -77,8 +76,8 @@ function revealNextOffer(game: Game, seconds: number): boolean {
     const { state } = game;
     if (seconds < regularOffersSeconds) return false;
     const offers = offeredUpgrades(game);
-    const shownLimit = seconds < introductionSeconds ? earlyOfferLimit : laterOfferLimit;
-    const listIsFull = offers.filter((item) => isUpgradeRevealed(state, item.id)).length >= shownLimit;
+    // The list is kept short in the first ten minutes, so that the opening cards come one at a time.
+    const listIsFull = seconds < introductionSeconds && offers.filter((item) => isUpgradeRevealed(state, item.id)).length >= earlyOfferLimit;
     const candidates = offers.filter((item) => !isUpgradeRevealed(state, item.id) && readyForUpgrade(game, item) && (item.onNeed || !listIsFull));
     const { missing } = currentSearch(game);
     const fixesWall = (item: Upgrade): number => Number(missing.includes(item.id));

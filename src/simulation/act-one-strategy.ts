@@ -41,6 +41,7 @@ const steadyTicketShare = 1 / 3;
 const burnSeconds = 300;
 const rentStepShare = 0.05;
 const roomyScripts = 6;
+const pocketMoneySeconds = 30;
 
 export function actOneStrategy(decisionIntervalSeconds: number, style: PlayStyle = 'attentive'): Strategy {
     const memories = new WeakMap<Game, DecisionMemory>();
@@ -110,12 +111,15 @@ function buyUpgrades(game: Game): { readonly acted: boolean; readonly offered: r
     const offered = offeredUpgrades(game).filter((item) => isUpgradeRevealed(state, item.id))
         .sort((first, second) => priority(second) - priority(first) || secondsUntilAffordable(game, first) - secondsUntilAffordable(game, second));
     const savedFor = new Set<string>();
+    // A person who is saving up still buys a card that costs them half a minute of income.
+    const isPocketMoney = (item: Upgrade): boolean => Object.entries(item.price).every(([resource, amount]) => amount <= spareIncome(game, resource) * pocketMoneySeconds);
     let acted = false;
     for (const item of offered) {
-        if (Object.keys(item.price).some((resource) => savedFor.has(resource))) continue;
+        const heldBack = Object.keys(item.price).some((resource) => savedFor.has(resource));
+        if (heldBack && !isPocketMoney(item)) continue;
         if (canAfford(state, item.price)) {
             acted = game.dispatch({ type: 'purchase', purchasableId: item.id }) || acted;
-        } else if (secondsUntilAffordable(game, item) < (patienceSeconds[priority(item)] ?? 0)) {
+        } else if (!heldBack && secondsUntilAffordable(game, item) < (patienceSeconds[priority(item)] ?? 0)) {
             for (const [resource, amount] of Object.entries(item.price)) if ((state.resources[resource] ?? 0) < amount) savedFor.add(resource);
         }
     }
@@ -180,7 +184,9 @@ function jobTargets(game: Game, free: number, keepsTickets = true): Record<JobId
         const others = jobTargets(game, free - steady, false);
         return { ...others, [ticketing.id]: others[ticketing.id] + steady };
     }
-    const goals = upgrades.filter((item) => !owns(state, item.id) && (item.onNeed ? isNeeded(state, item.id) : item.level <= state.currentLevel + lookaheadLevels));
+    // What the robot works towards: the cards on its list, and the ones that a few more levels will put there.
+    const goals = upgrades.filter((item) => !owns(state, item.id) && item.requires.every((required) => owns(state, required))
+        && (item.onNeed ? isNeeded(state, item.id) : item.level <= state.currentLevel + lookaheadLevels));
     const shortfall = (resource: string): number => Math.max(0, goals.reduce((sum, item) => sum + (item.price[resource] ?? 0), 0) - (state.resources[resource] ?? 0));
     const waits = unlocked.map((job) => shortfall(job.resource) / game.stat(job.rateStat));
     const total = waits.reduce((sum, wait) => sum + wait, 0);

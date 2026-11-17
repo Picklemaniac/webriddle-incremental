@@ -709,12 +709,54 @@ describe('Act I', () => {
     });
 
     it('offers a card from its level on, also when the player cannot pay for it yet', () => {
-        const game = automatedAt(147);
-        for (const id of ['certification', 'seniorCertification', 'secondLineSupport']) game.state.purchases[id] = 1;
+        const game = automatedAt(129);
+        game.state.purchases.proxyPool = 1;
         game.state.resources.money = 0;
-        expect(offeredUpgrades(game).map((item) => item.id)).not.toContain('teamLead');
-        game.state.currentLevel = 148;
-        expect(offeredUpgrades(game).map((item) => item.id)).toContain('teamLead');
+        expect(offeredUpgrades(game).map((item) => item.id)).not.toContain('proxyChecker');
+        game.state.currentLevel = 130;
+        expect(offeredUpgrades(game).map((item) => item.id)).toContain('proxyChecker');
+    });
+
+    it('offers the next pay rise and the next script card as soon as the one before it is bought, up to sixteen times the pay and 22 scripts', () => {
+        const game = automatedAt(6);
+        const offered = (): string[] => offeredUpgrades(game).map((item) => item.id);
+        const payCards = ['typingCourse', 'certification', 'nightShifts', 'seniorCertification', 'secondLineSupport', 'teamLead', 'onCallBonus', 'helpdeskManager'];
+        const scriptCards = ['ram', 'newPc', 'dualCore', 'dedicatedServer', 'headlessLinux', 'xeon', 'dualProcessorBoard', 'hyperThreading', 'sixtyFourBit', 'serverRack'];
+        for (const chain of [payCards, scriptCards]) {
+            chain.forEach((id, index) => {
+                expect(offered()).toContain(id);
+                for (const later of chain.slice(index + 1)) expect(offered()).not.toContain(later);
+                game.state.purchases[id] = 1;
+            });
+        }
+        expect(offered()).toContain('moreRam');
+        game.state.purchases.moreRam = 1;
+        game.invalidateStats();
+        expect(game.stat('workRate')).toBeCloseTo(16 * actOneContent.baseStats.workRate!);
+        expect(game.stat('ticketBotRate')).toBeCloseTo(16 * actOneContent.baseStats.ticketBotRate!);
+        expect(game.stat('scriptSlots')).toBe(22);
+    });
+
+    it('lists at most three cards in the first ten minutes, and after that shows a new card however many are listed', () => {
+        const openedAt = (seconds: number, listed: readonly string[]): Game => {
+            const game = automatedAt(10);
+            game.state.elapsedSeconds = seconds;
+            for (const id of ['ram', 'typingCourse']) game.state.purchases[id] = 1;
+            Object.assign(game.state.flags, { insightRevealed: true, moneyRevealed: true, scriptsRevealed: true }, Object.fromEntries(listed.map((id) => [`seen:${id}`, true])));
+            game.invalidateStats();
+            game.dispatch({ type: 'checkIn' });
+            return game;
+        };
+        const isListed = (game: Game, id: string): boolean => game.state.flags[`seen:${id}`] === true;
+        const early = openedAt(300, ['curlBatch', 'otherRiddles', 'autoReplyMacros']);
+        early.advance(1);
+        expect(isListed(early, 'certification')).toBe(false);
+        early.state.purchases.otherRiddles = 1;
+        early.advance(1);
+        expect(isListed(early, 'certification')).toBe(true);
+        const later = openedAt(700, ['curlBatch', 'otherRiddles', 'wgetMirror', 'autoReplyMacros', 'moreRam', 'newPc']);
+        later.advance(1);
+        expect(isListed(later, 'certification')).toBe(true);
     });
 
     it('keeps the search progress when a purchase adds a pass', () => {
