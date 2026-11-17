@@ -161,7 +161,9 @@ function assignScripts(game: Game): boolean {
     const scriptsToFillLimit = networkCapacity(game) / requestsPerScript(game);
     // With every address rented, a person who still has room under the limit fills it. The next block of addresses only comes to a player who does.
     const mostSearchers = rentsEveryAddress(game) ? slots - 1 : maximumSearchers(game);
-    const searchers = Math.min(mostSearchers, Math.max(1, isThrottled(game) ? Math.ceil(scriptsToFillLimit) : Math.floor(scriptsToFillLimit)));
+    // Nothing says that more addresses would help until the scripts have run into the limit. A person finds that out with a script to spare, so before it has proxies the robot lets a second script search.
+    const fewestSearchers = owns(game.state, 'freeProxies') ? 1 : 2;
+    const searchers = Math.min(mostSearchers, Math.max(fewestSearchers, isThrottled(game) ? Math.ceil(scriptsToFillLimit) : Math.floor(scriptsToFillLimit)));
     const targets = jobTargets(game, slots - searchers);
     let acted = false;
     for (const job of jobs) {
@@ -230,7 +232,10 @@ function chooseActivity(game: Game, offered: readonly Upgrade[]): ActivityId | u
     const secondsWith = (item: Upgrade, activity: ActivityId | undefined): number => Math.max(...Object.entries(item.price).map(([resource, amount]) => {
         const helped = activities.find((candidate) => candidate.id === activity)?.resource === resource;
         const income = fromScripts(resource) + (helped ? activityRate(game, activity!) : 0);
-        return Math.min(longestWaitSeconds, Math.max(0, amount - (state.resources[resource] ?? 0)) / Math.max(minimumIncomePerSecond, income));
+        const missing = Math.max(0, amount - (state.resources[resource] ?? 0));
+        // What nothing earns never comes, however little of it is missing. Without this the robot left a card a fraction short for minutes.
+        if (missing > 0 && income <= 0) return longestWaitSeconds;
+        return Math.min(longestWaitSeconds, missing / Math.max(minimumIncomePerSecond, income));
     }));
     let best: { id: ActivityId; saved: number } | undefined;
     for (const activity of activities.filter((candidate) => isResourceRevealed(game, candidate.resource))) {

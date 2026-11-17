@@ -13,12 +13,15 @@ type Condition = (game: Game, item: Upgrade) => boolean;
 interface Trigger {
     readonly holds: Condition;
     readonly forSeconds?: number;
+    // A cause that does not have to last, such as a ban.
+    readonly atOnceWhen?: Condition;
     // Set when only the rent slider can set the condition off by accident. Before there is a slider, the card comes at once.
     readonly onlyWithRentSlider?: true;
 }
 
 const settledSeconds = 60;
 const shortOfRoomSeconds = 30;
+const withoutABanSeconds = 180;
 const proxyDeathsBeforeLongerLives = 6;
 const longWaitSeconds = 180;
 
@@ -31,13 +34,13 @@ const twoScriptsStillFit: Condition = (game, item) => {
 const everyAddressIsInUse: Condition = (game) => rentsEveryAddress(game) && limitHoldsBack(game);
 const proxiesKeepDying: Condition = (game) => (game.state.statistics.proxyDeaths ?? 0) >= proxyDeathsBeforeLongerLives;
 const stoppedWhileAway: Condition = (game) => game.state.flags.offlineCapReached === true;
+const hasBeenBanned: Condition = (game) => (game.state.statistics.bans ?? 0) > 0;
 // A card on screen costs more than the player has and would earn in the next few minutes.
 const shortOf = (resource: string): Condition => (game) => {
     const withinReach = (game.state.resources[resource] ?? 0) + incomeWhileEarning(game, resource) * longWaitSeconds;
     return offeredUpgrades(game).some((item) => isUpgradeRevealed(game.state, item.id) && (item.price[resource] ?? 0) > withinReach);
 };
 
-const whenTheLimitFirstHoldsBack: Trigger = { holds: limitHoldsBack };
 const whenTheLimitHoldsBack: Trigger = { holds: limitHoldsBack, forSeconds: shortOfRoomSeconds };
 const whenEveryAddressIsInUse: Trigger = { holds: everyAddressIsInUse, forSeconds: settledSeconds };
 const whenTwoScriptsStillFit: Trigger = { holds: twoScriptsStillFit, forSeconds: settledSeconds, onlyWithRentSlider: true };
@@ -45,7 +48,8 @@ const whenShortOfData: Trigger = { holds: shortOf('data') };
 const whenShortOfInsight: Trigger = { holds: shortOf('insight') };
 
 const triggers: Readonly<Partial<Record<UpgradeId, Trigger>>> = {
-    freeProxies: whenTheLimitFirstHoldsBack,
+    // The first card for the limit answers the first ban. A player who stays clear of bans is not left without it.
+    freeProxies: { holds: limitHoldsBack, forSeconds: withoutABanSeconds, atOnceWhen: hasBeenBanned },
     openWifi: whenTheLimitHoldsBack,
     proxyPool: whenTheLimitHoldsBack,
     rentedAddresses: whenTheLimitHoldsBack,
@@ -89,13 +93,16 @@ export const needs: GameSystem = {
         if (state.flags.automated !== true) return;
         for (const { item, trigger } of triggered) {
             if (isNeeded(state, item.id) || owns(state, item.id) || state.currentLevel < item.level) continue;
-            if (!item.requires.every((required) => owns(state, required)) || !trigger.holds(game, item)) continue;
-            if (trigger.forSeconds !== undefined && (trigger.onlyWithRentSlider !== true || game.stat('rentableAddresses') > 0)) {
-                const held = `heldSeconds:${item.id}`;
-                increment(state, held, deltaSeconds);
-                if (state.statistics[held]! < trigger.forSeconds) continue;
-            }
-            markNeeded(state, item.id);
+            if (!item.requires.every((required) => owns(state, required))) continue;
+            if (trigger.atOnceWhen?.(game, item) === true || hasHeld(game, item, trigger, deltaSeconds)) markNeeded(state, item.id);
         }
     },
 };
+
+function hasHeld(game: Game, item: Upgrade, trigger: Trigger, deltaSeconds: number): boolean {
+    if (!trigger.holds(game, item)) return false;
+    if (trigger.forSeconds === undefined || (trigger.onlyWithRentSlider === true && game.stat('rentableAddresses') === 0)) return true;
+    const held = `heldSeconds:${item.id}`;
+    increment(game.state, held, deltaSeconds);
+    return game.state.statistics[held]! >= trigger.forSeconds;
+}

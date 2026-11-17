@@ -126,9 +126,11 @@ const pacedNetwork: GameSystem = {
         const revealed = game.state.flags.networkRevealed;
         const scriptsPending = !game.state.flags.scriptsRevealed && game.stat('scriptSlots') >= 2;
         if (!revealed && showsTheLimit(game) && (scriptsPending || game.state.elapsedSeconds < nextRevealAt(game))) return;
+        const bans = game.state.statistics.bans ?? 0;
         network.update(game, seconds);
-        // The card that answers the limit follows the panel that shows it.
-        if (!revealed && game.state.flags.networkRevealed) game.state.statistics.nextRevealAt = game.state.elapsedSeconds + currencyFollowSeconds;
+        // A new card leaves the panel that has just appeared a moment to itself, and the card that answers the first ban follows it.
+        const firstBan = bans === 0 && (game.state.statistics.bans ?? 0) > 0;
+        if ((!revealed && game.state.flags.networkRevealed) || firstBan) game.state.statistics.nextRevealAt = game.state.elapsedSeconds + currencyFollowSeconds;
     },
 };
 

@@ -389,6 +389,64 @@ describe('Act I', () => {
         expect(effectiveRate(game)).toBe(requestedRate(game));
     });
 
+    it('brings the server limit on screen when the scripts ask for more than it takes, and not while the second script has a job', () => {
+        const withTwoScripts = (): Game => {
+            const game = automatedAt(8);
+            for (const id of ['curlBatch', 'ram', 'otherRiddles']) game.state.purchases[id] = 1;
+            Object.assign(game.state.flags, { insightRevealed: true, moneyRevealed: true, scriptsRevealed: true });
+            game.invalidateStats();
+            game.dispatch({ type: 'checkIn' });
+            return game;
+        };
+        const working = withTwoScripts();
+        working.dispatch({ type: 'assignJob', jobId: 'riddles', change: 1 });
+        working.advance(300);
+        expect(requestedRate(working)).toBe(8);
+        expect(working.state.flags.networkRevealed).not.toBe(true);
+        expect(working.state.network.heat).toBe(0);
+        const searching = withTwoScripts();
+        searching.advance(60);
+        expect(requestedRate(searching)).toBe(16);
+        expect(searching.state.flags.networkRevealed).toBe(true);
+        expect(searching.state.network.heat).toBeGreaterThan(0);
+    });
+
+    it('offers the Free proxy list after the first ban, and not while Heat is only rising', () => {
+        const game = automatedAt(8);
+        game.state.elapsedSeconds = 300;
+        for (const id of ['curlBatch', 'ram']) game.state.purchases[id] = 1;
+        Object.assign(game.state.flags, { insightRevealed: true, moneyRevealed: true, scriptsRevealed: true });
+        game.invalidateStats();
+        game.dispatch({ type: 'checkIn' });
+        const offered = (): string[] => offeredUpgrades(game).map((item) => item.id);
+        game.advance(45);
+        expect(game.state.flags.networkRevealed).toBe(true);
+        expect(game.state.network.heat).toBeGreaterThan(50);
+        expect(offered()).not.toContain('freeProxies');
+        game.advance(15);
+        expect(game.state.statistics.bans).toBe(1);
+        expect(offered()).toContain('freeProxies');
+        expect(game.state.flags['seen:freeProxies']).not.toBe(true);
+        game.advance(7);
+        expect(game.state.flags['seen:freeProxies']).toBe(true);
+    });
+
+    it('also offers the Free proxy list to a player who stays clear of bans, once the limit has been in the way for three minutes', () => {
+        const game = automatedAt(8);
+        for (const id of ['curlBatch', 'ram', 'otherRiddles']) game.state.purchases[id] = 1;
+        Object.assign(game.state.flags, { insightRevealed: true, moneyRevealed: true, scriptsRevealed: true, networkRevealed: true });
+        game.invalidateStats();
+        game.dispatch({ type: 'checkIn' });
+        game.dispatch({ type: 'assignJob', jobId: 'riddles', change: 1 });
+        const offered = (): string[] => offeredUpgrades(game).map((item) => item.id);
+        game.advance(170);
+        expect(requestedRate(game)).toBeLessThan(networkCapacity(game));
+        expect(offered()).not.toContain('freeProxies');
+        game.advance(15);
+        expect(game.state.statistics.bans ?? 0).toBe(0);
+        expect(offered()).toContain('freeProxies');
+    });
+
     it('raises the server limit by ten requests a second for every rented IP address', () => {
         const game = automatedAt(120);
         game.state.purchases.rentedAddresses = 1;

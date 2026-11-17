@@ -85,8 +85,8 @@ describe('Act I onboarding', () => {
         expect(game.state.flags[firstJobCard]).toBe(true);
         for (let index = 1; index < introductions.length; index++) {
             const { seconds, id, onAnEmptyList } = introductions[index]!;
-            // A currency follows the first card that costs it, the Scripts panel the purchase of a second script, and the proxy card the panel that shows the limit.
-            const followsItsCause = ['insightRevealed', 'moneyRevealed', 'dataRevealed', 'scriptsRevealed'].includes(id) || introductions[index - 1]!.id === 'networkRevealed';
+            // A currency follows the first card that costs it, the Scripts panel the purchase of a second script, a card the panel that shows the limit, and the proxy card the first ban.
+            const followsItsCause = ['insightRevealed', 'moneyRevealed', 'dataRevealed', 'scriptsRevealed', 'seen:freeProxies'].includes(id) || introductions[index - 1]!.id === 'networkRevealed';
             expect(seconds - introductions[index - 1]!.seconds, id).toBeGreaterThanOrEqual(followsItsCause ? 6 : onAnEmptyList ? 8 : 30);
         }
     });

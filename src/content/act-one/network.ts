@@ -64,8 +64,9 @@ export function limitHoldsBack(game: Game): boolean {
     return game.state.flags.networkRevealed === true && hasNoRoomForAnotherScript(game);
 }
 
+// The limit comes on screen when the scripts ask for more than it takes. A script that has a job does not bring it up.
 export function showsTheLimit(game: Game): boolean {
-    return requestedRate(game) > networkCapacity(game) || (scriptSlots(game) > 1 && hasNoRoomForAnotherScript(game));
+    return requestedRate(game) > networkCapacity(game);
 }
 
 export function isBanned(game: Game): boolean {
