@@ -63,6 +63,7 @@ export class BrowserPanel implements Panel {
     private followOnArrival = false;
     private loginAddress = '';
     private hoveredLink: string | null = null;
+    private hoveredStatus: string | null = null;
     private readonly contextMenu = createElement('div', { className: 'menu-popup context-menu', attributes: { role: 'menu' } });
 
     constructor(game: Game) {
@@ -145,8 +146,8 @@ export class BrowserPanel implements Panel {
             document.title = title;
         }
         if (!this.pendingNavigation) {
-            setText(this.status, this.hoveredLink !== null ? `${menuText.statusShortcut} ${this.hoveredLink}`
-                : `${menuText.statusDone}${this.page.statusCode === 200 ? '' : ` (${this.page.statusCode || menuText.statusDns})`}`);
+            setText(this.status, this.hoveredStatus ?? (this.hoveredLink !== null ? `${menuText.statusShortcut} ${this.hoveredLink}`
+                : `${menuText.statusDone}${this.page.statusCode === 200 ? '' : ` (${this.page.statusCode || menuText.statusDns})`}`));
         }
         this.back.disabled = !this.canGoBack();
         this.forward.disabled = !this.canGoForward();
@@ -503,9 +504,18 @@ export class BrowserPanel implements Panel {
     private bindPage(): void {
         const doc = this.viewport.contentDocument;
         this.hoveredLink = null;
+        this.hoveredStatus = null;
         if (!doc) return;
-        doc.addEventListener('mouseover', (event) => { this.hoveredLink = linkAt(event.target as Element)?.url ?? null; });
-        doc.addEventListener('mouseout', (event) => { if (event.relatedTarget === null) this.hoveredLink = null; });
+        // A page of that time could write in the status bar while the pointer was on something. The pages here carry that text in an attribute, because their scripts do not run.
+        doc.addEventListener('mouseover', (event) => {
+            this.hoveredLink = linkAt(event.target as Element)?.url ?? null;
+            this.hoveredStatus = (event.target as Element).closest('[data-status]')?.getAttribute('data-status') ?? null;
+        });
+        doc.addEventListener('mouseout', (event) => {
+            if (event.relatedTarget !== null) return;
+            this.hoveredLink = null;
+            this.hoveredStatus = null;
+        });
         doc.addEventListener('contextmenu', (event) => {
             const target = event.target as Element;
             if (isTextField(target)) return;

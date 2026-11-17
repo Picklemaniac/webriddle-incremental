@@ -61,7 +61,17 @@ function picture(page: LevelPage, withExtras = false): string {
     const rollover = page.files.find((file) => file.display === 'rollover');
     const over = withExtras && rollover !== undefined && 'drawing' in rollover.content
         ? `<img class="over" src="${drawPicture(rollover.content.drawing).src}" alt="" data-address="${escapeHtml(rollover.name)}">` : '';
-    return `<span class="picture"><img src="${imagePath(page.imageId)}" alt="" data-address="${escapeHtml(page.imageName)}"${title}>${over}<span class="number">${page.level}</span>${spot}</span>`;
+    const status = withExtras && page.statusText !== null ? ` data-status="${escapeHtml(page.statusText)}"` : '';
+    return `<span class="picture"><img src="${imagePath(page.imageId)}" alt="${escapeHtml(page.altText ?? '')}" data-address="${escapeHtml(page.imageName)}"${title}${status}>${over}`
+        + `<span class="number">${page.level}</span>${spot}</span>`;
+}
+
+function checkboxRow(bits: string, extra = ''): string {
+    return [...bits].map((bit) => `<input type="checkbox"${bit === '1' ? ' checked' : ''}${extra}>`).join('');
+}
+
+function optionList(options: readonly string[]): string {
+    return options.map((option) => `<option>${escapeHtml(option)}</option>`).join('');
 }
 
 function lineHtml(line: string, dark: (part: string) => string): string {
@@ -100,8 +110,13 @@ function renderLevel(level: number): Page {
         page.spacers.length === 0 ? '' : `<p>${page.spacers.map((width) => pictureTag(drawPicture({ kind: 'spacer', text: '' }), 'spacer.gif', width, 1)).join('')}</p>`,
         page.grid.length === 0 ? '' : `<pre class="grid">${escapeHtml(page.grid.join('\n'))}</pre>`,
         page.colors.length === 0 ? '' : `<div class="swatches">${page.colors.map((color) => `<span style="background:${color}"></span>`).join('')}</div>`,
+        page.checkboxes.length === 0 ? '' : `<div class="boxes">${page.checkboxes.map((bits) => `<div>${checkboxRow(bits, ' tabindex="-1"')}</div>`).join('')}</div>`,
+        page.options.length === 0 ? '' : `<p><select>${optionList(page.options)}</select></p>`,
+        page.marquee === null ? '' : `<marquee scrollamount="14">${escapeHtml(page.marquee)}</marquee>`,
         page.hiddenText === null ? '' : `<p class="hidden">${escapeHtml(page.hiddenText)}</p>`,
+        page.unseen === null ? '' : `<div class="unseen">${escapeHtml(page.unseen)}</div>`,
         page.belowFold.length === 0 ? '' : `<div class="far">${page.belowFold.map((line) => `<p>${escapeHtml(line)}</p>`).join('')}</div>`,
+        page.farRight.length === 0 ? '' : `<div class="right">${page.farRight.map((line) => `<p>${escapeHtml(line)}</p>`).join('')}</div>`,
     ].join('');
     return { ...documentPage(page.title, body, 200, levelStyle), source: levelSource(page, link) };
 }
@@ -112,10 +127,17 @@ function levelSource(page: LevelPage, link: string | null): string {
     const rollover = page.files.find((file) => file.display === 'rollover');
     const swap = rollover === undefined ? '' : ` onmouseover="this.src='${rollover.name}'" onmouseout="this.src='${page.imageName}'"`;
     const name = page.attribute === null ? '' : ` name="${escapeHtml(page.attribute)}"`;
-    const image = `<img src="${page.imageName}" width="${pictureWidth}" height="${pictureHeight}" border="0"${name}${title}${hotspot === undefined ? '' : ' usemap="#map"'}${swap}>`;
-    const area = hotspot === undefined || page.hotspot === null ? [] : [`<map name="map"><area shape="rect" coords="${[page.hotspot.x * pictureWidth, page.hotspot.y * pictureHeight,
-        (page.hotspot.x + hotspotWidthPercent / 100) * pictureWidth, (page.hotspot.y + hotspotHeightPercent / 100) * pictureHeight].map(Math.round).join(',')}" href="${hotspot.name}"></map>`];
-    const font = (line: string): string => `<p><font face="Times New Roman" size="4">${lineHtml(line, (part) => `<font color="#000000">${part}</font>`)}</font></p>`;
+    const alt = page.altText === null ? '' : ` alt="${escapeHtml(page.altText)}"`;
+    const status = page.statusText === null ? '' : ` onmouseover="window.status='${page.statusText}'; return true" onmouseout="window.status=''; return true"`;
+    const mapped = hotspot !== undefined || page.areaCoordinates.length > 0;
+    const image = `<img src="${page.imageName}" width="${pictureWidth}" height="${pictureHeight}" border="0"${name}${alt}${title}${mapped ? ' usemap="#map"' : ''}${swap}${status}>`;
+    const area = [
+        ...(hotspot === undefined || page.hotspot === null ? [] : [`<map name="map"><area shape="rect" coords="${[page.hotspot.x * pictureWidth, page.hotspot.y * pictureHeight,
+            (page.hotspot.x + hotspotWidthPercent / 100) * pictureWidth, (page.hotspot.y + hotspotHeightPercent / 100) * pictureHeight].map(Math.round).join(',')}" href="${hotspot.name}"></map>`]),
+        ...(page.areaCoordinates.length === 0 ? [] : [`<map name="map"><area shape="poly" coords="${page.areaCoordinates.join(',')}" href="#"></map>`]),
+    ];
+    const face = (text: string): string => `<font face="Times New Roman" size="4">${text}</font>`;
+    const font = (line: string): string => `<p>${face(lineHtml(line, (part) => `<font color="#000000">${part}</font>`))}</p>`;
     const linked = (kind: LevelFile['linked'], tag: (file: LevelFile) => string): string[] => page.files.filter((file) => file.linked === kind).map(tag);
     const source = formatSource([
         doctype,
@@ -126,13 +148,18 @@ function levelSource(page: LevelPage, link: string | null): string {
         ...(page.meta === null ? [] : [`<meta name="description" content="${escapeHtml(page.meta)}">`]),
         ...linked('stylesheet', (file) => `<link rel="stylesheet" type="text/css" href="${file.name}">`),
         ...linked('script', (file) => `<script type="text/javascript" src="${file.name}"></script>`),
+        ...(page.scriptVariable === null ? [] : [`<script type="text/javascript">var next = "${page.scriptVariable}";</script>`]),
         '</head>',
         '<body bgcolor="#000000" text="#DDDDDD" link="#FFFFFF" vlink="#FFFFFF">',
+        ...(page.anchor === null ? [] : [`<p><a name="${escapeHtml(page.anchor)}"></a></p>`]),
         ...page.tags.map((tag) => `<${tag}></${tag}>`),
         '<center>',
         link === null ? image : `<a href="${link}">${image}</a>`,
         ...area,
         ...page.lines.map(font),
+        ...(page.marquee === null ? [] : [`<marquee scrollamount="14">${face(escapeHtml(page.marquee))}</marquee>`]),
+        ...(page.options.length === 0 ? [] : [`<form><select name="s">${optionList(page.options)}</select></form>`]),
+        ...(page.checkboxes.length === 0 ? [] : [`<form>${page.checkboxes.map((bits) => `<p>${checkboxRow(bits)}</p>`).join('')}</form>`]),
         ...linked('image', (file) => {
             if (file.display === 'rollover') return '';
             const drawing = 'drawing' in file.content ? drawPicture(file.content.drawing) : null;
@@ -147,6 +174,11 @@ function levelSource(page: LevelPage, link: string | null): string {
         ...(page.colors.length === 0 ? [] : [`<table border="0" cellspacing="6"><tr>${page.colors.map((color) => `<td bgcolor="${color}" width="26" height="26"></td>`).join('')}</tr></table>`]),
         ...(page.hiddenText === null ? [] : [`<p><font color="#000000">${escapeHtml(page.hiddenText)}</font></p>`]),
         '</center>',
+        ...(page.hiddenField === null ? [] : [`<form name="f"><input type="hidden" name="next" value="${escapeHtml(page.hiddenField)}"></form>`]),
+        ...(page.unseen === null ? [] : [`<div style="display:none">${escapeHtml(page.unseen)}</div>`]),
+        ...(page.noscript === null ? [] : [`<noscript>${escapeHtml(page.noscript)}</noscript>`]),
+        ...(page.conditional === null ? [] : [`<!--[if lt IE 5]><p>${escapeHtml(page.conditional)}</p><![endif]-->`]),
+        ...(page.farRight.length === 0 ? [] : [`<table width="6000" border="0"><tr><td align="right">${face(page.farRight.map(escapeHtml).join('<br>'))}</td></tr></table>`]),
         ...(page.belowFold.length === 0 ? [] : ['<br>'.repeat(60), '<center>', ...page.belowFold.map(font), '</center>']),
         ...page.comments.map((comment) => `<!-- ${comment.replaceAll('-->', '--&gt;')} -->`),
         '</body>',

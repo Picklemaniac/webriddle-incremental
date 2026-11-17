@@ -24,7 +24,9 @@ export const levelStyle = '*{box-sizing:border-box}html,body{height:100%}' +
     '.swatches{display:flex;justify-content:center;gap:8px;margin-top:16px}.swatches span{width:26px;height:26px;border:1px solid #555}p{margin:16px 0 0;white-space:nowrap}p+p{margin-top:6px}.hidden{color:#000}a{color:#fff}::selection{background:#3459b1;color:#fff}' +
     '.drawing img{display:block;max-width:100%;height:auto;margin:0 auto;image-rendering:pixelated}.drawing img.squashed{height:3px}audio{display:block;width:300px;height:32px;margin:0 auto;color-scheme:dark}' +
     '.picture .over{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;background:#000;opacity:0}.picture:hover .over{opacity:1}' +
-    '.far{position:absolute;left:0;right:0;top:300vh;padding-bottom:16px}.grid{margin:16px 0 0;font:13px/1.05 "Courier New",monospace;color:#bbb}.spot{position:absolute;display:block}';
+    '.far{position:absolute;left:0;right:0;top:300vh;padding-bottom:16px}.grid{margin:16px 0 0;font:13px/1.05 "Courier New",monospace;color:#bbb}.spot{position:absolute;display:block}' +
+    '.right{position:absolute;left:400vw;top:40%;padding-right:16px}.unseen{display:none}marquee{display:block;margin-top:16px}select{font:13px Tahoma,Arial,sans-serif}' +
+    '.boxes{margin-top:16px;line-height:1}.boxes input{margin:1px 2px;pointer-events:none;accent-color:#c0c0c0}';
 
 export const imageStyle = `*{box-sizing:border-box}body{margin:8px;background:#000}img{display:block;width:${pictureWidth}px;image-rendering:pixelated}.picture{width:${pictureWidth + 4}px}${pictureStyle}`;
 

@@ -52,6 +52,12 @@ export const salts = {
     gridLetter: 2400,
     gridFiller: 2500,
     boldFiller: 2600,
+    keyPlace: 31,
+    keyLayer: 32,
+    half: 33,
+    thirdFiller: 2700,
+    diagonalFiller: 2800,
+    coverFiller: 2900,
 } as const;
 
 export const firstYear = 1000;

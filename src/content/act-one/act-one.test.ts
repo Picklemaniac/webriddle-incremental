@@ -5,8 +5,9 @@ import { createInitialState } from '../../core/state.ts';
 import { parseSave, serializeSave } from '../../persistence/save.ts';
 import { actOneContent } from './index.ts';
 import { glyphRows } from './drawings.ts';
-import { encode } from './encodings.ts';
+import { decode } from './encodings.ts';
 import { entrance, entranceAction, firstGeneratedLevel, levelPage, ruleWordRanks, urlOfLevel } from './levels.ts';
+import type { Step } from './methods.ts';
 import { handcraftedAnswerWords, latinWords } from './word-lists.ts';
 import { canonicalUrl } from './pages.ts';
 import { hallOfFameUrl, hintsUrl, riddleHomeUrl, rulesUrl, salts, unitHash } from './riddle.ts';
@@ -116,12 +117,13 @@ describe('Act I', () => {
             const next = entrance(level + 1);
             if (next.clue.method !== 'earlierAnswers') continue;
             const page = levelPage(level);
-            const texts = [page.title, ...page.lines, ...page.comments, page.farComment, page.hiddenText, page.imageTitle, ...page.belowFold, page.meta, page.imageNote, page.zipped, page.attribute,
+            const texts = [page.title, ...page.lines, ...page.comments, page.farComment, page.hiddenText, page.imageTitle, ...page.belowFold, ...page.farRight, page.meta, page.imageNote, page.zipped,
+                page.attribute, page.altText, page.statusText, page.marquee, page.hiddenField, page.unseen, page.noscript, page.conditional, page.scriptVariable, page.options.join(' '),
                 ...page.files.map((file) => ('text' in file.content ? file.content.text : 'page' in file.content ? file.content.page : ''))].join(' ');
             const references = texts.match(/\d+(?::\d+)?(?: \d+(?::\d+)?){2,}/)![0].split(' ').map((reference) => reference.split(':').map(Number));
             expect(references.every(([earlier]) => earlier! < level), `level ${level}`).toBe(true);
             const spelled = references.map(([earlier, position]) => entrance(earlier!).answer[(position ?? 1) - 1]).join('');
-            expect([next.answer, encode(next.answer, 'reversed'), encode(next.answer, 'atbash'), encode(next.answer, 'rot13')], `level ${level}`).toContain(spelled);
+            expect(undone(spelled, next.clue.parts![0]!.ciphers), `level ${level}`).toBe(next.answer);
             checked++;
         }
         expect(checked).toBeGreaterThan(5);
@@ -133,13 +135,13 @@ describe('Act I', () => {
         for (const level of generatedLevels()) {
             const next = entrance(level + 1);
             const page = levelPage(level);
-            const readings = layerReadings(next.answer);
+            const ciphers = next.clue.parts?.[0]?.ciphers ?? [];
             if (page.spans.length > 0) {
-                expect(readings, `level ${level}`).toContain([...page.spans].sort((first, second) => first.order - second.order).map((span) => span.letter).join(''));
+                expect(undone([...page.spans].sort((first, second) => first.order - second.order).map((span) => span.letter).join(''), ciphers), `level ${level}`).toBe(next.answer);
                 spans++;
             }
-            if (page.grid.length > 0) {
-                expect(readings, `level ${level}`).toContain(readGrid(page.grid));
+            if (next.clue.method === 'letterGrid') {
+                expect(undone(readGrid(page.grid), ciphers), `level ${level}`).toBe(next.answer);
                 grids++;
             }
         }
@@ -153,7 +155,8 @@ describe('Act I', () => {
             const next = entrance(level + 1);
             const page = levelPage(level);
             const method = next.clue.method ?? '';
-            const readings = layerReadings(next.answer);
+            // Reading spacer widths as letters undoes the letter numbers, and reading the base64 undoes that: the ciphers under them are what is left.
+            const ciphers = (next.clue.parts?.[0]?.ciphers ?? []).slice(method === 'spacers' || method === 'caselessBase64' ? 1 : 0);
             const capitals = new Set((page.comments[0] ?? '').split(' ').map(Number));
             const reading = {
                 spacers: () => page.spacers.map((width) => String.fromCharCode(96 + width)).join(''),
@@ -163,7 +166,7 @@ describe('Act I', () => {
                 caselessBase64: () => atob([...page.lines.filter((line) => /^[a-z0-9+/=]+$/.test(line)).join('')].map((character, index) => (capitals.has(index + 1) ? character.toUpperCase() : character)).join('')),
             }[method];
             if (reading === undefined) continue;
-            expect(readings, `level ${level} (${method})`).toContain(reading());
+            expect(undone(reading(), ciphers), `level ${level} (${method})`).toBe(next.answer);
             seen.add(method);
         }
         expect([...seen].sort()).toEqual(['boldLetters', 'caselessBase64', 'fakeTags', 'interleaved', 'spacers']);
@@ -184,7 +187,7 @@ describe('Act I', () => {
             const target = entrance(index + 1);
             return [target.url, target.kind, target.answer, target.clue.method ?? ''];
         });
-        expect(createHash('sha256').update(JSON.stringify(levels)).digest('hex')).toMatchInlineSnapshot(`"0b5c85bc91c208459e257bc9e7342036cf8de3fa8519b8f90a6dd1b17f3e4ead"`);
+        expect(createHash('sha256').update(JSON.stringify(levels)).digest('hex')).toMatchInlineSnapshot(`"b59d2f02471976cb2fa8c72eaaa5242a1fa39326e864aec251acc7d5734e4352"`);
     });
 
     it('lists every handcrafted answer for the vocabulary build', () => {
@@ -214,14 +217,14 @@ describe('Act I', () => {
     });
 
     it('draws encoded text instead of the answer in letter pictures', () => {
-        const letterPictures = new Set(['plain', 'mirror', 'rotated', 'dark', 'transparent', 'flash', 'delayed']);
+        const letterPictures = new Set(['plain', 'mirror', 'rotated', 'dark', 'transparent', 'flash', 'delayed', 'tiny', 'sideways']);
         let pictures = 0;
         for (const level of generatedLevels()) {
             const { clue, answer } = entrance(level);
             const text = clue.renamed ?? (clue.drawing !== undefined && letterPictures.has(clue.drawing.kind) ? clue.drawing.text : undefined);
             if (text === undefined) continue;
             expect(text, `level ${level}`).not.toBe(answer);
-            expect(layerReadings(answer).some((reading) => encode(reading, 'atbash') === text || encode(reading, 'rot13') === text || reading === text), `level ${level}`).toBe(true);
+            expect(undone(text, clue.parts![0]!.ciphers), `level ${level}`).toBe(answer);
             pictures++;
         }
         expect(pictures).toBeGreaterThan(20);
@@ -1260,9 +1263,9 @@ function withoutTimeAway(state: Game['state']): Game['state'] {
     return { ...state, statistics };
 }
 
-function layerReadings(answer: string): string[] {
-    const shifts = Array.from({ length: 25 }, (_, index) => answer.replace(/[a-z]/g, (letter) => String.fromCharCode(97 + ((letter.charCodeAt(0) - 97 + index + 1) % 26))));
-    return [answer, ...(['reversed', 'atbash', 'rot13'] as const).map((layer) => encode(answer, layer)), ...shifts];
+// A text with the ciphers of a clue taken off again, outermost first.
+function undone(text: string, ciphers: readonly Step[]): string {
+    return ciphers.reduce((current, step) => decode(current, step.cipher, step.unit, step.key), text);
 }
 
 function readGrid(grid: readonly string[]): string {
