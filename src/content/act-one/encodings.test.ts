@@ -59,7 +59,7 @@ describe('encodings', () => {
         ['primes', 'abz', '2 3 101'],
         ['squares', 'abz', '1 4 676'],
         ['romanLetters', 'abz', 'I II XXVI'],
-        ['spelledNumbers', 'az', 'one twenty-six'],
+        ['spelledNumbers', 'tau', 'twenty, one, twenty-one'],
         ['brailleDots', 'abc', '1 12 14'],
         ['ableBaker', 'ab', 'Able Baker'],
         ['kenny', 'abc', 'mmmmmpmmf'],

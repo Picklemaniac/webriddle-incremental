@@ -38,7 +38,25 @@ export const puzzleNames: Readonly<Record<string, string>> = {
     caselessBase64: 'Base64 in lower case, with the capital positions in a comment', utf16: 'Text read in the wrong encoding',
     sharesPicture: 'Two noise pictures that show the text when overlaid', delayedPicture: 'Picture that shows the text after a long wait',
     adfgvx: 'ADFGVX', pollux: 'Pollux', dvorak: 'Typed on a Dvorak keyboard', flashPicture: 'Picture that flashes the text for a moment',
-    layered: 'Two encodings on top of each other', phoneTones: 'Phone tones sound file', sum: 'A sum',
+    phoneTones: 'Phone tones sound file', sum: 'A sum',
+    tallyPicture: 'Tally marks picture (letter numbers)', ableBaker: 'Able Baker alphabet', primes: 'Prime numbers (A = 2, B = 3, C = 5)',
+    tapePicture: 'Morse code on a telegraph tape picture', spelledNumbers: 'Letter numbers written out in words', romanLetters: 'Letter numbers as Roman numerals',
+    ditDah: 'Morse code spoken as dit and dah', checkboxes: 'Rows of eight checkboxes (binary)', dominoesPicture: 'Dominoes picture (row and column in a six by six square)',
+    qwertyAlphabet: 'Alphabet in the order of the keyboard (A = Q, B = W)', morseBits: 'Morse code written with 0 and 1', letterChart: 'Grid as wide as the alphabet with one mark in each row',
+    sevenSegmentPicture: 'Hexadecimal on a seven-segment display picture', keypadTones: 'Phone keypad presses as tones in a sound file', hexEntities: 'HTML entities in hexadecimal',
+    knocks: 'Tap code as knocks in a sound file', swappedPairs: 'Neighbouring letters swapped', squares: 'Square numbers (A = 1, B = 4, C = 9)', everyThird: 'Every third letter of a line',
+    barcodePicture: 'Barcode picture (Code 39)', split: 'Two halves, each with its own encoding, in two places', gronsfeld: 'Gronsfeld, with a number as the key', base32: 'Base32',
+    tinyPicture: 'Very small picture of the text', quotedPrintable: 'Quoted-printable', trithemius: 'Trithemius (the shift grows by one with each letter)', brailleDots: 'Braille as dot numbers',
+    mayanPicture: 'Maya numerals picture (letter numbers)', polybius6: 'Six by six square with digits', kenny: 'Kenny language (m, p and f)', hexEscapes: 'Hexadecimal escapes (\\x68)',
+    scytale: 'Scytale (written in rows, read in columns)', blinkerPicture: 'Picture of a lamp that flashes Morse code', affine: 'Affine cipher, with the key written as a line',
+    sidewaysPicture: 'Picture of the text turned on its side', ternary: 'Base 3', baconFonts: 'Baconian cipher in the bold and plain letters of a text',
+    resistorsPicture: 'Resistor colour bands picture (letter codes)', keyedAlphabet: 'Alphabet that starts with a key word', unicodeEscapes: 'Unicode escapes (\\u0068)',
+    morseSwapped: 'Morse code with dots and dashes swapped', greysPicture: 'Grey squares picture (the shade is the letter code)', bitTones: 'Binary as low and high tones in a sound file',
+    octalEscapes: 'Octal escapes (\\150)', colemak: 'Typed on a Colemak keyboard', pulses: 'Letter numbers as dial pulses in a sound file',
+    diagonal: 'First letter of the first line, second letter of the second line, and so on', punchTapePicture: 'Five-hole punched tape picture (teleprinter code)', beaufort: 'Beaufort cipher',
+    baconCase: 'Baconian cipher in the capitals and small letters of a text', baudot: 'Teleprinter code (ITA2) in groups of five bits', whitespace: 'Spaces and tabs in a source comment (binary)',
+    columnar: 'Columnar transposition with a key word', ebcdic: 'EBCDIC codes', autokey: 'Autokey cipher', ascii85: 'Ascii85', punchCardPicture: 'Punched card picture',
+    uuencode: 'Uuencoded line', nihilist: 'Nihilist cipher', xor: 'XOR with a number', zeroWidth: 'Zero-width characters (binary)',
 };
 
 const openingPuzzles: Readonly<Record<number, string>> = {
@@ -110,6 +128,14 @@ export function levelTextDocument(): string {
         return [puzzleNames[method] ?? method, String(list[0]!.level), lines([...groups].flatMap(([group, where]) => variants(group, where))), exampleOf(list[0]!)];
     });
 
+    const combined = new Map<number, Survey[]>();
+    for (const survey of surveys) {
+        const count = thingsToUndo(survey.clue);
+        if (survey.level >= firstGeneratedLevel && count > 1) combined.set(count, [...(combined.get(count) ?? []), survey]);
+    }
+    const combinationRows = [...combined].sort(([first], [second]) => first - second)
+        .map(([count, list]) => [String(count), String(list[0]!.level), String(list.length), `Level ${list[0]!.level}: ${wayBack(list[0]!.clue)}`]);
+
     const places = new Map<string, Survey[]>();
     for (const survey of surveys) {
         if (survey.level < firstGeneratedLevel) continue;
@@ -137,6 +163,9 @@ export function levelTextDocument(): string {
         '## Puzzle types',
         'Every way a generated level can encode its answer, in the order they first appear, with the hints that go with it. The example is the first level that uses the puzzle.',
         table(['Puzzle', 'First level', 'Hints', 'Example'], puzzleRows),
+        '## Combinations',
+        'A clue can take more than one thing to undo: a picture of a code, a cipher under another cipher, or an answer in two halves. The example is the first level with that many, with what a solver undoes in order.',
+        table(['Things to undo', 'First level', 'Levels', 'Example'], combinationRows),
         '## Hiding places',
         'Where the encoded clue can end up on a page. Most puzzle types can use any of these.',
         table(['Place', 'First level', 'Levels', 'Hint'], placeRows),
@@ -202,6 +231,10 @@ function placesOf({ page, clue }: Survey): string[] {
         clue.meta !== undefined && 'Meta tag in the source', clue.stylesheet !== undefined && 'Comment in a linked .css file',
         clue.imageName !== undefined && !/\.\w+\.jpg$/.test(clue.imageName) && 'Name of the picture file', clue.imageNote !== undefined && 'Inside the picture file',
         clue.zipped !== undefined && 'Zip file stuck to the end of the picture', clue.attribute !== undefined && 'Unused attribute on the picture in the source',
+        clue.altText !== undefined && 'Alt text of the picture', clue.statusText !== undefined && 'Status bar, while pointing at the picture', clue.farRight !== undefined && 'Far to the right of the page',
+        clue.marquee !== undefined && 'Scrolling marquee', clue.unseen !== undefined && 'Element that is not displayed', clue.hiddenField !== undefined && 'Hidden form field',
+        clue.options !== undefined && 'Options of a drop-down list', clue.noscript !== undefined && 'Noscript block in the source', clue.scriptVariable !== undefined && 'Variable in a script in the source',
+        clue.anchor !== undefined && 'Name of an anchor in the source', clue.areaCoordinates !== undefined && 'Coordinates of an image map', clue.conditional !== undefined && 'Conditional comment in the source',
         ...page.files.map((file) => {
             switch (file.linked) {
                 case 'image': return { hidden: 'Picture at zero size, only in the source', rollover: 'Picture shown when pointing at the photo', squashed: 'Extra picture under the photo' }[file.display ?? 'squashed'];
@@ -223,6 +256,9 @@ function exampleOf({ level, clue }: Survey): string {
         ['title', clue.title !== undefined && !known.has(clue.title) ? clue.title : undefined], ['black text', clue.hiddenText], ['tooltip', clue.imageTitle],
         ['far below', clue.belowFold?.join(' ')], ['meta tag', clue.meta], ['.css comment', clue.stylesheet], ['picture name', clue.imageName !== undefined && !/\.\w+\.jpg$/.test(clue.imageName) ? clue.imageName : undefined],
         ['inside the picture', clue.imageNote], ['zip in the picture', clue.zipped], ['behind the invisible link', clue.hotspot], ['attribute', clue.attribute],
+        ['alt text', clue.altText], ['status bar', clue.statusText], ['far to the right', clue.farRight?.join(' ')], ['marquee', clue.marquee], ['not displayed', clue.unseen],
+        ['hidden field', clue.hiddenField], ['drop-down list', clue.options?.join(' ')], ['noscript', clue.noscript], ['script variable', clue.scriptVariable], ['anchor name', clue.anchor],
+        ['image map', clue.areaCoordinates?.join(',')], ['conditional comment', clue.conditional], ['checkboxes', clue.checkboxes?.join(' ')],
         ['letters', clue.spans?.map((span) => span.letter).join(' ')], ['line with bold letters as capitals', clue.emphasis?.map((line) => line.map((segment) => (segment.bold ? segment.text.toUpperCase() : segment.text)).join('')).join(' ')],
         ['tags', clue.tags?.join(' ')], ['spacer widths', clue.spacers?.join(' ')], ['colours', clue.colors?.join(' ')], ['first grid line', clue.grid?.[0]],
         ['picture', clue.drawing === undefined ? undefined : `${clue.drawing.kind} picture of "${clue.drawing.text}"`],
@@ -233,7 +269,18 @@ function exampleOf({ level, clue }: Survey): string {
     const found = candidates.find(([, text]) => text !== undefined && text !== '');
     if (found === undefined) return '—';
     const text = found[1]!;
-    return `Level ${level}, ${found[0]}: ${text.length > 48 ? `${text.slice(0, 45)}...` : text}`;
+    return `Level ${level}, ${found[0]}: ${text.length > 48 ? `${text.slice(0, 45)}...` : text}${thingsToUndo(clue) > 1 ? ` (${wayBack(clue)})` : ''}`;
+}
+
+// How many things a solver has to undo: reading a picture, a sound or a pattern is one, and so is each cipher. Two halves are two.
+function thingsToUndo(clue: Clue): number {
+    const parts = clue.parts ?? [];
+    return parts.length > 1 ? parts.length : (parts[0]?.reading === undefined ? 0 : 1) + (parts[0]?.ciphers.length ?? 0);
+}
+
+function wayBack(clue: Clue): string {
+    const named = (name: string): string => puzzleNames[name] ?? name;
+    return (clue.parts ?? []).map((part) => [...(part.reading === undefined ? [] : [named(part.reading)]), ...part.ciphers.map((step) => named(step.cipher))].join(', then ')).join('; and ');
 }
 
 function escapeRegExp(text: string): string {

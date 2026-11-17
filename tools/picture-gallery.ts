@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { drawPicture, type DrawingKind } from '../src/content/act-one/drawings.ts';
-import { characterColors } from '../src/content/act-one/encodings.ts';
+import { characterColors, encode, type Encoding } from '../src/content/act-one/encodings.ts';
 import { levelPage } from '../src/content/act-one/levels.ts';
 import { soundData, type Sound } from '../src/content/act-one/sounds.ts';
 import { lastLevel, puzzleNames } from './level-text.ts';
@@ -16,7 +16,11 @@ interface Item {
 
 const sampleWord = 'bridge';
 const alphabet = 'abcdefghijklmnopqrstuvwxyz';
-const alphabetKinds = new Set<DrawingKind>(['semaphore', 'clocks', 'pigpen', 'flags', 'braille']);
+const alphabetKinds = new Set<DrawingKind>(['semaphore', 'clocks', 'pigpen', 'flags', 'braille', 'tally', 'mayan', 'dominoes', 'punchTape', 'punchCard']);
+// The pictures that are drawn from a code and not from the letters: what they are given for a word.
+const codes: Partial<Record<DrawingKind, Encoding>> = {
+    tally: 'a1z26', mayan: 'a1z26', tape: 'morse', blinker: 'morse', dominoes: 'polybius6', sevenSegment: 'hex', greys: 'hex', resistors: 'ascii', punchTape: 'baudot',
+};
 const notes: Partial<Record<DrawingKind, string>> = {
     dark: 'Nearly black on purpose. You need to brighten it to read it.',
     transparent: 'Black text on a transparent background, so it disappears on the black page until you select it.',
@@ -24,9 +28,17 @@ const notes: Partial<Record<DrawingKind, string>> = {
     delayed: 'Animated. Blank for 21 seconds, then the text shows for 3.',
     shares: 'Overlay the two halves (difference blend) to read the text.',
     plain: 'On the page it is squashed to 3 pixels high. Opening the file shows it like this.',
+    tiny: 'Shown at its real size. Zoom in to read it.',
+    blinker: 'Animated. The lamp flashes the word in Morse code, waits, and starts again.',
+    dominoes: 'One tile for each letter: its row and its column in a square of six by six that holds the alphabet and the digits.',
+    sevenSegment: 'The codes of the letters in hexadecimal.',
+    resistors: 'Three bands for each letter: the digits of its code.',
+    greys: 'One square for each letter. Its shade is the code of the letter.',
+    punchTape: 'One column for each letter. The small holes are for the sprocket.',
+    punchCard: 'One column for each letter. The two rows at the top have no printed number.',
 };
 const kinds: readonly DrawingKind[] = ['gift', 'semaphore', 'clocks', 'pigpen', 'flags', 'braille', 'plain', 'mirror', 'rotated', 'dark', 'transparent',
-    'flash', 'delayed', 'pixels', 'bits', 'shares'];
+    'flash', 'delayed', 'pixels', 'bits', 'shares', 'tally', 'tape', 'dominoes', 'sevenSegment', 'barcode', 'mayan', 'resistors', 'punchTape', 'punchCard', 'blinker', 'greys', 'tiny', 'sideways'];
 
 const firstLevels = new Map<string, number>();
 let firstGrid: readonly string[] = [];
@@ -53,7 +65,11 @@ const items: Item[] = [
     })),
     sound('Morse sound', puzzleNames.morseSound!, { kind: 'morse', text: sampleWord }),
     sound('Phone tones', puzzleNames.phoneTones!, { kind: 'tones', text: '1066' }),
+    sound('Phone keypad sound', puzzleNames.keypadTones!, { kind: 'tones', text: encode(sampleWord, 'phone') }, 'One tone for each press of a key, with a pause between letters.'),
     sound('Spectrogram sound', puzzleNames.spectrogram!, { kind: 'spectrogram', text: sampleWord }, 'Open it in a program that shows a spectrogram, such as Audacity.'),
+    sound('Knocks sound', puzzleNames.knocks!, { kind: 'knocks', text: encode('bridge', 'tap') }, 'Two groups of knocks for each letter: its row and its column.'),
+    sound('Two tones sound', puzzleNames.bitTones!, { kind: 'bits', text: encode(sampleWord, 'binary') }, 'A low tone is a zero and a high tone is a one, eight for each letter.'),
+    sound('Dial pulses sound', puzzleNames.pulses!, { kind: 'pulses', text: encode(sampleWord, 'a1z26') }, 'The number of each letter, dialled digit by digit.'),
     {
         key: 'swatches', title: 'Colour swatches', usedBy: puzzleNames.swatches!, body: `<div class="swatches">${characterColors(sampleWord).map((color) => `<span style="background:${color}"></span>`).join('')}</div>`,
     },
@@ -84,8 +100,9 @@ await mkdir(new URL('../docs/', import.meta.url), { recursive: true });
 await writeFile(new URL('../docs/pictures.html', import.meta.url), html, 'utf8');
 console.log(`Wrote ${items.length} pictures and sounds to docs/pictures.html. With the dev server running, open http://127.0.0.1:5173/docs/pictures.html`);
 
-function image(kind: DrawingKind, text: string): string {
-    const picture = drawPicture({ kind, text });
+function image(kind: DrawingKind, word: string): string {
+    const code = codes[kind];
+    const picture = drawPicture({ kind, text: code === undefined ? word : encode(word, code) });
     return `<img src="${picture.src}" width="${picture.width}" height="${picture.height}" alt="">`;
 }
 

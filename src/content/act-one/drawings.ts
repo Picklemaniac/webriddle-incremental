@@ -56,6 +56,7 @@ const litSegments: Readonly<Record<string, string>> = {
 };
 const segmentBoxes: readonly (readonly [number, number, number, number])[] = [[2, 0, 8, 2], [10, 2, 2, 7], [10, 11, 2, 7], [2, 18, 8, 2], [0, 11, 2, 7], [0, 2, 2, 7], [2, 9, 8, 2]];
 const punchedCardRows: readonly string[] = ['12', '11', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+const fewestCardColumns = 16;
 const lampSeconds = 0.25;
 
 const painters: Readonly<Record<DrawingKind, (text: string) => Picture>> = {
@@ -294,10 +295,10 @@ function tally(numbers: string): Picture {
 // Morse code as a telegraph prints it on a paper strip.
 function tape(morse: string): Picture {
     const letters = morse.split(' ').filter((token) => token !== '/');
-    return tokenRow(letters, 72, 14, 5, (token) => {
+    return tokenRow(letters, 66, 14, 3, (token) => {
         let x = 4;
         return [...token].map((symbol) => {
-            const width = symbol === '-' ? 10 : 3;
+            const width = symbol === '-' ? 9 : 3;
             const mark = box(x, 5, width, 4, '#222222');
             x += width + 3;
             return mark;
@@ -379,10 +380,10 @@ function punchTape(codes: string): Picture {
 
 // An 80-column punched card, as wide as the text: a column for each character, with the zone rows at the top.
 function punchCard(text: string): Picture {
-    const width = text.length * 9 + 22;
+    const width = Math.max(text.length, fewestCardColumns) * 9 + 22;
     const height = punchedCardRows.length * 8 + 16;
     const rowY = (row: string): number => 9 + punchedCardRows.indexOf(row) * 8;
-    const printed = punchedCardRows.slice(2).flatMap((row) => [...text].map((_, column) =>
+    const printed = punchedCardRows.slice(2).flatMap((row) => Array.from({ length: Math.max(text.length, fewestCardColumns) }, (_, column) =>
         `<text x="${13.5 + column * 9}" y="${rowY(row) + 5}" font-family="Courier New, monospace" font-size="5" text-anchor="middle" fill="#b9ad8a">${row}</text>`));
     const holes = [...text].flatMap((character, column) => punchedRows(character).map((row) => box(11 + column * 9, rowY(row), 5, 6, ink)));
     const card = `<polygon points="8,0 ${width},0 ${width},${height} 0,${height} 0,8" fill="${paper}"/>`;

@@ -114,7 +114,7 @@ const ciphers: Readonly<Record<Encoding, Cipher>> = {
     primes: letterCode(alphabet, (index) => String(firstPrimes[index]), ' ', ' / '),
     squares: letterCode(alphabet, (index) => String((index + 1) ** 2), ' ', ' / '),
     romanLetters: letterCode(alphabet, (index) => toRomanNumerals(index + 1), ' ', ' / '),
-    spelledNumbers: letterCode(alphabet, (index) => numberWords[index]!, ' ', ' / '),
+    spelledNumbers: letterCode(alphabet, (index) => numberWords[index]!, ', ', ' / '),
     morse: morseCipher,
     morseBits: letterCode(squareGrid, (index) => morseAlphabet[squareGrid[index]!]!.replace(/\./g, '0').replace(/-/g, '1'), ' ', ' / '),
     morseSwapped: letterCode(squareGrid, (index) => morseAlphabet[squareGrid[index]!]!.replace(/[.-]/g, (symbol) => (symbol === '.' ? '-' : '.')), ' ', ' / '),
