@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { sandboxContent } from '../testing/sandbox.ts';
 import { backlogSeconds, incomePerSecond } from '../content/act-one/economy.ts';
 import { actOneContent } from '../content/act-one/index.ts';
+import { owns } from '../content/act-one/progress.ts';
 import { upgrades } from '../content/act-one/upgrades.ts';
 import { testContent } from '../testing/test-content.ts';
 import { Game } from '../core/game.ts';
 import { createInitialState, type GameState } from '../core/state.ts';
-import { actOneStrategy } from './act-one-strategy.ts';
+import { actOneStrategy, type PlayStyle } from './act-one-strategy.ts';
 import { AutoPlayer } from './auto-player.ts';
 import { withHabits } from './habits.ts';
 import { continuousActiveProfile, longBreaksProfile, playerProfiles, puristProfile, type PlayerProfile } from './profiles.ts';
@@ -98,6 +99,15 @@ describe('Act I pacing', () => {
         expect(milestoneTiming(report, 'level1000')?.activeSeconds).toBeLessThan(4 * 3600);
         expect(report.upgradesPurchased).toBeGreaterThanOrEqual(upgrades.length - 4);
     });
+
+    it('has a robot that goes for income first, which owns every pay card and every script card long before the attentive robot does', () => {
+        const secondsUntilEveryIncomeCard = (style: PlayStyle): number => {
+            const game = new Game(actOneContent, createInitialState(actOneContent, 1));
+            new AutoPlayer(actOneStrategy(4, style)).playUntil(game, () => owns(game.state, 'helpdeskManager') && owns(game.state, 'serverRack'), 4 * 3600);
+            return game.state.elapsedSeconds;
+        };
+        expect(secondsUntilEveryIncomeCard('earner')).toBeLessThan(secondsUntilEveryIncomeCard('attentive') * 0.75);
+    }, 20_000);
 
     it('lets DirBuster keep going during long breaks without paying for a backlog of upgrades', () => {
         const report = simulatePlayer(longBreaksProfile, actOneContent, { days: 3, seed: 1, stepSeconds: 1 });

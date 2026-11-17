@@ -13,6 +13,7 @@
         "test:watch": "vitest",
         "simulate": "node tools/simulate.ts",
         "balance": "node tools/balance-report.ts",
+        "audit": "node tools/experience-audit.ts",
         "export-text": "node tools/export-text.ts",
         "gallery": "node tools/level-gallery.ts",
         "pictures": "node tools/picture-gallery.ts",

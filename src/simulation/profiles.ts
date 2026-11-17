@@ -47,6 +47,11 @@ export const continuousActiveProfile: PlayerProfile = {
     name: 'continuous active', dailySessions: [{ startHour: 18, durationMinutes: 360 }], strategy: actOneStrategy(4),
 };
 
+// A player who goes for income first. The pacing targets are checked against the continuous active profile, and this one is printed next to it.
+export const earnerProfile: PlayerProfile = {
+    name: 'earner', dailySessions: [{ startHour: 18, durationMinutes: 360 }], strategy: actOneStrategy(4, 'earner'),
+};
+
 export const handsOffProfile: PlayerProfile = {
     name: 'hands off', dailySessions: [{ startHour: 18, durationMinutes: 360 }], strategy: actOneStrategy(4, 'handsOff'),
 };

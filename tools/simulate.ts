@@ -1,7 +1,7 @@
 import { gameContent } from '../src/content/index.ts';
 import { formatDuration } from '../src/format.ts';
 import { assessActOnePacing } from '../src/simulation/pacing.ts';
-import { continuousActiveProfile, handsOffProfile, longBreaksProfile, playerProfiles, puristProfile } from '../src/simulation/profiles.ts';
+import { continuousActiveProfile, earnerProfile, handsOffProfile, longBreaksProfile, playerProfiles, puristProfile } from '../src/simulation/profiles.ts';
 import { formatReports } from '../src/simulation/report.ts';
 import { milestoneTiming, simulatePlayer } from '../src/simulation/simulation.ts';
 import { readArgument } from './shared.ts';
@@ -12,7 +12,7 @@ const seeds = (readArgument('--seeds') ?? readArgument('--seed') ?? '1').split('
     if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) throw new Error('Seeds must be integers between 0 and 4294967295.');
     return seed;
 });
-const availableProfiles = [...playerProfiles, longBreaksProfile, continuousActiveProfile, handsOffProfile, puristProfile];
+const availableProfiles = [...playerProfiles, longBreaksProfile, continuousActiveProfile, earnerProfile, handsOffProfile, puristProfile];
 const selectedName = readArgument('--profile');
 const aliases: Readonly<Record<string, string>> = { continuous: 'continuous active', away: 'away often', breaks: 'long breaks', handsoff: 'hands off' };
 const profiles = selectedName === undefined ? availableProfiles : availableProfiles.filter((profile) => profile.name === (aliases[selectedName] ?? selectedName));

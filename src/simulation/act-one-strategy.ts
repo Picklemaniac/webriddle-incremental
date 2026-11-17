@@ -11,7 +11,19 @@ import type { Game } from '../core/game.ts';
 import { canAfford } from '../core/purchasing.ts';
 import type { Strategy } from './strategies.ts';
 
-export type PlayStyle = 'attentive' | 'handsOff' | 'purist';
+export type PlayStyle = 'attentive' | 'earner' | 'handsOff' | 'purist';
+
+// How a robot weighs levels against money.
+interface Leaning {
+    // More pay and more scripts are bought before anything else.
+    readonly investsFirst: boolean;
+    // The share of the scripts with a job that always close tickets.
+    readonly steadyTicketShare: number;
+    readonly lookaheadLevels: number;
+    readonly rentShareWhileSaving: number;
+    // Addresses are rented for at least this many searching scripts, also when fewer search.
+    readonly roomyScripts: number;
+}
 
 interface DecisionMemory { level: number; handSeconds: number; captchaSeconds: number }
 
@@ -22,13 +34,13 @@ const capacityStats: ReadonlySet<string> = new Set(['proxySlots', 'ownAddresses'
 // Cards that take a chore away. The robot does the chore for free, but a person would want them.
 const choreCards: ReadonlySet<string> = new Set(['proxyUptime', 'proxyChecker']);
 const searcherShare = 1 / 3;
+const firstPriority = 3;
 const urgentPriority = 2;
 const incomePriority = 1;
 // More pay and more scripts come before more speed: they are what pays for everything else.
 const investmentPriority = 1.5;
 // The robot holds a resource back for the nearest card that it can pay for within this time. A card that is further off does not stop it from buying others.
-const patienceSeconds: Readonly<Record<number, number>> = { [urgentPriority]: 300, [investmentPriority]: 600, [incomePriority]: 600 };
-const lookaheadLevels = 50;
+const patienceSeconds: Readonly<Record<number, number>> = { [firstPriority]: 600, [urgentPriority]: 300, [investmentPriority]: 600, [incomePriority]: 600 };
 const captchaSeconds = 12;
 const openingSolveSeconds: readonly number[] = [45, 60, 75, 60];
 const baseSolveSeconds = 100;
@@ -36,16 +48,19 @@ const solveSecondsPerRootLevel = 3;
 const stuckSearchSeconds = 180;
 const minimumIncomePerSecond = 0.001;
 const longestWaitSeconds = 3600;
-const savingRentShare = 0.4;
-const steadyTicketShare = 1 / 3;
 const burnSeconds = 300;
 const rentStepShare = 0.05;
-const roomyScripts = 6;
+const mostSearchersForRoom = 6;
 const pocketMoneySeconds = 30;
+// The attentive robot goes for levels: it keeps room under the limit to spare for the next speed card, and works towards cards that are still some levels off.
+const levelChaser: Leaning = { investsFirst: false, steadyTicketShare: 1 / 3, lookaheadLevels: 50, rentShareWhileSaving: 0.4, roomyScripts: 6 };
+// The earner goes for income: pay and scripts first, most scripts on tickets, and no more addresses than its searching scripts use.
+const earner: Leaning = { investsFirst: true, steadyTicketShare: 3 / 4, lookaheadLevels: 0, rentShareWhileSaving: 0.2, roomyScripts: 0 };
 
 export function actOneStrategy(decisionIntervalSeconds: number, style: PlayStyle = 'attentive'): Strategy {
     const memories = new WeakMap<Game, DecisionMemory>();
     const purist = style === 'purist';
+    const leaning = style === 'earner' ? earner : levelChaser;
     return {
         decisionIntervalSeconds,
         act(game) {
@@ -60,12 +75,12 @@ export function actOneStrategy(decisionIntervalSeconds: number, style: PlayStyle
             if (!purist && state.currentLevel >= automationLevel && !state.flags.automated) return game.dispatch({ type: 'automate' });
             let acted = false;
             if (state.flags.automated) {
-                const purchases = buyUpgrades(game);
+                const purchases = buyUpgrades(game, leaning);
                 acted = purchases.acted;
                 const activity = chooseActivity(game, purchases.offered);
                 if (activity !== undefined) acted = game.dispatch({ type: 'setActivity', activity }) || acted;
-                if (style === 'attentive') acted = chooseRent(game, purchases.offered) || acted;
-                acted = assignScripts(game) || acted;
+                if (style === 'attentive' || style === 'earner') acted = chooseRent(game, purchases.offered, leaning) || acted;
+                acted = assignScripts(game, leaning) || acted;
                 acted = replaceDeadProxies(game) || acted;
             }
             if ((purist || !state.flags.automated || isStuck(game)) && memory.handSeconds >= handSolveSeconds(state.currentLevel)) {
@@ -91,19 +106,21 @@ function decisionMemory(memories: WeakMap<Game, DecisionMemory>, game: Game, dec
     return memory;
 }
 
-function buyUpgrades(game: Game): { readonly acted: boolean; readonly offered: readonly Upgrade[] } {
+function buyUpgrades(game: Game, leaning: Leaning): { readonly acted: boolean; readonly offered: readonly Upgrade[] } {
     const { state } = game;
     const { missing } = currentSearch(game);
     // More room under the limit only matters once the robot would search with more scripts than fit.
     const wantsMoreRoom = Math.max(requestedRate(game), maximumSearchers(game) * requestsPerScript(game)) > networkCapacity(game);
     const hasRoomToSpare = maximumSearchers(game) * requestsPerScript(game) < networkCapacity(game);
     const priority = (item: Upgrade): number => {
-        if (missing.includes(item.id)) return urgentPriority;
         const stats = (item.modifiers?.(1) ?? []).map((modifier) => modifier.statId);
+        const invests = stats.some((statId) => investmentStats.has(statId));
+        if (invests && leaning.investsFirst) return firstPriority;
+        if (missing.includes(item.id)) return urgentPriority;
         if (stats.some((statId) => capacityStats.has(statId)) || capacityUpgrades.has(item.id)) return wantsMoreRoom ? urgentPriority : incomePriority;
         // A faster script is worth most while the limit has room that the robot's scripts cannot fill.
         if (stats.some((statId) => requestStats.has(statId))) return hasRoomToSpare ? urgentPriority : incomePriority;
-        if (stats.some((statId) => investmentStats.has(statId))) return investmentPriority;
+        if (invests) return investmentPriority;
         if (stats.some((statId) => incomeStats.has(statId)) || jobs.some((job) => job.unlockedBy === item.id)) return incomePriority;
         if (choreCards.has(item.id)) return incomePriority;
         return item.onNeed ? urgentPriority : 0;
@@ -126,7 +143,7 @@ function buyUpgrades(game: Game): { readonly acted: boolean; readonly offered: r
     return { acted, offered };
 }
 
-function chooseRent(game: Game, offered: readonly Upgrade[]): boolean {
+function chooseRent(game: Game, offered: readonly Upgrade[], leaning: Leaning): boolean {
     const { state } = game;
     const rentable = game.stat('rentableAddresses');
     if (rentable === 0) return false;
@@ -134,9 +151,9 @@ function chooseRent(game: Game, offered: readonly Upgrade[]): boolean {
     const income = incomePerSecond(game, 'money');
     // While a card on the list costs more money than the robot has, the rent stays a share of the pay. With nothing left to save for, all of it can go to addresses.
     const saving = offered.some((item) => (item.price.money ?? 0) > money);
-    const budget = saving ? income * savingRentShare : income + money / burnSeconds;
-    // A person keeps some room to spare. The robot keeps what the next speed card asks for: two scripts at three times the speed.
-    const useful = Math.max(maximumSearchers(game), roomyScripts) * requestsPerScript(game) / requestsPerAddress - game.stat('ownAddresses') - liveProxies(game);
+    const budget = saving ? income * leaning.rentShareWhileSaving : income + money / burnSeconds;
+    // A robot that keeps room to spare keeps what the next speed card asks for: two scripts at three times the speed.
+    const useful = Math.max(maximumSearchers(game), leaning.roomyScripts) * requestsPerScript(game) / requestsPerAddress - game.stat('ownAddresses') - liveProxies(game);
     const roomy = Math.ceil(useful);
     const target = Math.max(0, Math.min(rentable, Math.floor(budget / game.stat('addressRent')), roomy));
     // Small changes of the budget are not worth a move of the slider, but stopping a few addresses short of the room a speed card asks for is.
@@ -153,10 +170,10 @@ function requestsPerScript(game: Game): number {
 // The speed cards count on two scripts searching, so it searches with two as soon as it has a third script for a job.
 function maximumSearchers(game: Game): number {
     const slots = scriptSlots(game);
-    return Math.max(slots >= 3 ? 2 : 1, Math.ceil(slots * searcherShare), Math.min(roomyScripts, Math.floor(slots / 2)));
+    return Math.max(slots >= 3 ? 2 : 1, Math.ceil(slots * searcherShare), Math.min(mostSearchersForRoom, Math.floor(slots / 2)));
 }
 
-function assignScripts(game: Game): boolean {
+function assignScripts(game: Game, leaning: Leaning): boolean {
     const slots = scriptSlots(game);
     const scriptsToFillLimit = networkCapacity(game) / requestsPerScript(game);
     // With every address rented, a person who still has room under the limit fills it. The next block of addresses only comes to a player who does.
@@ -164,7 +181,7 @@ function assignScripts(game: Game): boolean {
     // Nothing says that more addresses would help until the scripts have run into the limit. A person finds that out with a script to spare, so before it has proxies the robot lets a second script search.
     const fewestSearchers = owns(game.state, 'freeProxies') ? 1 : 2;
     const searchers = Math.min(mostSearchers, Math.max(fewestSearchers, isThrottled(game) ? Math.ceil(scriptsToFillLimit) : Math.floor(scriptsToFillLimit)));
-    const targets = jobTargets(game, slots - searchers);
+    const targets = jobTargets(game, slots - searchers, leaning);
     let acted = false;
     for (const job of jobs) {
         if (!isJobUnlocked(game, job.id)) continue;
@@ -174,21 +191,21 @@ function assignScripts(game: Game): boolean {
     return acted;
 }
 
-function jobTargets(game: Game, free: number, keepsTickets = true): Record<JobId, number> {
+function jobTargets(game: Game, free: number, leaning: Leaning, keepsTickets = true): Record<JobId, number> {
     const { state } = game;
     const targets: Record<JobId, number> = { scraping: 0, ticketing: 0, riddles: 0 };
     const unlocked = jobs.filter((job) => isJobUnlocked(game, job.id));
     if (unlocked.length === 0 || free <= 0) return targets;
-    // The rent and most cards are paid from the pay, so a third of the job scripts always close tickets. The rest go where the next cards need them.
+    // The rent and most cards are paid from the pay, so a share of the job scripts always closes tickets. The rest go where the next cards need them.
     const ticketing = unlocked.find((job) => job.resource === 'money');
     if (keepsTickets && ticketing !== undefined) {
-        const steady = Math.floor(free * steadyTicketShare);
-        const others = jobTargets(game, free - steady, false);
+        const steady = Math.floor(free * leaning.steadyTicketShare);
+        const others = jobTargets(game, free - steady, leaning, false);
         return { ...others, [ticketing.id]: others[ticketing.id] + steady };
     }
     // What the robot works towards: the cards on its list, and the ones that a few more levels will put there.
     const goals = upgrades.filter((item) => !owns(state, item.id) && item.requires.every((required) => owns(state, required))
-        && (item.onNeed ? isNeeded(state, item.id) : item.level <= state.currentLevel + lookaheadLevels));
+        && (item.onNeed ? isNeeded(state, item.id) : item.level <= state.currentLevel + leaning.lookaheadLevels));
     const shortfall = (resource: string): number => Math.max(0, goals.reduce((sum, item) => sum + (item.price[resource] ?? 0), 0) - (state.resources[resource] ?? 0));
     const waits = unlocked.map((job) => shortfall(job.resource) / game.stat(job.rateStat));
     const total = waits.reduce((sum, wait) => sum + wait, 0);

@@ -43,6 +43,7 @@ const seenEvents: ReadonlySet<string> = new Set(['levelSolved', 'upgradeRevealed
 
 const players: readonly Player[] = [
     { name: 'attentive robot', habits: {} },
+    { name: 'income first', habits: {}, style: 'earner' },
     { name: 'never solves by hand', habits: { solvesByHand: false } },
     { name: 'looks every 30 seconds', habits: {}, reactionSeconds: 30 },
     { name: 'waits out every ban', habits: { captchaSeconds: null } },
@@ -189,7 +190,7 @@ if (logFile !== undefined) {
     process.exit();
 }
 const runs = reportPlayers();
-for (const name of ['attentive robot', 'casual']) {
+for (const name of ['attentive robot', 'income first', 'casual']) {
     const run = runs[players.findIndex((player) => player.name === name)]!;
     reportStaring(name, run.staring, run);
     reportPurchases(name, run);
