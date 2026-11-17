@@ -200,7 +200,7 @@ export function searchCapabilities(state: GameState): SearchCapabilities {
         cracked: owned('crackHtpasswd'),
         userAgent: owned('fakeUserAgent'),
         scriptsBlocked: (state.statistics.bans ?? 0) >= bansBeforeScriptsAreBlocked,
-        sizeFilter: owned('sizeFilter') || owned('ffuf'),
+        sizeFilter: owned('sizeFilter'),
     };
 }
 

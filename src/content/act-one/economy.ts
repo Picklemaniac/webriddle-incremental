@@ -87,10 +87,16 @@ export function isAway(state: GameState): boolean {
     return state.elapsedSeconds - (state.statistics.lastSeenAt ?? 0) > backlogSeconds;
 }
 
-export function incomePerSecond(game: Game, resource: string): number {
+export function incomeSources(game: Game, resource: string): { readonly fromActivity: number; readonly fromScripts: number; readonly scripts: number } {
     const activity = activities.find((candidate) => candidate.resource === resource && candidate.id === game.state.activity);
     const job = jobs.find((candidate) => candidate.resource === resource)!;
-    return (activity === undefined ? 0 : game.stat(activity.rateStat)) + assignedScripts(game, job.id) * game.stat(job.rateStat);
+    const scripts = assignedScripts(game, job.id);
+    return { fromActivity: activity === undefined ? 0 : game.stat(activity.rateStat), fromScripts: scripts * game.stat(job.rateStat), scripts };
+}
+
+export function incomePerSecond(game: Game, resource: string): number {
+    const { fromActivity, fromScripts } = incomeSources(game, resource);
+    return fromActivity + fromScripts;
 }
 
 export function incomeWhileEarning(game: Game, resource: string): number {

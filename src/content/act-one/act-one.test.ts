@@ -1209,7 +1209,7 @@ function automatedAt(level: number): Game {
     return game;
 }
 
-const alsoFixing: Readonly<Record<string, readonly string[]>> = { dirb: ['gobuster', 'ffuf'], sizeFilter: ['ffuf'], clusterBomb: ['crackHtpasswd'] };
+const alsoFixing: Readonly<Record<string, readonly string[]>> = { dirb: ['gobuster', 'ffuf'], clusterBomb: ['crackHtpasswd'] };
 const searchEngineCards: readonly string[] = ['dorking', 'indexCache', 'searchAlerts'];
 
 // A game with every upgrade, or with every upgrade except one and the others that would do its job.

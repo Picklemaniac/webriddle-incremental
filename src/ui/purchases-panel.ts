@@ -1,6 +1,7 @@
 import type { Game } from '../core/game.ts';
 import type { Modifier } from '../core/stats.ts';
 import { canAfford } from '../core/purchasing.ts';
+import { isJobUnlocked, jobs } from '../content/act-one/economy.ts';
 import { offeredUpgrades, upgrades, type Upgrade } from '../content/act-one/upgrades.ts';
 import { isUpgradeRevealed } from '../content/act-one/progress.ts';
 import { fill, labels, statText, uiText } from '../content/act-one/text.ts';
@@ -103,7 +104,9 @@ export class PurchasesPanel implements Panel {
     private effectText(item: Upgrade): string {
         const modifiers = item.modifiers?.(1) ?? [];
         const shownStats = new Set(modifiers.flatMap(({ statId }) => (requestStats.has(statId) ? [...(statId === 'threadsPerScript' ? [statId] : []), 'requestRate'] : [statId])));
-        const lines = [...shownStats].flatMap((statId) => {
+        // What a script earns in a job is left out until a script can have that job.
+        const lockedJobStats = new Set(jobs.filter((job) => !isJobUnlocked(this.game, job.id)).map((job) => job.rateStat));
+        const lines = [...shownStats].filter((statId) => !lockedJobStats.has(statId)).flatMap((statId) => {
             const text = statLabels[statId];
             if (text === undefined) return [];
             const value = (extra: readonly Modifier[]): string => fill(text.value, { value: statNumber(statId, this.statValue(statId, extra)) });

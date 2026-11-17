@@ -13,7 +13,7 @@ import { encodeExport, serializeSave } from '../src/persistence/save.ts';
 import { AutoPlayer } from '../src/simulation/auto-player.ts';
 import { actOneStrategy } from '../src/simulation/act-one-strategy.ts';
 import { upgrades } from '../src/content/act-one/upgrades.ts';
-import { handcraftedText } from '../src/content/act-one/text.ts';
+import { handcraftedText, statText as statLabels } from '../src/content/act-one/text.ts';
 import { formatRate } from '../src/ui/amounts.ts';
 
 const origin = process.env.WEBRIDDLE_TEST_URL ?? 'http://127.0.0.1:5173';
@@ -209,6 +209,15 @@ try {
     assert.equal(await evaluate(`document.querySelector('.resource-action').closest('.resource-row').hidden`), false);
     await screenshot('first-money');
 
+    const beforeTickets = new Game(actOneContent, createInitialState(actOneContent, 7));
+    new AutoPlayer(actOneStrategy(4)).playUntil(beforeTickets, () => beforeTickets.state.flags['seen:typingCourse'] === true, 1800);
+    assert.equal(beforeTickets.state.purchases.autoReplyMacros, undefined);
+    await importGame(beforeTickets);
+    assert.ok(!(await tooltipOf('typingCourse')).includes(statLabels.ticketBotRate.label), 'A pay card does not speak of ticket scripts before there are any');
+    beforeTickets.state.purchases.autoReplyMacros = 1;
+    await importGame(beforeTickets);
+    assert.ok((await tooltipOf('typingCourse')).includes(statLabels.ticketBotRate.label));
+
     const game = new Game(actOneContent, createInitialState(actOneContent, 7));
     const player = new AutoPlayer(actOneStrategy(4));
     player.playUntil(game, () => game.state.currentLevel >= 220, 18000);
@@ -218,13 +227,16 @@ try {
     await importGame(game);
     await sleep(900);
     await screenshot('working');
+    assert.match(await evaluate(`[...document.querySelectorAll('.resource-row')].find((row) => row.firstElementChild.textContent === 'Money').firstElementChild.title`), /\d+ scripts?: \+\$[\d.]+\/s/, 'The Money row says where the money comes from');
     await setSlider('Rented IPs', 0);
     await waitFor(`${sliderText('Rented IPs')}.startsWith('0 of ')`);
     assert.equal(await evaluate(statText('Rent')), '$0/s');
     assert.equal(await evaluate(`document.querySelector('.throttle-switch').textContent`), 'On');
     assert.equal(await evaluate(`document.querySelector('.stat-row .over-limit')`), null, 'Throttle keeps the scripts under the server limit');
+    assert.match(await evaluate(`document.querySelector('.throttle-note').textContent`), /^[\d,]+\/s held back$/, 'The Throttle row says what it holds back');
     await evaluate(`document.querySelector('.throttle-switch').click()`);
     await waitFor(`document.querySelector('.throttle-switch').textContent === 'Off' && document.querySelector('.stat-row .over-limit') !== null`);
+    assert.equal(await evaluate(`document.querySelector('.throttle-note').textContent`), '');
     await evaluate(`document.querySelector('.throttle-switch').click()`);
     await waitFor(`document.querySelector('.throttle-switch').textContent === 'On' && document.querySelector('.stat-row .over-limit') === null`);
     await setSlider('Rented IPs', 8);
@@ -470,6 +482,15 @@ function statValue(label) {
 
 function statNumber(label) {
     return `Number(${statText(label)}.replace(/[^0-9]/g, ''))`;
+}
+
+async function tooltipOf(upgradeId) {
+    const card = `document.querySelector('.upgrade-card[data-upgrade="${upgradeId}"]')`;
+    await evaluate(`${card}.dispatchEvent(new MouseEvent('mouseenter'))`);
+    await waitFor(`!document.querySelector('.win-tooltip').hidden`);
+    const text = await evaluate(`document.querySelector('.win-tooltip').textContent`);
+    await evaluate(`${card}.dispatchEvent(new MouseEvent('mouseleave'))`);
+    return text;
 }
 
 async function setSlider(label, value) {

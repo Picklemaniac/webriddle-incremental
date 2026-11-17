@@ -1,6 +1,6 @@
 import type { Game } from '../core/game.ts';
 import {
-    activities, activityRate, assignedScripts, backlogSeconds, dirbustingScripts, incomePerSecond, isAway, isJobUnlocked, isResourceRevealed, scriptSlots, type ActivityId, type JobId,
+    activities, activityRate, assignedScripts, backlogSeconds, dirbustingScripts, incomePerSecond, incomeSources, isAway, isJobUnlocked, isResourceRevealed, scriptSlots, type ActivityId, type JobId,
 } from '../content/act-one/economy.ts';
 import {
     addressCount, effectiveRate, isBanned, isThrottled, liveProxies, networkCapacity, ownAddress, rentedBlocks, rentedInUse, rentPerSecond, requestedRate, requestsPerAddress, wifiAddress,
@@ -13,7 +13,7 @@ import { formatRate, formatValue } from './amounts.ts';
 import { createButton, createElement, createSlider, section, setText } from './dom.ts';
 import type { Panel } from './panel.ts';
 
-interface ResourceRow { element: HTMLElement; value: HTMLElement; rate: HTMLElement; button: HTMLButtonElement; yield: HTMLElement; activity: ActivityId }
+interface ResourceRow { element: HTMLElement; name: HTMLElement; value: HTMLElement; rate: HTMLElement; button: HTMLButtonElement; yield: HTMLElement; activity: ActivityId }
 interface WorkerRow { element: HTMLElement; count: HTMLElement; minus: HTMLButtonElement; plus: HTMLButtonElement }
 interface StatRow { readonly row: HTMLElement; readonly value: HTMLElement }
 interface SliderRow extends StatRow { readonly slider: HTMLInputElement }
@@ -43,7 +43,8 @@ export class StatusPanel implements Panel {
     private readonly status = addStat(this.networkElement, labels.heat);
     private readonly heat = createElement('div', { className: 'heat-fill' });
     private readonly throttle = createButton('', () => this.game.dispatch({ type: 'setThrottle', enabled: !isThrottled(this.game) }), 'throttle-switch');
-    private readonly throttleRow = createElement('div', { className: 'stat-row' }, [createElement('span', { text: labels.throttle }), this.throttle]);
+    private readonly heldBack = createElement('span', { className: 'muted throttle-note' });
+    private readonly throttleRow = createElement('div', { className: 'stat-row' }, [createElement('span', { text: labels.throttle }), this.heldBack, this.throttle]);
     private readonly proxySummary = createElement('span', { className: 'proxy-summary' });
     private readonly proxySummaryRow = createElement('div', { className: 'stat-row' }, [createElement('span', { text: uiText.proxies }), this.proxySummary]);
     private readonly proxyList = createElement('div');
@@ -61,10 +62,10 @@ export class StatusPanel implements Panel {
             const yieldLabel = createElement('span', { className: 'action-yield' });
             const button = createButton('', () => game.dispatch({ type: 'setActivity', activity: activity.id }), 'resource-action');
             button.replaceChildren(createElement('span', { text: activityText[activity.id] }), yieldLabel);
-            const name = labels[activity.resource as 'insight' | 'money' | 'data'];
-            const row = createElement('div', { className: 'resource-row' }, [createElement('span', { text: name }), value, rate, button]);
+            const name = createElement('span', { text: labels[activity.resource as 'insight' | 'money' | 'data'] });
+            const row = createElement('div', { className: 'resource-row' }, [name, value, rate, button]);
             this.you.append(row);
-            this.resources.set(activity.resource, { element: row, value, rate, button, yield: yieldLabel, activity: activity.id });
+            this.resources.set(activity.resource, { element: row, name, value, rate, button, yield: yieldLabel, activity: activity.id });
         }
         this.scripts.append(createElement('div', { className: 'stat-row' }, [createElement('span', { text: labels.dirbusting }), this.bustingCount]));
         for (const [id, label] of [['riddles', labels.otherRiddles], ['ticketing', labels.ticketBot], ['scraping', labels.scraping]] as const) {
@@ -105,15 +106,25 @@ export class StatusPanel implements Panel {
         for (const [id, row] of this.resources) {
             row.element.hidden = !isResourceRevealed(game, id);
             setText(row.value, formatValue(id, game.state.resources[id] ?? 0));
-            const income = incomePerSecond(game, id) - (id === 'money' ? rentPerSecond(game) * game.state.network.rentShare : 0);
+            const rentPaid = id === 'money' ? rentPerSecond(game) * game.state.network.rentShare : 0;
+            const income = incomePerSecond(game, id) - rentPaid;
             const waiting = isAway(game.state) && incomePerSecond(game, id) > 0;
             setText(row.rate, waiting ? uiText.jobsWaiting : income === 0 ? '' : `${income > 0 ? '+' : '−'}${formatRate(id, Math.abs(income))}`);
             row.rate.classList.toggle('negative', !waiting && income < 0);
-            const help = waiting ? fill(uiText.jobsWaitingHelp, { minutes: backlogSeconds / 60 }) : '';
-            if (row.rate.title !== help) row.rate.title = help;
+            const help = waiting ? fill(uiText.jobsWaitingHelp, { minutes: backlogSeconds / 60 }) : this.incomeBreakdown(id, rentPaid);
+            for (const part of [row.name, row.value, row.rate]) if (part.title !== help) part.title = help;
             row.button.setAttribute('aria-pressed', String(game.state.activity === row.activity));
             setText(row.yield, formatRate(id, activityRate(game, row.activity)));
         }
+    }
+
+    private incomeBreakdown(resource: string, rentPaid: number): string {
+        const { fromActivity, fromScripts, scripts } = incomeSources(this.game, resource);
+        const lines: string[] = [];
+        if (fromActivity > 0) lines.push(fill(uiText.incomeFromYou, { rate: `+${formatRate(resource, fromActivity)}` }));
+        if (scripts > 0) lines.push(fill(scripts === 1 ? uiText.incomeFromScript : uiText.incomeFromScripts, { count: scripts, rate: `+${formatRate(resource, fromScripts)}` }));
+        if (rentPaid > 0) lines.push(fill(uiText.incomeToRent, { rate: `−${formatRate(resource, rentPaid)}` }));
+        return lines.join('\n');
     }
 
     private renderScripts(): void {
@@ -155,6 +166,8 @@ export class StatusPanel implements Panel {
         this.throttleRow.hidden = !owns(game.state, 'throttle');
         setText(this.throttle, isThrottled(game) ? uiText.on : uiText.off);
         this.throttle.setAttribute('aria-pressed', String(isThrottled(game)));
+        const heldBack = isThrottled(game) && !isBanned(game) ? requested - sent : 0;
+        setText(this.heldBack, heldBack > 0 ? fill(uiText.heldBack, { rate: formatNumber(heldBack) }) : '');
         this.renderRent();
     }
 
