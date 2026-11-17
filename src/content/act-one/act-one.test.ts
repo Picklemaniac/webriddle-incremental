@@ -710,7 +710,7 @@ describe('Act I', () => {
 
     it('offers a card from its level on, also when the player cannot pay for it yet', () => {
         const game = automatedAt(147);
-        for (const id of ['certification', 'seniorCertification']) game.state.purchases[id] = 1;
+        for (const id of ['certification', 'seniorCertification', 'secondLineSupport']) game.state.purchases[id] = 1;
         game.state.resources.money = 0;
         expect(offeredUpgrades(game).map((item) => item.id)).not.toContain('teamLead');
         game.state.currentLevel = 148;

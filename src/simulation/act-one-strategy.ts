@@ -133,8 +133,11 @@ function chooseRent(game: Game, offered: readonly Upgrade[]): boolean {
     const budget = saving ? income * savingRentShare : income + money / burnSeconds;
     // A person keeps some room to spare. The robot keeps what the next speed card asks for: two scripts at three times the speed.
     const useful = Math.max(maximumSearchers(game), roomyScripts) * requestsPerScript(game) / requestsPerAddress - game.stat('ownAddresses') - liveProxies(game);
-    const target = Math.max(0, Math.min(rentable, Math.floor(budget / game.stat('addressRent')), Math.ceil(useful)));
-    if (Math.abs(target - state.network.rentedAddresses) < Math.max(1, rentable * rentStepShare) && target !== rentable && target !== 0) return false;
+    const roomy = Math.ceil(useful);
+    const target = Math.max(0, Math.min(rentable, Math.floor(budget / game.stat('addressRent')), roomy));
+    // Small changes of the budget are not worth a move of the slider, but stopping a few addresses short of the room a speed card asks for is.
+    const settles = target === rentable || target === 0 || target === roomy;
+    if (Math.abs(target - state.network.rentedAddresses) < Math.max(1, rentable * rentStepShare) && !settles) return false;
     return game.dispatch({ type: 'setRentedAddresses', count: target });
 }
 

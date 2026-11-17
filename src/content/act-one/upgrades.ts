@@ -15,6 +15,8 @@ export interface Upgrade extends PurchasableDefinition {
 
 const multiply = (statId: string, value: number): Modifier => ({ statId, operation: 'multiply', value });
 const add = (statId: string, value: number): Modifier => ({ statId, operation: 'add', value });
+// The eight pay cards take the pay from 1 to 1.5, 2, 3, 4, 6, 8, 12 and 16 dollars a second.
+const payRise = (factor: number): Modifier[] => [multiply('workRate', factor), multiply('ticketBotRate', factor)];
 const requiredFindings: Partial<Record<UpgradeId, string>> = { crackHtpasswd: 'htpasswd' };
 // The later tools also look for folders, so dirb has nothing to add once one of them is owned.
 const supersededBy: Partial<Record<UpgradeId, readonly UpgradeId[]>> = { dirb: ['gobuster', 'ffuf'] };
@@ -50,7 +52,9 @@ export const upgrades: readonly Upgrade[] = [
     upgrade('otherRiddles', { insight: 20 }, 5),
     upgrade('wgetMirror', { insight: 20 }, 5),
     upgrade('autoReplyMacros', { insight: 20 }, 5),
-    upgrade('certification', { money: 210 }, 5, [], [multiply('workRate', 2), multiply('ticketBotRate', 2)]),
+    upgrade('typingCourse', { money: 120 }, 5, [], payRise(1.5)),
+    upgrade('certification', { money: 280 }, 5, ['typingCourse'], payRise(4 / 3)),
+    upgrade('nightShifts', { money: 700 }, 30, ['certification'], payRise(1.5)),
     upgrade('moreRam', { money: 150 }, 5, ['ram'], [add('scriptSlots', 1)]),
     whenUseful('freeProxies', { money: 80 }, 5, [], [add('proxySlots', 3)]),
     whenUseful('keepAlive', { insight: 30 }, 5, ['curlBatch'], [multiply('requestsPerThread', 2)]),
@@ -72,7 +76,8 @@ export const upgrades: readonly Upgrade[] = [
     whenUseful('rentedAddresses', { money: 400 }, 5, ['proxyPool'], [add('rentableAddresses', 8)]),
     whenUseful('leavePcOn', { money: 1000 }, 100),
     whenUseful('addressBlock', { money: 600 }, 5, ['rentedAddresses'], [add('rentableAddresses', 16), cheaperAddresses]),
-    upgrade('seniorCertification', { money: 1700 }, 70, ['certification'], [multiply('workRate', 2), multiply('ticketBotRate', 2)]),
+    upgrade('seniorCertification', { money: 1700 }, 70, ['nightShifts'], payRise(4 / 3)),
+    upgrade('secondLineSupport', { money: 3500 }, 110, ['seniorCertification'], payRise(1.5)),
     whenNeeded('extensionList', { insight: 80 }, 156),
     whenNeeded('dictWords', { data: 512 * kilobytes }, 160),
     upgrade('proxyChecker', { insight: 130, money: 1700 }, 130, ['proxyPool']),
@@ -84,7 +89,8 @@ export const upgrades: readonly Upgrade[] = [
     whenUseful('archives', { money: 800 }, 262, ['rssFeeds'], [multiply('scourRate', 2), multiply('scraperRate', 2)]),
     whenNeeded('scrabble', { data: 2 * megabytes }, 277),
     whenUseful('riddleForum', { money: 4000 }, 285, ['otherRiddles'], [multiply('riddleRate', 2), multiply('riddleBotRate', 2)]),
-    upgrade('teamLead', { money: 7000 }, 148, ['seniorCertification'], [multiply('workRate', 2), multiply('ticketBotRate', 2)]),
+    upgrade('teamLead', { money: 7000 }, 148, ['secondLineSupport'], payRise(4 / 3)),
+    upgrade('onCallBonus', { money: 15000 }, 190, ['teamLead'], payRise(1.5)),
     whenNeeded('mutationRules', { insight: 120 }, 300),
     whenNeeded('rockyou', { data: 1.25 * megabytes }, 300),
     whenUseful('webCrawler', { money: 7000 }, 320, ['archives'], [multiply('scourRate', 2), multiply('scraperRate', 2)]),
@@ -100,7 +106,7 @@ export const upgrades: readonly Upgrade[] = [
     whenUseful('secondLeasedRange', { money: 8000 }, 5, ['leasedRange'], [add('rentableAddresses', 256), cheaperAddresses]),
     upgrade('indexCache', { insight: 840, data: 10 * megabytes }, 205, ['dorking'], [add('searchFindShare', 0.04)]),
     whenNeeded('backupExtensions', { insight: 220 }, 450),
-    upgrade('helpdeskManager', { money: 30000 }, 230, ['teamLead'], [multiply('workRate', 2), multiply('ticketBotRate', 2)]),
+    upgrade('helpdeskManager', { money: 30000 }, 230, ['onCallBonus'], payRise(4 / 3)),
     whenNeeded('clusterBomb', { insight: 200, money: 3000 }, 515),
     upgrade('crackHtpasswd', { insight: 130 }, 258, ['clusterBomb']),
     whenNeeded('usernames', { data: 3 * megabytes }, 540),
