@@ -21,7 +21,6 @@ export class PurchasesPanel implements Panel {
     readonly element = section(labels.upgradesPanel);
     private readonly game: Game;
     private readonly cards = new Map<string, HTMLButtonElement>();
-    private readonly fills = new Map<string, HTMLElement>();
     private readonly leaving = new Map<string, number>();
     private readonly tooltip = createElement('div', { className: 'win-tooltip', attributes: { role: 'tooltip' } });
     private tooltipTimer: ReturnType<typeof setTimeout> | undefined;
@@ -37,9 +36,6 @@ export class PurchasesPanel implements Panel {
             const cost = Object.entries(item.price).map(([id, amount]) => formatAmount(id, amount)).join(', ');
             card.append(createElement('div', { className: 'upgrade-heading' }, [createElement('strong', { text: item.name }), createElement('span', { className: 'upgrade-cost', text: cost })]),
                 createElement('div', { className: 'upgrade-description', text: item.description }));
-            const fill = createElement('div', { className: 'upgrade-progress-fill' });
-            card.append(createElement('div', { className: 'upgrade-progress' }, [fill]));
-            this.fills.set(item.id, fill);
             for (const show of ['mouseenter', 'focus']) card.addEventListener(show, () => this.scheduleTooltip(item, card));
             for (const hide of ['mouseleave', 'blur']) card.addEventListener(hide, () => this.hideTooltip());
             this.cards.set(item.id, card);
@@ -71,9 +67,11 @@ export class PurchasesPanel implements Panel {
             const heldBack = card.hidden && (this.leaving.size > 0 || now < this.newCardsAfter);
             card.hidden = leaving ? false : !offered.has(item.id) || heldBack;
             card.disabled = leaving || !affordable || now < this.purchaseLockUntil;
-            card.classList.toggle('unaffordable', !affordable && !leaving);
+            // A card that has just been bought keeps the look it had when it was clicked while it fades.
+            const saving = !affordable && !leaving;
+            card.classList.toggle('unaffordable', saving);
             card.classList.toggle('leaving', leaving);
-            this.fills.get(item.id)!.style.width = `${affordable ? 0 : this.shareSaved(item) * 100}%`;
+            if (saving && !card.hidden) card.style.setProperty('--saved', `${this.shareSaved(item) * 100}%`);
         }
     }
 

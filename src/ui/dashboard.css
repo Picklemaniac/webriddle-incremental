@@ -31,10 +31,11 @@
 .dashboard .upgrade-card { --pad-y: 6px; --pad-x: 10px; min-height: 46px; white-space: normal; }
 .dashboard .upgrade-heading strong, .dashboard .upgrade-description { line-height: 15px; }
 .dashboard .upgrade-heading { flex-wrap: wrap; column-gap: 10px; row-gap: 4px; margin-bottom: 3px; }
-.dashboard .upgrade-card.unaffordable { color: #505050; text-shadow: none; }
+@property --saved { syntax: '<percentage>'; inherits: false; initial-value: 0%; }
+.dashboard .upgrade-card.unaffordable { color: #383838; text-shadow: none; background: linear-gradient(to right, #b4b4b4 var(--saved), #a0a0a0 var(--saved)); transition: --saved .25s linear; }
 .dashboard .upgrade-heading strong,
 .dashboard .upgrade-cost { white-space: nowrap; }
-.dashboard .upgrade-card.leaving { opacity: 0; transition: opacity .4s ease; }
+.dashboard .upgrade-card.leaving { color: #000; text-shadow: none; opacity: 0; transition: opacity .4s ease; }
 
 @media (max-width: 1150px) {
     .game-screen .dashboard {
