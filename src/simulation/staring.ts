@@ -15,7 +15,7 @@ export interface StaringBand {
 
 // A stretch this long with no moment in it counts as staring at the screen.
 export const staringStretchSeconds = 30;
-export const actOneStaringBands: readonly number[] = [5, 25, 50, 100, 250, 500, 1000];
+export const actOneStaringBands: readonly number[] = [5, 25, 50, 100, 250, 500];
 
 export class StaringMeter {
     private readonly moments: Moment[] = [];

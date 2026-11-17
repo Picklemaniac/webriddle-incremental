@@ -1,5 +1,5 @@
 import { actOneContent } from '../src/content/act-one/index.ts';
-import { entrance } from '../src/content/act-one/levels.ts';
+import { entrance, lastActOneLevel } from '../src/content/act-one/levels.ts';
 import { offeredUpgrades, upgrades } from '../src/content/act-one/upgrades.ts';
 import { canAfford } from '../src/core/purchasing.ts';
 import { isUpgradeRevealed, owns } from '../src/content/act-one/progress.ts';
@@ -38,7 +38,7 @@ const longestRunSeconds = 10 * 3600;
 const slowLevelSeconds = 240;
 const purchaseWindowSeconds = 600;
 const longPurchaseGapSeconds = 300;
-const marks: readonly number[] = [100, 500, 1000];
+const marks: readonly number[] = [100, 250, lastActOneLevel];
 const seenEvents: ReadonlySet<string> = new Set(['levelSolved', 'upgradeRevealed', 'notice', 'proxyDied', 'banned', 'unbanned']);
 
 const players: readonly Player[] = [
@@ -81,7 +81,7 @@ function play(player: Player): Run {
             lastSolveAt = elapsedSeconds;
         }
     });
-    while (game.state.currentLevel < 1000 && game.state.elapsedSeconds < longestRunSeconds) {
+    while (game.state.currentLevel < lastActOneLevel && game.state.elapsedSeconds < longestRunSeconds) {
         robot.playStep(game, 1);
         for (const mark of marks) if (reached[mark] === undefined && game.state.currentLevel >= mark) reached[mark] = game.state.elapsedSeconds;
         if (game.state.flags.automated !== true) continue;
@@ -106,7 +106,7 @@ function row(cells: readonly (string | number)[], widths: readonly number[]): st
 
 function reportPlayers(): readonly Run[] {
     const widths = [24, 9, 9, 9, 7, 6, 12, 20, 13, 9];
-    console.log(row(['player', 'L100', 'L500', 'L1000', 'cards', 'bans', 'longest wait', 'levels over 4 min', 'nothing to buy', 'money left'], widths));
+    console.log(row(['player', 'L100', 'L250', 'L500', 'cards', 'bans', 'longest wait', 'levels over 4 min', 'nothing to buy', 'money left'], widths));
     const runs: Run[] = [];
     for (const player of players) {
         const run = play(player);
@@ -114,7 +114,7 @@ function reportPlayers(): readonly Run[] {
         const time = (level: number): string => (run.reached[level] === undefined ? `L${run.game.state.currentLevel}` : formatDuration(run.reached[level]));
         const slowest = run.slowLevels.reduce((longest, entry) => Math.max(longest, entry.seconds), 0);
         console.log(row([
-            player.name, time(100), time(500), time(1000), run.purchaseTimes.length, run.bans, formatDuration(Math.max(0, ...purchaseGaps(run))),
+            player.name, time(100), time(250), time(lastActOneLevel), run.purchaseTimes.length, run.bans, formatDuration(Math.max(0, ...purchaseGaps(run))),
             run.slowLevels.length === 0 ? 'none' : `${run.slowLevels.length}, longest ${formatDuration(slowest)}`,
             formatDuration(run.nothingOnOffer), `$${formatNumber(run.game.state.resources.money ?? 0)}`,
         ], widths));

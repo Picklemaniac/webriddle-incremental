@@ -18,15 +18,9 @@ export function isUpgradeRevealed(state: GameState, purchasableId: string): bool
 }
 
 export function solveLevel(game: Game, method: SolveMethod): void {
-    reachLevel(game, game.state.currentLevel + 1, method);
-}
-
-// A page that a search engine has indexed can be several levels on. The levels before it are skipped, and their addresses stay unknown.
-export function reachLevel(game: Game, level: number, method: SolveMethod): void {
     const { state } = game;
     const previousUrl = urlOfLevel(state.currentLevel);
-    increment(state, 'levelsSkipped', level - state.currentLevel - 1);
-    state.currentLevel = level;
+    state.currentLevel += 1;
     state.search = { stage: 0, requestsSpent: 0, configuration: state.search.configuration };
     state.visitedLevels[urlOfLevel(state.currentLevel)] = state.currentLevel;
     state.statistics.lastSolveAt = state.elapsedSeconds;
@@ -63,6 +57,16 @@ export function isNeeded(state: GameState, purchasableId: string): boolean {
 
 export function markNeeded(state: GameState, purchasableId: string): void {
     state.flags[`needed:${purchasableId}`] = true;
+}
+
+// The level whose answer showed that a card was missing. The card carries that address.
+export function markLearned(state: GameState, purchasableId: string, level: number): void {
+    markNeeded(state, purchasableId);
+    state.statistics[`learnedAt:${purchasableId}`] ??= level;
+}
+
+export function levelLearnedAt(state: GameState, purchasableId: string): number | undefined {
+    return state.statistics[`learnedAt:${purchasableId}`];
 }
 
 export function owns(state: GameState, purchasableId: string): boolean {

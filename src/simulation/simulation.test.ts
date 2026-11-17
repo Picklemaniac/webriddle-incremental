@@ -10,11 +10,13 @@ import { createInitialState, type GameState } from '../core/state.ts';
 import { actOneStrategy, type PlayStyle } from './act-one-strategy.ts';
 import { AutoPlayer } from './auto-player.ts';
 import { withHabits } from './habits.ts';
-import { continuousActiveProfile, longBreaksProfile, playerProfiles, puristProfile, type PlayerProfile } from './profiles.ts';
+import { continuousActiveProfile, earnerProfile, longBreaksProfile, playerProfiles, puristProfile, type PlayerProfile } from './profiles.ts';
 import { assessActOnePacing } from './pacing.ts';
 import { milestoneTiming, simulatePlayer, type SimulationOptions } from './simulation.ts';
 
 const options: SimulationOptions = { days: 2, seed: 1, stepSeconds: 1 };
+// A robot buys about 65 of the cards before level 500. The rest are for the kinds of answers after it.
+const cardsBeforeTheWall = 60;
 
 function profileNamed(name: string): PlayerProfile {
     const profile = playerProfiles.find((candidate) => candidate.name === name);
@@ -86,18 +88,20 @@ describe('Act I pacing', () => {
         expect(simulatePlayer(continuousActiveProfile, actOneContent, options)).toEqual(simulatePlayer(continuousActiveProfile, actOneContent, options));
     });
 
-    it.each([1, 2, 3, 7, 19])('meets the continuous active targets and buys every upgrade with seed %i', (seed) => {
-        const report = simulatePlayer(continuousActiveProfile, actOneContent, { days: 1, seed, stepSeconds: 1 });
-        expect(assessActOnePacing(report).filter((check) => !check.passed)).toEqual([]);
-        expect(report.upgradesPurchased).toBeGreaterThanOrEqual(upgrades.length - 3);
-        expect(report.offlineProgressShare).toBe(0);
+    it.each([1, 2, 3, 7, 19])('meets the targets for the robot that goes for levels and for the one that goes for income, with seed %i', (seed) => {
+        for (const profile of [continuousActiveProfile, earnerProfile]) {
+            const report = simulatePlayer(profile, actOneContent, { days: 1, seed, stepSeconds: 1 });
+            expect(assessActOnePacing(report).filter((check) => !check.passed), profile.name).toEqual([]);
+            expect(report.upgradesPurchased, profile.name).toBeGreaterThanOrEqual(cardsBeforeTheWall);
+            expect(report.offlineProgressShare).toBe(0);
+        }
     });
 
-    it('still finishes in four hours for a player who moves the rent slider once in ten minutes at most', () => {
+    it('still reaches the wall in two and a half hours for a player who moves the rent slider once in ten minutes at most', () => {
         const profile = { ...continuousActiveProfile, strategy: withHabits(actOneStrategy(4), { rentEverySeconds: 600 }) };
         const report = simulatePlayer(profile, actOneContent, { days: 1, seed: 1, stepSeconds: 1 });
-        expect(milestoneTiming(report, 'level1000')?.activeSeconds).toBeLessThan(4 * 3600);
-        expect(report.upgradesPurchased).toBeGreaterThanOrEqual(upgrades.length - 4);
+        expect(milestoneTiming(report, 'level500')?.activeSeconds).toBeLessThan(2.5 * 3600);
+        expect(report.upgradesPurchased).toBeGreaterThanOrEqual(cardsBeforeTheWall - 5);
     });
 
     it('has a robot that goes for income first, which owns every pay card and every script card long before the attentive robot does', () => {
@@ -111,7 +115,7 @@ describe('Act I pacing', () => {
 
     it('lets DirBuster keep going during long breaks without paying for a backlog of upgrades', () => {
         const report = simulatePlayer(longBreaksProfile, actOneContent, { days: 3, seed: 1, stepSeconds: 1 });
-        expect(milestoneTiming(report, 'level1000')?.realSeconds).toBeLessThan(2 * 86400);
+        expect(milestoneTiming(report, 'level500')?.realSeconds).toBeLessThan(2 * 86400);
         expect(report.offlineProgressShare).toBeGreaterThan(0.2);
         const game = new Game(actOneContent, createInitialState(actOneContent, 1));
         new AutoPlayer(actOneStrategy(4)).playUntil(game, () => game.state.currentLevel >= 400, 3 * 3600);
@@ -136,8 +140,8 @@ describe('Act I pacing', () => {
     it('can reach the entire Act I wall by hand without requiring the automation milestone', () => {
         const profile = { ...puristProfile, dailySessions: [{ startHour: 0, durationMinutes: 16 * 60 }] };
         const report = simulatePlayer(profile, actOneContent, { days: 5, seed: 3, stepSeconds: 5 });
-        expect(report.finalLevel).toBe(1000);
-        expect(report.handSolves).toBe(999);
+        expect(report.finalLevel).toBe(500);
+        expect(report.handSolves).toBe(499);
         expect(report.upgradesPurchased).toBe(0);
         expect(report.offlineProgressShare).toBe(0);
     });

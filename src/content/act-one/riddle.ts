@@ -42,6 +42,7 @@ export const salts = {
     hintShown: 28,
     month: 29,
     day: 30,
+    phrase: 31,
     // Chosen so that the pages search engines find are spread evenly over the levels.
     indexed: 39,
     shuffle: 1000,

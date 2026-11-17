@@ -117,16 +117,16 @@ describe('Act I onboarding', () => {
         Object.assign(game.state.flags, { 'seen:curlBatch': true, insightRevealed: true, moneyRevealed: true });
         game.state.purchases.fakeUserAgent = 1;
         game.advance(60);
-        expect(isUpgradeRevealed(game.state, 'english10k')).toBe(false);
-        const isGuessed = (level: number): boolean => planSearch(level, searchCapabilities(game.state)).learns.includes('english10k');
+        expect(isUpgradeRevealed(game.state, 'oxford3000')).toBe(false);
+        const isGuessed = (level: number): boolean => planSearch(level, searchCapabilities(game.state)).learns.includes('oxford3000');
         const guessedLevel = Array.from({ length: 200 }, (_, index) => index + 30).find(isGuessed)!;
         game.state.currentLevel = guessedLevel - 1;
         let cardSecond: number | undefined;
         let second = 0;
         for (; second < 3600 && game.state.flags.dataRevealed !== true; second++) {
-            if (game.state.currentLevel < guessedLevel) expect(isUpgradeRevealed(game.state, 'english10k')).toBe(false);
+            if (game.state.currentLevel < guessedLevel) expect(isUpgradeRevealed(game.state, 'oxford3000')).toBe(false);
             game.advance(1);
-            if (cardSecond === undefined && isUpgradeRevealed(game.state, 'english10k')) cardSecond = second;
+            if (cardSecond === undefined && isUpgradeRevealed(game.state, 'oxford3000')) cardSecond = second;
         }
         expect(game.state.currentLevel).toBeGreaterThanOrEqual(guessedLevel);
         expect(game.state.flags.dataRevealed).toBe(true);

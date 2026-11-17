@@ -25,25 +25,28 @@ const allReports = seeds.flatMap((seed) => {
     return reports.map((report) => ({ seed, report }));
 });
 
-const continuousRuns = allReports.filter(({ report }) => report.profileName === continuousActiveProfile.name);
-if (continuousRuns.length > 0) {
-    const reached = continuousRuns.flatMap(({ seed, report }) => {
-        const timing = milestoneTiming(report, 'level1000');
+// The pacing targets are for the two robots that play all of Act I in one sitting.
+const checkedProfiles = [continuousActiveProfile, earnerProfile].filter((profile) => allReports.some(({ report }) => report.profileName === profile.name));
+for (const profile of checkedProfiles) {
+    const runs = allReports.filter(({ report }) => report.profileName === profile.name);
+    const reached = runs.flatMap(({ seed, report }) => {
+        const timing = milestoneTiming(report, 'level500');
         return timing === undefined ? [] : [{ seed, seconds: timing.activeSeconds }];
     }).sort((first, second) => first.seconds - second.seconds);
     if (reached.length > 0) {
         const best = reached[0]!;
         const worst = reached[reached.length - 1]!;
         const median = reached[Math.floor(reached.length / 2)]!;
-        console.log(`Continuous active, level 1000: fastest ${formatDuration(best.seconds)} (seed ${best.seed}), median ${formatDuration(median.seconds)}, slowest ${formatDuration(worst.seconds)} (seed ${worst.seed}).`);
+        console.log(`${profile.name}, level 500: fastest ${formatDuration(best.seconds)} (seed ${best.seed}), median ${formatDuration(median.seconds)}, slowest ${formatDuration(worst.seconds)} (seed ${worst.seed}).`);
     }
-    for (const { seed, report } of continuousRuns) {
+    for (const { seed, report } of runs) {
         const failures = assessActOnePacing(report).filter((check) => !check.passed);
-        console.log(`Pacing targets, seed ${seed}: ${failures.length ? failures.map((check) => `${check.name} [${check.actual ?? 'not reached'}]`).join('; ') : 'all passed'}.`);
+        console.log(`Pacing targets, ${profile.name}, seed ${seed}: ${failures.length ? failures.map((check) => `${check.name} [${check.actual ?? 'not reached'}]`).join('; ') : 'all passed'}.`);
         if (failures.length && process.argv.includes('--check')) process.exitCode = 1;
     }
-} else if (process.argv.includes('--check')) {
-    throw new Error('--check requires the continuous active profile (use --profile continuous or omit --profile).');
+}
+if (checkedProfiles.length === 0 && process.argv.includes('--check')) {
+    throw new Error('--check requires the continuous active or the earner profile (use --profile continuous, --profile earner or omit --profile).');
 }
 
 console.log('\nIdle stretch = no robot input. Progress gap = no solve, unlock, finding or meaningful intervention; activity switches do not reset it.');

@@ -4,11 +4,11 @@ import { currentSearch, dirbuster } from './automation.ts';
 import { answerCaptcha } from './captchas.ts';
 import { assignJob, isResourceRevealed, passiveIncome, setActivity } from './economy.ts';
 import { findingDrops, findingModifiers, findingsEnabled } from './findings.ts';
-import { entrance } from './levels.ts';
+import { entrance, lastActOneLevel } from './levels.ts';
 import { needs } from './needs.ts';
 import { isBanned, network, networkCapacity, rent, replaceProxy, requestedRate, setRentedAddresses, setThrottle, showsTheLimit } from './network.ts';
 import { canonicalUrl, resolvePage } from './pages.ts';
-import { automationElapsed, automationLevel, isNeeded, isUpgradeRevealed, owns, solveLevel } from './progress.ts';
+import { automationElapsed, automationLevel, increment, isNeeded, isUpgradeRevealed, owns, solveLevel } from './progress.ts';
 import { homeUrl, startUrl } from './riddle.ts';
 import { labels } from './text.ts';
 import { capacityUpgrades, offeredUpgrades, upgrades, type Upgrade } from './upgrades.ts';
@@ -49,14 +49,19 @@ const reveals: GameSystem = {
             state.flags.insightRevealed = true;
         } else if (!state.flags.moneyRevealed && owns(state, 'curlBatch')) {
             if (!revealWithCurrency(game, 'ram', 'moneyRevealed')) return;
-        } else if (!state.flags.dataRevealed && isNeeded(state, 'english10k')) {
-            if (!revealWithCurrency(game, 'english10k', 'dataRevealed')) return;
+        } else if (!state.flags.dataRevealed && neededDataCard(game) !== undefined) {
+            if (!revealWithCurrency(game, neededDataCard(game)!.id, 'dataRevealed')) return;
         } else if (!revealNextOffer(game, seconds)) {
             return;
         }
         reserveReveal(game);
     },
 };
+
+// Data comes on screen with the first card that costs it: the wordlist that an answer has shown to be missing.
+function neededDataCard(game: Game): Upgrade | undefined {
+    return upgrades.find((item) => item.price.data !== undefined && isNeeded(game.state, item.id) && !owns(game.state, item.id));
+}
 
 // With nothing left to buy, the next card does not wait for its usual turn.
 function listIsEmpty(game: Game): boolean {
@@ -154,14 +159,14 @@ export const actOneContent: GameContent = {
     startUrl,
     resources: [{ id: 'insight', name: labels.insight }, { id: 'money', name: labels.money }, { id: 'data', name: labels.data }],
     baseStats: { requestsPerThread: 2, threadsPerScript: 1, scriptSlots: 1, riddleRate: 0.3, workRate: 1, scourRate: 1024,
-        ticketBotRate: 0.7, riddleBotRate: 0.3, scraperRate: 1024, ownAddresses: 1, proxySlots: 0, proxyLifetime: 1, rentableAddresses: 0, addressRent: 0.16, searchFindShare: 0 },
+        ticketBotRate: 0.7, riddleBotRate: 0.3, scraperRate: 1024, ownAddresses: 1, proxySlots: 0, proxyLifetime: 1, rentableAddresses: 0, addressRent: 0.5 },
     purchasables: upgrades.map((item) => ({
         ...item, isAvailable: (state) => isUpgradeRevealed(state, item.id) && item.isAvailable(state),
     })),
     milestones: [
         { id: 'automated', name: 'Automate', isReached: (state) => state.flags.automated === true },
         { id: 'firstUpgrade', name: 'First upgrade', isReached: (state) => Object.keys(state.purchases).length > 0 },
-        ...[10, 50, 100, 200, 300, 500, 700, 1000].map((level) => ({ id: `level${level}`, name: `Level ${level}`, isReached: (state: Game['state']) => state.currentLevel >= level })),
+        ...[10, 50, 100, 200, 300, 400, lastActOneLevel].map((level) => ({ id: `level${level}`, name: `Level ${level}`, isReached: (state: Game['state']) => state.currentLevel >= level })),
     ],
     systems: [passiveIncome, rent, pacedNetwork, pacedFindings, needs, reveals, dirbuster],
     extraModifiers: findingModifiers,
@@ -186,7 +191,10 @@ export const actOneContent: GameContent = {
             case 'setThrottle': return setThrottle(game, action.enabled);
             case 'setRentedAddresses': return setRentedAddresses(game, action.count);
             case 'assignJob': return assignJob(game, action.jobId, action.change);
-            case 'replaceProxy': return replaceProxy(game, action.proxyIndex);
+            case 'replaceProxy':
+                if (!replaceProxy(game, action.proxyIndex)) return false;
+                increment(game.state, 'proxiesReplacedByHand');
+                return true;
             case 'answerCaptcha': return answerCaptcha(game, action.answer);
             case 'submitCredentials': {
                 const next = entrance(game.state.currentLevel + 1);

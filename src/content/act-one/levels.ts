@@ -77,6 +77,8 @@ interface HandcraftedEntrance {
 }
 
 export const firstGeneratedLevel = 11;
+// Up to here DirBuster can find every level. After it a growing share of the answers are phrases, which no wordlist has.
+export const lastActOneLevel = 500;
 const firstFolderLevel = 100;
 const commonWordShare = 0.25;
 const commonWordRanks = 300;
@@ -405,8 +407,9 @@ function wordPageName(level: number): string | null {
 }
 
 function chooseKind(level: number): GeneratedKind {
+    // A phrase takes the place of whatever the level would have been, so that the levels before the first phrase stay as they are.
+    if (unitHash(level, salts.phrase) < ramp(level, lastActOneLevel + 1, lastActOneLevel + 300, 0.15, 0.6)) return 'phrase';
     const weights: readonly (readonly [GeneratedKind, number])[] = [
-        ['phrase', ramp(level, 1000, 1300, 0.15, 0.6)],
         ['extension', ramp(level, 150, 400, 0.08, 0.14)],
         ['name', ramp(level, 250, 1000, 0.015, 0.03)],
         ['leet', ramp(level, 300, 600, 0.06, 0.1)],

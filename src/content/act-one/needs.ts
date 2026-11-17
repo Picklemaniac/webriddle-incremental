@@ -1,7 +1,7 @@
 import type { GameSystem } from '../../core/content.ts';
 import type { Game } from '../../core/game.ts';
 import { incomeWhileEarning } from './economy.ts';
-import { limitHoldsBack, networkCapacity, rentsEveryAddress } from './network.ts';
+import { limitHoldsBack, networkCapacity, rentedInUse, rentsEveryAddress } from './network.ts';
 import { increment, isNeeded, isUpgradeRevealed, markNeeded, owns } from './progress.ts';
 import type { UpgradeId } from './text.ts';
 import { offeredUpgrades, upgrades, type Upgrade } from './upgrades.ts';
@@ -23,6 +23,10 @@ const settledSeconds = 60;
 const shortOfRoomSeconds = 30;
 const withoutABanSeconds = 180;
 const proxyDeathsBeforeLongerLives = 6;
+const bansBeforeThrottle = 2;
+const replacementsBeforeChecker = 20;
+const addressesForResellers = 50;
+const addressesForVolume = 500;
 const longWaitSeconds = 180;
 
 // A faster script is only of use when the limit leaves room to run more than one of them.
@@ -35,6 +39,9 @@ const everyAddressIsInUse: Condition = (game) => rentsEveryAddress(game) && limi
 const proxiesKeepDying: Condition = (game) => (game.state.statistics.proxyDeaths ?? 0) >= proxyDeathsBeforeLongerLives;
 const stoppedWhileAway: Condition = (game) => game.state.flags.offlineCapReached === true;
 const hasBeenBanned: Condition = (game) => (game.state.statistics.bans ?? 0) > 0;
+const hasBeenBannedAgain: Condition = (game) => (game.state.statistics.bans ?? 0) >= bansBeforeThrottle;
+const hasReplacedManyProxies: Condition = (game) => (game.state.statistics.proxiesReplacedByHand ?? 0) >= replacementsBeforeChecker;
+const rentsAtLeast = (addresses: number): Condition => (game) => rentedInUse(game) >= addresses;
 // A card on screen costs more than the player has and would earn in the next few minutes.
 const shortOf = (resource: string): Condition => (game) => {
     const withinReach = (game.state.resources[resource] ?? 0) + incomeWhileEarning(game, resource) * longWaitSeconds;
@@ -64,6 +71,11 @@ const triggers: Readonly<Partial<Record<UpgradeId, Trigger>>> = {
     secondRegionalAllocation: whenEveryAddressIsInUse,
     thirdRegionalAllocation: whenEveryAddressIsInUse,
     proxyUptime: { holds: proxiesKeepDying },
+    // Relief comes after the chore: the switch that ends Heat after a second ban, and the checker after twenty proxies replaced by hand.
+    throttle: { holds: hasBeenBannedAgain },
+    proxyChecker: { holds: hasReplacedManyProxies },
+    resellerAccount: { holds: rentsAtLeast(addressesForResellers), forSeconds: settledSeconds },
+    volumeDiscount: { holds: rentsAtLeast(addressesForVolume), forSeconds: settledSeconds },
     keepAlive: whenTwoScriptsStillFit,
     isdn: whenTwoScriptsStillFit,
     threads8: whenTwoScriptsStillFit,

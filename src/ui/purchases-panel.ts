@@ -3,25 +3,26 @@ import type { Modifier } from '../core/stats.ts';
 import { canAfford } from '../core/purchasing.ts';
 import { isJobUnlocked, jobs } from '../content/act-one/economy.ts';
 import { offeredUpgrades, upgrades, type Upgrade } from '../content/act-one/upgrades.ts';
-import { isUpgradeRevealed } from '../content/act-one/progress.ts';
-import { fill, labels, statText, uiText } from '../content/act-one/text.ts';
+import { isUpgradeRevealed, levelLearnedAt } from '../content/act-one/progress.ts';
+import { fill, labels, statText, terminalText, uiText } from '../content/act-one/text.ts';
 import { formatBytes, formatNumber } from '../format.ts';
 import { formatAmount } from './amounts.ts';
-import { createButton, createElement, section } from './dom.ts';
+import { createButton, createElement, section, setText } from './dom.ts';
 import type { Panel } from './panel.ts';
 import { setupSeconds } from './setup-windows.ts';
+import { addressOfLevel } from './terminal-panel.ts';
 
 const statLabels: Readonly<Record<string, { readonly label: string; readonly value: string }>> = statText;
 const requestStats: ReadonlySet<string> = new Set(['threadsPerScript', 'requestsPerThread']);
 const moneyStats: ReadonlySet<string> = new Set(['workRate', 'ticketBotRate', 'addressRent']);
 const byteStats: ReadonlySet<string> = new Set(['scourRate', 'scraperRate']);
-const perHundredStats: ReadonlySet<string> = new Set(['searchFindShare']);
 const tooltipDelayMilliseconds = 350;
 
 export class PurchasesPanel implements Panel {
     readonly element = section(labels.upgradesPanel);
     private readonly game: Game;
     private readonly cards = new Map<string, HTMLButtonElement>();
+    private readonly evidence = new Map<string, HTMLElement>();
     private readonly leaving = new Map<string, number>();
     private readonly tooltip = createElement('div', { className: 'win-tooltip', attributes: { role: 'tooltip' } });
     private tooltipTimer: ReturnType<typeof setTimeout> | undefined;
@@ -35,8 +36,10 @@ export class PurchasesPanel implements Panel {
             const card = createButton('', () => this.purchase(item), 'upgrade-card');
             card.dataset.upgrade = item.id;
             const cost = Object.entries(item.price).map(([id, amount]) => formatAmount(id, amount)).join(', ');
+            const evidence = createElement('div', { className: 'upgrade-evidence' });
             card.append(createElement('div', { className: 'upgrade-heading' }, [createElement('strong', { text: item.name }), createElement('span', { className: 'upgrade-cost', text: cost })]),
-                createElement('div', { className: 'upgrade-description', text: item.description }));
+                createElement('div', { className: 'upgrade-description', text: item.description }), evidence);
+            this.evidence.set(item.id, evidence);
             for (const show of ['mouseenter', 'focus']) card.addEventListener(show, () => this.scheduleTooltip(item, card));
             for (const hide of ['mouseleave', 'blur']) card.addEventListener(hide, () => this.hideTooltip());
             this.cards.set(item.id, card);
@@ -73,6 +76,11 @@ export class PurchasesPanel implements Panel {
             card.classList.toggle('unaffordable', saving);
             card.classList.toggle('leaving', leaving);
             if (saving && !card.hidden) card.style.setProperty('--saved', `${this.shareSaved(item) * 100}%`);
+            // A card that an answer brought up says which one: the line DirBuster printed when it found it.
+            const learnedAt = levelLearnedAt(this.game.state, item.id);
+            const evidence = this.evidence.get(item.id)!;
+            evidence.hidden = learnedAt === undefined;
+            if (learnedAt !== undefined && !card.hidden) setText(evidence, fill(terminalText.hit, { address: addressOfLevel(learnedAt) }));
         }
     }
 
@@ -137,7 +145,6 @@ export class PurchasesPanel implements Panel {
 
 function statNumber(statId: string, value: number): string {
     if (byteStats.has(statId)) return formatBytes(value);
-    if (perHundredStats.has(statId)) return formatNumber(Math.round(value * 100));
     if (Number.isInteger(value)) return formatNumber(value);
     if (moneyStats.has(statId)) return value.toFixed(value < 0.1 ? 3 : 2);
     return String(Number(value.toFixed(2)));

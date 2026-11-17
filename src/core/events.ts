@@ -1,7 +1,7 @@
 import type { Action } from './actions.ts';
 import type { OfflineSummary } from './offline.ts';
 
-export type SolveMethod = 'script' | 'hand' | 'search' | 'windfall';
+export type SolveMethod = 'script' | 'hand' | 'windfall';
 
 export type GameEvent =
     | { readonly type: 'actionApplied'; readonly action: Action }
@@ -15,7 +15,6 @@ export type GameEvent =
     | { readonly type: 'banned' }
     | { readonly type: 'unbanned'; readonly byCaptcha: boolean }
     | { readonly type: 'proxyDied' }
-    | { readonly type: 'searchQuery' }
     | { readonly type: 'captchaFailed' };
 
 export type GameEventListener = (event: GameEvent) => void;

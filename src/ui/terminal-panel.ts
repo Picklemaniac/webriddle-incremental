@@ -6,7 +6,7 @@ import { findingFile, findings } from '../content/act-one/findings.ts';
 import { urlOfLevel } from '../content/act-one/levels.ts';
 import { effectiveRate, isBanned, requestedRate } from '../content/act-one/network.ts';
 import { automationBootSeconds, automationElapsed } from '../content/act-one/progress.ts';
-import { riddleDomain, riddleOrigin } from '../content/act-one/riddle.ts';
+import { riddleOrigin } from '../content/act-one/riddle.ts';
 import { currentPhase, guessedLength, starterWordlistName, type SearchPhase, type SearchPlan, type SlowReason } from '../content/act-one/search.ts';
 import { automationText, fill, notices, searchText, terminalText, uiText, type NoticeId } from '../content/act-one/text.ts';
 import { ownedTier, toolTiers } from '../content/act-one/upgrades.ts';
@@ -16,11 +16,11 @@ import { createElement, createTitleBar, setText } from './dom.ts';
 import type { Panel } from './panel.ts';
 
 const warningNotices: ReadonlySet<NoticeId> = new Set<NoticeId>(['firstRateLimit', 'firstBan', 'firstProxyDeath']);
-// Solved levels that queue up one after another are printed as one line, the latest. A level found by a search engine does not join the others, so that it is not lost among them.
-const solvedLineStyles: ReadonlySet<string> = new Set(['hit', 'indexed']);
+// Solved levels that queue up one after another are printed as one line, the latest.
+const solvedLineStyle = 'hit';
 const hitResponse = 200;
 const loginResponse = 401;
-const slowResponses: Readonly<Partial<Record<SlowReason, number>>> = { credentials: loginResponse, userAgent: 403, wildcard: hitResponse };
+const slowResponses: Readonly<Partial<Record<SlowReason, number>>> = { credentials: loginResponse, userAgent: 403 };
 const missResponse = 404;
 const userAgentPassesEvery = 10;
 const earlyLineMilliseconds = 1500;
@@ -46,6 +46,7 @@ export class TerminalPanel implements Panel {
     private lastSampledRequests = 0;
     private sampleIndex = 0;
     private wasGuessing = false;
+    private wasSlowedBy: SlowReason | null = null;
     private lastSearch: { level: number; stage: number; finds: SearchPlan['finds'] } = { level: 0, stage: 0, finds: 'level' };
     private lastStep = { requestsSpent: 0, at: 0 };
 
@@ -85,6 +86,8 @@ export class TerminalPanel implements Panel {
         const guessing = phase?.guessing === true;
         if (guessing && !this.wasGuessing) this.queueLine(notices.bruteForce, 'warning');
         this.wasGuessing = guessing;
+        if (plan.slowedBy === 'wildcard' && this.wasSlowedBy !== 'wildcard') this.queueLine(notices.wildcard, 'warning');
+        this.wasSlowedBy = plan.slowedBy;
         this.footer.classList.toggle('warning', isBanned(game) || plan.slowedBy !== null || guessing);
         const pass = phase === undefined ? undefined : passProgress(phase, spent);
         this.progress.style.width = `${pass ? Math.min(100, pass.tried / pass.total * 100) : 0}%`;
@@ -156,11 +159,12 @@ export class TerminalPanel implements Panel {
         }
         const requestsSent = game.state.statistics.requestsSent ?? 0;
         if (nextLine || requestedRate(game) === 0 || now - this.lastLineAt < sampleInterval(rate) || requestsSent <= this.lastSampledRequests || isBanned(game)) return;
+        // In a folder that answers every name the same, there is nothing to list until the level is found. The warning says why.
+        if (plan.slowedBy === 'wildcard') return;
         this.lastSampledRequests = requestsSent;
         this.sampleIndex++;
         const code = this.responseCode(plan);
-        const note = code === slowResponses.wildcard ? `  ${terminalText.identicalResponse}` : '';
-        this.line(`${String(code)}  ${sampledRequest()}${note}`, code === missResponse ? 'miss' : 'warning');
+        this.line(`${String(code)}  ${sampledRequest()}`, code === missResponse ? 'miss' : 'warning');
     }
 
     private responseCode(plan: SearchPlan): number {
@@ -175,6 +179,7 @@ export class TerminalPanel implements Panel {
             this.sampleIndex = 0;
             this.lastSampledRequests = 0;
             this.wasGuessing = false;
+            this.wasSlowedBy = null;
             this.lastSearch = { level: 0, stage: 0, finds: 'level' };
             this.lastLineAt = performance.now();
             return;
@@ -187,15 +192,10 @@ export class TerminalPanel implements Panel {
                 break;
             case 'levelSolved': {
                 if (event.method === 'windfall') break;
-                const indexed = event.method === 'search';
-                const method = event.method === 'hand' ? terminalText.hand : indexed ? terminalText.indexed : '200';
-                const solved = new URL(urlOfLevel(event.level));
-                this.queueLine(`${method}  ${solved.origin === riddleOrigin ? solved.pathname : solved.href}`, indexed ? 'indexed' : 'hit');
+                const address = addressOfLevel(event.level);
+                this.queueLine(event.method === 'hand' ? `${terminalText.hand}  ${address}` : fill(terminalText.hit, { address }), solvedLineStyle);
                 break;
             }
-            case 'searchQuery':
-                this.queueLine(`${fill(terminalText.searchQuery, { domain: riddleDomain })}  ${terminalText.nothingNew}`, 'query');
-                break;
             case 'findingDiscovered': {
                 const finding = findings.find((item) => item.id === event.findingId);
                 if (finding) this.queueLine(fill(terminalText.found, { path: finding.path, size: findingFile(finding, this.game.state).length }), 'finding');
@@ -206,7 +206,7 @@ export class TerminalPanel implements Panel {
 
     private queueLine(text: string, style: string): void {
         const previous = this.pendingLines.at(-1);
-        if (solvedLineStyles.has(style) && previous?.style === style) previous.text = text;
+        if (style === solvedLineStyle && previous?.style === style) previous.text = text;
         else this.pendingLines.push({ text, style });
         if (this.pendingLines.length > queuedLineLimit) this.pendingLines.shift();
     }
@@ -218,6 +218,12 @@ export class TerminalPanel implements Panel {
         while (this.lines.childElementCount > shownLineLimit) this.lines.firstElementChild?.remove();
         if (nearBottom) this.lines.scrollTop = this.lines.scrollHeight;
     }
+}
+
+// A level's address the way the terminal prints it: the path, or the whole address when the level is on a subdomain.
+export function addressOfLevel(level: number): string {
+    const address = new URL(urlOfLevel(level));
+    return address.origin === riddleOrigin ? address.pathname : address.href;
 }
 
 // Brute force has no end, so it is shown one name length at a time.

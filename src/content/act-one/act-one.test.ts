@@ -14,7 +14,7 @@ import { createCaptcha } from './captchas.ts';
 import { backlogSeconds, incomePerSecond, isAway } from './economy.ts';
 import { addressCount, effectiveRate, networkCapacity, rentedBlocks, rentPerSecond, requestedRate } from './network.ts';
 import { currentSearch } from './automation.ts';
-import { markNeeded } from './progress.ts';
+import { levelLearnedAt, markNeeded } from './progress.ts';
 import {
     bansBeforeScriptsAreBlocked, currentPhase, guessedLength, isLightLeet, planSearch, requestsKept, searchCapabilities, type SearchCapabilities, type SearchPhase, type SearchPlan, type SlowReason,
 } from './search.ts';
@@ -184,7 +184,7 @@ describe('Act I', () => {
             const target = entrance(index + 1);
             return [target.url, target.kind, target.answer, target.clue.method ?? ''];
         });
-        expect(createHash('sha256').update(JSON.stringify(levels)).digest('hex')).toMatchInlineSnapshot(`"0b5c85bc91c208459e257bc9e7342036cf8de3fa8519b8f90a6dd1b17f3e4ead"`);
+        expect(createHash('sha256').update(JSON.stringify(levels)).digest('hex')).toMatchInlineSnapshot(`"72d2f3deec50359fab27fb8920878e676918478101914d46aeea4f5d7e079f62"`);
     });
 
     it('lists every handcrafted answer for the vocabulary build', () => {
@@ -245,23 +245,23 @@ describe('Act I', () => {
     });
 
     it.each<[string, RegExp]>([
-        ['word', /^(words\.txt|english-10k\.txt|\/usr\/share\/dict\/words|scrabble\.txt)$/],
-        ['extension', /^(words|english-10k)\.txt × 4 extensions$/],
-        ['capitals', /^(words|english-10k)\.txt, also in capitals$/],
-        ['reversed', /^(words|english-10k)\.txt, also backwards$/],
-        ['backup', /^(words|english-10k)\.txt × 3 endings$/],
-        ['subdomain', /^(words|english-10k)\.txt \(subdomains\)$/],
-        ['credentials', /^(words|english-10k)\.txt \(folders\)$/],
-        ['leet', /^(words|english-10k)\.txt × 6 mutations$|^rockyou-75\.txt$|^leaks\.txt$/],
+        ['word', /^(words\.txt|oxford-3000\.txt|english-10k\.txt|2of12\.txt|\/usr\/share\/dict\/words|scrabble\.txt)$/],
+        ['extension', /^(words|oxford-3000|english-10k)\.txt × 4 extensions$/],
+        ['capitals', /^(words|oxford-3000|english-10k)\.txt, also in capitals$/],
+        ['reversed', /^(words|oxford-3000|english-10k)\.txt, also backwards$/],
+        ['backup', /^(words|oxford-3000|english-10k)\.txt × 3 endings$/],
+        ['subdomain', /^(words|oxford-3000|english-10k)\.txt \(subdomains\)$/],
+        ['credentials', /^(words|oxford-3000|english-10k)\.txt \(folders\)$/],
+        ['leet', /^(words|oxford-3000|english-10k)\.txt × 6 mutations$|^rockyou-75\.txt$|^leaks\.txt$/],
         ['name', /^names\.txt$/],
         ['number', /^0000-9999$/],
         ['date', /^dates 1000-2099$/],
         ['latin', /^latin\.txt$/],
-        ['twoWords', /^words\.txt × (words|english-10k)\.txt$/],
+        ['twoWords', /^words\.txt × (words|oxford-3000|english-10k)\.txt$/],
     ])('comes to every %s answer in the pass that tries such names', (kind, label) => {
         const capabilities = searchCapabilities(stockedAt(10).state);
-        const levels = generatedLevels().filter((level) => level <= 1000 && entrance(level).kind === kind);
-        expect(levels.length).toBeGreaterThan(10);
+        const levels = generatedLevels().filter((level) => entrance(level).kind === kind);
+        expect(levels.length).toBeGreaterThan(4);
         for (const level of levels) {
             const plan = stagePlans(level, capabilities).find((stage) => stage.finds !== 'folder')!;
             expect(hitPhase(plan).label, `level ${level}`).toMatch(label);
@@ -280,22 +280,22 @@ describe('Act I', () => {
             expect(without.learns, `level ${level}`).toEqual(['namesList']);
             expect(without.phases.map((phase) => phase.label)).toEqual(['words.txt', 'words.txt (folders)', 'english-10k.txt', 'english-10k.txt (folders)', 'brute force']);
             const listed = planSearch(level, searchCapabilities({ ...state, purchases: { ...state.purchases, namesList: 1 } }));
-            expect(listed.phases.map((phase) => phase.label)).toEqual(['words.txt', 'words.txt (folders)', 'names.txt', 'english-10k.txt', 'english-10k.txt (folders)']);
+            expect(listed.phases.map((phase) => phase.label)).toEqual(['words.txt', 'words.txt (folders)', 'english-10k.txt', 'names.txt', 'english-10k.txt (folders)']);
             expect(hitPhase(listed).label).toBe('names.txt');
-            expect(without.hitAt - passRequests(without)).toBeGreaterThanOrEqual(20 * (listed.hitAt - 3_000));
+            expect(without.hitAt - passRequests(without)).toBeGreaterThanOrEqual(20 * (listed.hitAt - 10_000));
             expect(without.speed).toBe(1);
             expect(listed.speed).toBe(1);
         }
     });
 
-    it('searches word pairs in english-10k.txt once a word is too rare for words.txt', () => {
+    it('searches word pairs in the longer lists once a word is too rare for words.txt', () => {
         const state = newGame().state;
-        for (const id of ['english10k', 'combinator', 'fakeUserAgent', 'dirb', 'sizeFilter']) state.purchases[id] = 1;
+        for (const id of ['oxford3000', 'english10k', 'combinator', 'fakeUserAgent', 'dirb', 'sizeFilter']) state.purchases[id] = 1;
         const labels = new Set<string>();
-        for (let level = 700; level <= 1000; level++) {
+        for (const level of generatedLevels(700)) {
             if (entrance(level).kind === 'twoWords') labels.add(hitPhase(stagePlans(level, searchCapabilities(state)).at(-1)!).label);
         }
-        expect([...labels].sort()).toEqual(['words.txt × english-10k.txt', 'words.txt × words.txt']);
+        expect([...labels].sort()).toEqual(['words.txt × english-10k.txt', 'words.txt × oxford-3000.txt', 'words.txt × words.txt']);
     });
 
     it('lists rented addresses as address blocks, fills them in order, and charges less for an address with every larger block', () => {
@@ -315,7 +315,7 @@ describe('Act I', () => {
             '198.18.8.0/21', '198.18.16.0/20', '198.18.32.0/19']);
         expect(blocks.map((block) => block.rented)).toEqual([8, 16, 32, 64, 80, 0, 0, 0, 0, 0, 0]);
         expect(game.stat('rentableAddresses')).toBe(8 * (2 ** 11 - 1));
-        for (const [index, rent] of rents.entries()) expect(rent).toBeCloseTo(0.16 * 0.75 ** index);
+        for (const [index, rent] of rents.entries()) expect(rent).toBeCloseTo(0.5 * (2 / 3) ** index);
     });
 
     it('keeps all generated levels solvable by hand, including credentials', () => {
@@ -484,7 +484,7 @@ describe('Act I', () => {
         expect(game.state.resources.money).toBeCloseTo(0);
         expect(game.state.network.rentShare).toBeCloseTo(incomePerSecond(game, 'money') / rentPerSecond(game));
         expect(addressCount(game)).toBeCloseTo(1 + 8 * game.state.network.rentShare);
-        expect(game.dispatch({ type: 'setRentedAddresses', count: 2 })).toBe(true);
+        expect(game.dispatch({ type: 'setRentedAddresses', count: 1 })).toBe(true);
         game.advance(10);
         expect(game.state.network.rentShare).toBe(1);
         expect(game.state.resources.money).toBeGreaterThan(0);
@@ -628,72 +628,6 @@ describe('Act I', () => {
         expect(ownedTier(game.state, toolTiers)).toBe(2);
     });
 
-    it('asks a search engine once a minute, and jumps to a page a few levels ahead when one has been indexed', () => {
-        const game = automatedAt(60);
-        for (const id of ['curlBatch', 'dorking']) game.state.purchases[id] = 1;
-        game.invalidateStats();
-        game.dispatch({ type: 'checkIn' });
-        const seen: string[] = [];
-        game.subscribe((event) => {
-            if (event.type === 'searchQuery') seen.push('nothing new');
-            if (event.type === 'levelSolved') seen.push(event.method);
-        });
-        game.advance(0.25);
-        expect(seen).toEqual(['search']);
-        const landed = game.state.currentLevel;
-        expect(landed).toBeGreaterThanOrEqual(62);
-        expect(landed).toBeLessThanOrEqual(64);
-        expect(game.state.statistics.levelsSkipped).toBe(landed - 61);
-        for (let level = 61; level < landed; level++) expect(game.state.visitedLevels[urlOfLevel(level)]).toBeUndefined();
-        expect(game.state.visitedLevels[urlOfLevel(landed)]).toBe(landed);
-        expect(game.state.browserUrl).toBe(urlOfLevel(landed));
-
-        game.state.network.bannedUntil = game.state.elapsedSeconds + 290;
-        game.advance(290);
-        expect(game.state.currentLevel).toBe(landed);
-        expect(seen.slice(1)).toEqual(['nothing new', 'nothing new', 'nothing new', 'nothing new']);
-
-        const isIndexed = (level: number): boolean => unitHash(level, salts.indexed) < game.stat('searchFindShare');
-        let indexedSinceTheLastFind = false;
-        let finds = 0;
-        game.subscribe((event) => {
-            if (event.type !== 'levelSolved') return;
-            if (event.method === 'script') indexedSinceTheLastFind ||= isIndexed(event.level);
-            if (event.method === 'search') {
-                expect(indexedSinceTheLastFind, `level ${event.level}`).toBe(true);
-                indexedSinceTheLastFind = false;
-                finds++;
-            }
-        });
-        for (const id of ['keepAlive', 'throttle']) game.state.purchases[id] = 1;
-        game.invalidateStats();
-        for (let seconds = 0; game.state.currentLevel < 140 && seconds < 6 * 3600; seconds += 10) game.advance(10);
-        expect(finds).toBeGreaterThanOrEqual(3);
-        expect(finds).toBeLessThanOrEqual(12);
-    });
-
-    it('never finds a login page or a page past the last level through a search engine, and learns of folders from a page inside one', () => {
-        const withSearch = (level: number): Game => {
-            const game = automatedAt(level);
-            for (const id of ['curlBatch', 'dorking']) game.state.purchases[id] = 1;
-            game.invalidateStats();
-            game.dispatch({ type: 'checkIn' });
-            game.advance(0.25);
-            return game;
-        };
-        const login = firstLevelOfKind('credentials');
-        for (let start = login - 4; start < login; start++) {
-            const landed = withSearch(start).state.currentLevel;
-            expect(landed, `from level ${start}`).not.toBe(login);
-            expect(landed).toBeLessThanOrEqual(start + 4);
-        }
-        for (const start of [996, 997, 998, 999, 1000, 1005]) expect(withSearch(start).state.currentLevel, `from level ${start}`).toBeLessThanOrEqual(Math.max(start, 1000));
-        const intoAmber = withSearch(98);
-        expect(intoAmber.state.currentLevel).toBeGreaterThanOrEqual(100);
-        expect(offeredUpgrades(intoAmber).map((item) => item.id)).toContain('dirb');
-        expect(offeredUpgrades(withSearch(90)).map((item) => item.id)).not.toContain('dirb');
-    });
-
     it('counts the network next door as one more IP address', () => {
         const game = automatedAt(30);
         expect(addressCount(game)).toBe(1);
@@ -733,10 +667,13 @@ describe('Act I', () => {
         Object.assign(game.state.flags, { dataRevealed: true, 'needed:english10k': true, 'seen:english10k': true });
         game.dispatch({ type: 'checkIn' });
         const offered = (): string[] => offeredUpgrades(game).map((item) => item.id);
+        // Two minutes of scouring away from the wordlist: no card for more data. Ten minutes away: the card comes.
+        const price = upgrades.find((item) => item.id === 'english10k')!.price.data!;
+        game.state.resources.data = price - 120 * game.stat('scourRate');
         game.advance(1);
         expect(offered()).toContain('english10k');
         expect(offered()).not.toContain('rssFeeds');
-        Object.assign(game.state.flags, { 'needed:dictWords': true, 'seen:dictWords': true });
+        game.state.resources.data = price - 600 * game.stat('scourRate');
         game.advance(1);
         expect(offered()).toContain('rssFeeds');
     });
@@ -766,13 +703,52 @@ describe('Act I', () => {
         expect(game.state.network.rentShare).toBe(1);
     });
 
-    it('offers a card from its level on, also when the player cannot pay for it yet', () => {
-        const game = automatedAt(129);
-        game.state.purchases.proxyPool = 1;
-        game.state.resources.money = 0;
-        expect(offeredUpgrades(game).map((item) => item.id)).not.toContain('proxyChecker');
-        game.state.currentLevel = 130;
-        expect(offeredUpgrades(game).map((item) => item.id)).toContain('proxyChecker');
+    it('offers no card for its level alone', () => {
+        // Crack .htpasswd waits for a finding, and findings are parked.
+        expect(upgrades.filter((item) => !item.onNeed && item.level > 5).map((item) => item.id)).toEqual(['crackHtpasswd']);
+    });
+
+    it('offers Throttle after the second ban, the Proxy checker after twenty proxies replaced by hand, and the rent discounts by the addresses rented', () => {
+        const game = automatedAt(8);
+        for (const id of ['curlBatch', 'freeProxies', 'proxyPool', 'rentedAddresses', 'addressBlock', 'secondAddressBlock', 'thirdAddressBlock', 'leasedRange', 'secondLeasedRange']) game.state.purchases[id] = 1;
+        Object.assign(game.state.flags, { insightRevealed: true, moneyRevealed: true, networkRevealed: true });
+        game.state.resources.money = 1e9;
+        game.state.activity = 'work';
+        game.invalidateStats();
+        const offered = (): string[] => offeredUpgrades(game).map((item) => item.id);
+        const step = (): void => { game.dispatch({ type: 'checkIn' }); game.advance(1); };
+        game.state.statistics.bans = 1;
+        step();
+        expect(offered()).not.toContain('throttle');
+        game.state.statistics.bans = 2;
+        step();
+        expect(offered()).toContain('throttle');
+
+        expect(offered()).not.toContain('proxyChecker');
+        for (let replaced = 0; replaced < 20; replaced++) {
+            game.state.network.proxies[0]!.diesAtSeconds = game.state.elapsedSeconds;
+            expect(game.dispatch({ type: 'replaceProxy', proxyIndex: 0 })).toBe(true);
+            if (replaced === 18) { step(); expect(offered()).not.toContain('proxyChecker'); }
+        }
+        step();
+        expect(offered()).toContain('proxyChecker');
+
+        game.dispatch({ type: 'setRentedAddresses', count: 49 });
+        for (let seconds = 0; seconds < 90; seconds++) step();
+        expect(offered()).not.toContain('resellerAccount');
+        game.dispatch({ type: 'setRentedAddresses', count: 50 });
+        for (let seconds = 0; seconds < 59; seconds++) step();
+        expect(offered()).not.toContain('resellerAccount');
+        for (let seconds = 0; seconds < 3; seconds++) step();
+        expect(offered()).toContain('resellerAccount');
+        game.state.purchases.resellerAccount = 1;
+        game.invalidateStats();
+        game.dispatch({ type: 'setRentedAddresses', count: 499 });
+        for (let seconds = 0; seconds < 90; seconds++) step();
+        expect(offered()).not.toContain('volumeDiscount');
+        game.dispatch({ type: 'setRentedAddresses', count: 500 });
+        for (let seconds = 0; seconds < 62; seconds++) step();
+        expect(offered()).toContain('volumeDiscount');
     });
 
     it('offers the next pay rise and the next script card as soon as the one before it is bought, up to sixteen times the pay and 22 scripts', () => {
@@ -845,19 +821,21 @@ describe('Act I', () => {
 
     it('puts the passes of a card bought in the middle of a level last, and gives them their own place from the next level on', () => {
         const state = newGame().state;
-        for (const id of ['english10k', 'dirb', 'dictWords']) state.purchases[id] = 1;
-        const level = firstLevelWhere((target) => target.kind === 'word' && planSearch(target.level, searchCapabilities(state)).hitAt > 20_000);
+        for (const id of ['oxford3000', 'english10k', 'twelveDicts', 'dirb', 'dictWords']) state.purchases[id] = 1;
+        const level = firstLevelWhere((target) => target.kind === 'word' && planSearch(target.level, searchCapabilities(state)).hitAt > 60_000);
         const before = planSearch(level, searchCapabilities(state));
-        expect(before.phases.map((phase) => phase.label)).toEqual(['words.txt', 'words.txt (folders)', 'english-10k.txt', 'english-10k.txt (folders)', '/usr/share/dict/words']);
+        expect(before.phases.map((phase) => phase.label)).toEqual(
+            ['words.txt', 'words.txt (folders)', 'oxford-3000.txt', 'oxford-3000.txt (folders)', 'english-10k.txt', 'english-10k.txt (folders)', '2of12.txt', '/usr/share/dict/words']);
         state.purchases.extensionList = 1;
         const resumed = planSearch(level, searchCapabilities(state), 0, before.signature);
-        expect(resumed.phases.map((phase) => phase.label)).toEqual([...before.phases.map((phase) => phase.label), 'words.txt × 4 extensions', 'english-10k.txt × 4 extensions']);
+        expect(resumed.phases.map((phase) => phase.label)).toEqual(
+            [...before.phases.map((phase) => phase.label), 'words.txt × 4 extensions', 'oxford-3000.txt × 4 extensions', 'english-10k.txt × 4 extensions']);
         expect(resumed.hitAt).toBe(before.hitAt);
         expect(requestsKept(before.signature, resumed, 12_345)).toBe(12_345);
         const next = planSearch(level + 1, searchCapabilities(state));
-        expect(next.phases.map((phase) => phase.label)).toEqual(
-            ['words.txt', 'words.txt (folders)', 'words.txt × 4 extensions', 'english-10k.txt', 'english-10k.txt (folders)', 'english-10k.txt × 4 extensions', '/usr/share/dict/words']);
-        expect(requestsKept(before.signature, next, 12_345)).toBe(3_000);
+        expect(next.phases.map((phase) => phase.label)).toEqual(['words.txt', 'words.txt (folders)', 'oxford-3000.txt', 'words.txt × 4 extensions', 'oxford-3000.txt (folders)', 'english-10k.txt',
+            'oxford-3000.txt × 4 extensions', 'english-10k.txt (folders)', 'english-10k.txt × 4 extensions', '2of12.txt', '/usr/share/dict/words']);
+        expect(requestsKept(before.signature, next, 12_345)).toBe(5_000);
     });
 
     it('resumes saved search progress, random drops, proxies and economy identically', () => {
@@ -1095,36 +1073,37 @@ describe('Act I', () => {
         for (const id of ['curlBatch', 'keepAlive', 'freeProxies', 'throttle']) game.state.purchases[id] = 1;
         game.invalidateStats();
         game.dispatch({ type: 'checkIn' });
-        const isGuessed = (candidate: number): boolean => planSearch(candidate, searchCapabilities(game.state)).phases.at(-1)?.guessing === true;
-        const level = Array.from({ length: 60 }, (_, index) => index + 81).find(isGuessed)!;
+        const takesTheList = (candidate: number): boolean => planSearch(candidate, searchCapabilities(game.state)).learns.includes('oxford3000');
+        const level = Array.from({ length: 60 }, (_, index) => index + 61).find(takesTheList)!;
         game.state.currentLevel = level - 1;
         const plan = planSearch(level, searchCapabilities(game.state));
         expect(plan.phases.map((phase) => phase.label)).toEqual(['words.txt', 'brute force']);
-        expect(plan.learns).toEqual(['english10k']);
+        expect(plan.learns).toEqual(['oxford3000']);
         expect(plan.missing).toEqual([]);
         expect(plan.speed).toBe(1);
-        const withList = planSearch(level, searchCapabilities({ ...game.state, purchases: { ...game.state.purchases, english10k: 1 } }));
-        expect(withList.phases.map((phase) => phase.label)).toEqual(['words.txt', 'english-10k.txt']);
-        expect(withList.hitAt).toBeLessThan(12_000);
+        const withList = planSearch(level, searchCapabilities({ ...game.state, purchases: { ...game.state.purchases, oxford3000: 1 } }));
+        expect(withList.phases.map((phase) => phase.label)).toEqual(['words.txt', 'oxford-3000.txt']);
+        expect(withList.hitAt).toBeLessThan(3_100);
         let seconds = 0;
         for (; game.state.currentLevel < level && seconds < 1800; seconds++) {
-            expect(offeredUpgrades(game).map((item) => item.id)).not.toContain('english10k');
+            expect(offeredUpgrades(game).map((item) => item.id)).not.toContain('oxford3000');
             game.advance(1);
         }
         expect(seconds).toBeGreaterThan(5);
         expect(game.state.currentLevel).toBeGreaterThanOrEqual(level);
         expect(game.state.statistics.handSolves ?? 0).toBe(0);
         game.advance(1);
-        expect(offeredUpgrades(game).map((item) => item.id)).toContain('english10k');
-        const next = Array.from({ length: 60 }, (_, index) => game.state.currentLevel + 1 + index).find(isGuessed)!;
+        expect(offeredUpgrades(game).map((item) => item.id)).toContain('oxford3000');
+        expect(levelLearnedAt(game.state, 'oxford3000')).toBe(level);
+        const next = Array.from({ length: 60 }, (_, index) => game.state.currentLevel + 1 + index).find(takesTheList)!;
         const known = planSearch(next, searchCapabilities(game.state));
-        const listed = planSearch(next, searchCapabilities({ ...game.state, purchases: { ...game.state.purchases, english10k: 1 } }));
+        const listed = planSearch(next, searchCapabilities({ ...game.state, purchases: { ...game.state.purchases, oxford3000: 1 } }));
         expect(known.hitAt - 1_000).toBeGreaterThanOrEqual((listed.hitAt - 1_000) * 20);
         expect(requestsKept(known.signature, listed, 999)).toBe(999);
         expect(requestsKept(known.signature, listed, known.hitAt)).toBe(1_000);
         game.state.currentLevel = next - 1;
         game.state.search = { stage: 0, requestsSpent: 1_500, configuration: known.signature };
-        game.state.purchases.english10k = 1;
+        game.state.purchases.oxford3000 = 1;
         game.advance(0.25);
         if (game.state.currentLevel === next - 1) expect(game.state.search.requestsSpent).toBeLessThan(1_100);
     });
@@ -1210,14 +1189,12 @@ function automatedAt(level: number): Game {
 }
 
 const alsoFixing: Readonly<Record<string, readonly string[]>> = { dirb: ['gobuster', 'ffuf'], clusterBomb: ['crackHtpasswd'] };
-const searchEngineCards: readonly string[] = ['dorking', 'indexCache', 'searchAlerts'];
 
 // A game with every upgrade, or with every upgrade except one and the others that would do its job.
-// The search engine cards are left out, so that a test can follow DirBuster from one level to the next.
 function stockedAt(level: number, without?: string): Game {
     const game = automatedAt(level);
     for (const item of upgrades) {
-        if (item.id !== without && !(alsoFixing[without ?? ''] ?? []).includes(item.id) && !searchEngineCards.includes(item.id)) game.state.purchases[item.id] = 1;
+        if (item.id !== without && !(alsoFixing[without ?? ''] ?? []).includes(item.id)) game.state.purchases[item.id] = 1;
     }
     game.invalidateStats();
     game.state.activity = 'work';

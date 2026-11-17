@@ -224,6 +224,8 @@ try {
     assert.ok(game.state.currentLevel >= 220);
     delete game.state.purchases.isdn;
     game.state.flags['seen:isdn'] = true;
+    // The robot is banned once and so never gets the card that a second ban brings.
+    game.state.purchases.throttle = 1;
     await importGame(game);
     await sleep(900);
     await screenshot('working');

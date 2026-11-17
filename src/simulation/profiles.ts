@@ -40,7 +40,7 @@ export const playerProfiles: readonly PlayerProfile[] = [
 ];
 
 export const puristProfile: PlayerProfile = {
-    name: 'purist', dailySessions: [{ startHour: 18, durationMinutes: 180 }], strategy: actOneStrategy(5, 'purist'), stopAtMilestone: 'level1000',
+    name: 'purist', dailySessions: [{ startHour: 18, durationMinutes: 180 }], strategy: actOneStrategy(5, 'purist'), stopAtMilestone: 'level500',
 };
 
 export const continuousActiveProfile: PlayerProfile = {

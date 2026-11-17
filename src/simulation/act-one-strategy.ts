@@ -23,6 +23,8 @@ interface Leaning {
     readonly rentShareWhileSaving: number;
     // Addresses are rented for at least this many searching scripts, also when fewer search.
     readonly roomyScripts: number;
+    // While it saves for a card, the robot still buys one that costs it less than this many seconds of income.
+    readonly pocketMoneySeconds: number;
 }
 
 interface DecisionMemory { level: number; handSeconds: number; captchaSeconds: number }
@@ -51,11 +53,10 @@ const longestWaitSeconds = 3600;
 const burnSeconds = 300;
 const rentStepShare = 0.05;
 const mostSearchersForRoom = 6;
-const pocketMoneySeconds = 30;
 // The attentive robot goes for levels: it keeps room under the limit to spare for the next speed card, and works towards cards that are still some levels off.
-const levelChaser: Leaning = { investsFirst: false, steadyTicketShare: 1 / 3, lookaheadLevels: 50, rentShareWhileSaving: 0.4, roomyScripts: 6 };
+const levelChaser: Leaning = { investsFirst: false, steadyTicketShare: 1 / 3, lookaheadLevels: 50, rentShareWhileSaving: 0.4, roomyScripts: 6, pocketMoneySeconds: 30 };
 // The earner goes for income: pay and scripts first, most scripts on tickets, and no more addresses than its searching scripts use.
-const earner: Leaning = { investsFirst: true, steadyTicketShare: 3 / 4, lookaheadLevels: 0, rentShareWhileSaving: 0.2, roomyScripts: 0 };
+const earner: Leaning = { investsFirst: true, steadyTicketShare: 0.6, lookaheadLevels: 0, rentShareWhileSaving: 0.2, roomyScripts: 0, pocketMoneySeconds: 120 };
 
 export function actOneStrategy(decisionIntervalSeconds: number, style: PlayStyle = 'attentive'): Strategy {
     const memories = new WeakMap<Game, DecisionMemory>();
@@ -128,8 +129,8 @@ function buyUpgrades(game: Game, leaning: Leaning): { readonly acted: boolean; r
     const offered = offeredUpgrades(game).filter((item) => isUpgradeRevealed(state, item.id))
         .sort((first, second) => priority(second) - priority(first) || secondsUntilAffordable(game, first) - secondsUntilAffordable(game, second));
     const savedFor = new Set<string>();
-    // A person who is saving up still buys a card that costs them half a minute of income.
-    const isPocketMoney = (item: Upgrade): boolean => Object.entries(item.price).every(([resource, amount]) => amount <= spareIncome(game, resource) * pocketMoneySeconds);
+    // A person who is saving up still buys a card that costs them little.
+    const isPocketMoney = (item: Upgrade): boolean => Object.entries(item.price).every(([resource, amount]) => amount <= spareIncome(game, resource) * leaning.pocketMoneySeconds);
     let acted = false;
     for (const item of offered) {
         const heldBack = Object.keys(item.price).some((resource) => savedFor.has(resource));
@@ -191,36 +192,37 @@ function assignScripts(game: Game, leaning: Leaning): boolean {
     return acted;
 }
 
-function jobTargets(game: Game, free: number, leaning: Leaning, keepsTickets = true): Record<JobId, number> {
+function jobTargets(game: Game, free: number, leaning: Leaning): Record<JobId, number> {
     const { state } = game;
     const targets: Record<JobId, number> = { scraping: 0, ticketing: 0, riddles: 0 };
     const unlocked = jobs.filter((job) => isJobUnlocked(game, job.id));
     if (unlocked.length === 0 || free <= 0) return targets;
-    // The rent and most cards are paid from the pay, so a share of the job scripts always closes tickets. The rest go where the next cards need them.
+    // The rent and most cards are paid from the pay, so a share of the job scripts always closes tickets.
     const ticketing = unlocked.find((job) => job.resource === 'money');
-    if (keepsTickets && ticketing !== undefined) {
-        const steady = Math.floor(free * leaning.steadyTicketShare);
-        const others = jobTargets(game, free - steady, leaning, false);
-        return { ...others, [ticketing.id]: others[ticketing.id] + steady };
-    }
+    const steady = ticketing === undefined ? 0 : Math.floor(free * leaning.steadyTicketShare);
+    if (ticketing !== undefined) targets[ticketing.id] = steady;
     // What the robot works towards: the cards on its list, and the ones that a few more levels will put there.
     const goals = upgrades.filter((item) => !owns(state, item.id) && item.requires.every((required) => owns(state, required))
         && (item.onNeed ? isNeeded(state, item.id) : item.level <= state.currentLevel + leaning.lookaheadLevels));
-    const shortfall = (resource: string): number => Math.max(0, goals.reduce((sum, item) => sum + (item.price[resource] ?? 0), 0) - (state.resources[resource] ?? 0));
-    const waits = unlocked.map((job) => shortfall(job.resource) / game.stat(job.rateStat));
-    const total = waits.reduce((sum, wait) => sum + wait, 0);
-    if (total === 0) {
-        targets[(unlocked.find((job) => job.resource === 'money') ?? unlocked[0]!).id] = free;
-        return targets;
+    // What the nearest card of a currency is still short of. Summing every card on the list let the dear pay cards crowd out a tool that was 200 insight away.
+    const shortfall = (resource: string): number => {
+        const held = state.resources[resource] ?? 0;
+        const missing = goals.map((item) => (item.price[resource] ?? 0) - held).filter((amount) => amount > 0);
+        return missing.length === 0 ? 0 : Math.min(...missing);
+    };
+    const byHand = (resource: string): number => {
+        const activity = activities.find((candidate) => candidate.resource === resource && candidate.id === state.activity);
+        return activity === undefined ? 0 : activityRate(game, activity.id);
+    };
+    const wait = (job: (typeof jobs)[number]): number => {
+        const missing = shortfall(job.resource);
+        return missing === 0 ? 0 : missing / (byHand(job.resource) + targets[job.id] * game.stat(job.rateStat));
+    };
+    // The other scripts go one by one to the currency whose next card is furthest away, so that the next card of each comes at about the same time.
+    for (let assigned = steady; assigned < free; assigned++) {
+        const furthest = unlocked.reduce((longest, job) => (wait(job) > wait(longest) ? job : longest));
+        targets[(wait(furthest) > 0 ? furthest : ticketing ?? furthest).id]++;
     }
-    const needy = unlocked.filter((_, index) => waits[index]! > 0).slice(0, free);
-    for (const job of needy) targets[job.id] = 1;
-    const shared = free - needy.length;
-    const quotas = waits.map((wait) => (shared * wait) / total);
-    unlocked.forEach((job, index) => { targets[job.id] += Math.floor(quotas[index]!); });
-    const byRemainder = unlocked.map((job, index) => ({ job, remainder: quotas[index]! % 1 })).sort((first, second) => second.remainder - first.remainder);
-    const leftover = free - unlocked.reduce((sum, job) => sum + targets[job.id], 0);
-    for (const { job } of byRemainder.slice(0, leftover)) targets[job.id]++;
     return targets;
 }
 

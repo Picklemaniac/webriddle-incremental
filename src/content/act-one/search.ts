@@ -8,7 +8,7 @@ import { rankOfWord, vocabularySize, wordAtRank } from './vocabulary.ts';
 import { answerNames, latinWords } from './word-lists.ts';
 
 interface Wordlist {
-    readonly id: 'words' | 'english10k' | 'dictWords' | 'scrabble';
+    readonly id: 'words' | 'oxford3000' | 'english10k' | 'twelveDicts' | 'dictWords' | 'scrabble';
     readonly fileName: string;
     readonly size: number;
     // The rank of the rarest word of the vocabulary that the list has.
@@ -67,7 +67,7 @@ export interface SearchCapabilities {
 
 // Cards that add passes. A search that fails cannot tell which one is missing: a longer wordlist, a new folder or a kind of answer. So each is offered once an answer that needed it has been found.
 const cardsLearnedFromAnswers = [
-    'english10k', 'dictWords', 'scrabble', 'dirb', 'extensionList', 'mutationRules', 'rockyou', 'moreLeaks', 'namesList', 'numberRanges', 'capitalRule', 'reverseRule',
+    'oxford3000', 'english10k', 'twelveDicts', 'dictWords', 'scrabble', 'dirb', 'extensionList', 'mutationRules', 'rockyou', 'moreLeaks', 'namesList', 'numberRanges', 'capitalRule', 'reverseRule',
     'backupExtensions', 'dateFormats', 'latinList', 'subdomainScan', 'combinator',
 ] as const;
 type LearnedCard = (typeof cardsLearnedFromAnswers)[number];
@@ -101,7 +101,9 @@ interface NamedList {
 // Each wordlist adds the words that the shorter ones do not have.
 const wordlists: readonly Wordlist[] = [
     { id: 'words', fileName: 'words.txt', size: 1_000, coverage: 300 },
+    { id: 'oxford3000', fileName: 'oxford-3000.txt', size: 3_000, coverage: 550 },
     { id: 'english10k', fileName: 'english-10k.txt', size: 10_000, coverage: ruleWordRanks },
+    { id: 'twelveDicts', fileName: '2of12.txt', size: 41_238, coverage: 1_250 },
     { id: 'dictWords', fileName: '/usr/share/dict/words', size: 102_774, coverage: 1_700 },
     { id: 'scrabble', fileName: 'scrabble.txt', size: 279_496, coverage: vocabularySize },
 ];

@@ -9,14 +9,14 @@ type SetupKind = 'install' | 'download' | 'hardware' | 'connection';
 
 const kinds: Readonly<Partial<Record<UpgradeId, SetupKind>>> = {
     wgetMirror: 'install', autoReplyMacros: 'install', dirb: 'install', gobuster: 'install', ffuf: 'install', proxyChecker: 'install', crackHtpasswd: 'install',
-    english10k: 'download', dictWords: 'download', scrabble: 'download', rockyou: 'download', freeProxies: 'download',
+    oxford3000: 'download', english10k: 'download', twelveDicts: 'download', dictWords: 'download', scrabble: 'download', rockyou: 'download', freeProxies: 'download',
     customFuzzer: 'install', namesList: 'download', moreLeaks: 'download', proxyUptime: 'download', usernames: 'download', passwords: 'download', latinList: 'download',
     ram: 'hardware', newPc: 'hardware', dualCore: 'hardware', dedicatedServer: 'hardware', xeon: 'hardware', dualProcessorBoard: 'hardware', quadCore: 'hardware', serverRack: 'hardware',
     isdn: 'connection', adsl: 'connection', cable: 'connection', fiber: 'connection',
 };
 
 const downloadFiles: Readonly<Partial<Record<UpgradeId, string>>> = {
-    english10k: 'english-10k.txt', dictWords: 'words', scrabble: 'scrabble.txt', rockyou: 'rockyou-75.txt', freeProxies: 'proxies.txt', proxyUptime: 'proxies-checked.txt', namesList: 'names.txt', moreLeaks: 'leaks.txt',
+    oxford3000: 'oxford-3000.txt', english10k: 'english-10k.txt', twelveDicts: '2of12.txt', dictWords: 'words', scrabble: 'scrabble.txt', rockyou: 'rockyou-75.txt', freeProxies: 'proxies.txt', proxyUptime: 'proxies-checked.txt', namesList: 'names.txt', moreLeaks: 'leaks.txt',
     usernames: 'usernames.txt', passwords: 'passwords.txt', latinList: 'latin.txt',
 };
 

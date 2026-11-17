@@ -101,8 +101,6 @@ strong { font-weight: 600; }
 .terminal-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 19px; }
 .terminal-line.miss { color: #8a8a8a; }
 .terminal-line.hit { color: var(--found); }
-.terminal-line.indexed { color: var(--link); }
-.terminal-line.query { color: color-mix(in srgb, var(--link) 55%, #000); }
 .terminal-line.finding { color: var(--treasure); }
 .terminal-line.warning { color: var(--problem); }
 .terminal-line.live { flex-shrink: 0; color: #c8c8c8; }
@@ -139,6 +137,7 @@ strong { font-weight: 600; }
 .upgrade-heading strong { font: bold 12px Tahoma, Arial, sans-serif; }
 .upgrade-cost { font-size: 11px; }
 .upgrade-description { font-size: 11px; line-height: 1.45; }
+.upgrade-evidence { margin-top: 2px; font: 11px/15px 'IBM Plex Mono', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .win-tooltip { position: fixed; z-index: 40; max-width: 300px; padding: 2px 5px; background: #ffffe1; color: #000; border: 1px solid #000; font: 11px Tahoma, Arial, sans-serif; line-height: 1.45; white-space: pre-line; pointer-events: none; }
 .heat-track { height: 12px; margin: 8px 0 12px; padding: 1px; background: #000; border: 1px solid; border-color: var(--sunken); }
 .heat-fill { height: 100%; background: var(--problem); }
