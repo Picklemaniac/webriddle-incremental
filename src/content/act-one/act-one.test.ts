@@ -304,7 +304,7 @@ describe('Act I', () => {
     it('lists rented addresses as address blocks, fills them in order, and charges less for an address with every larger block', () => {
         const game = newGame();
         const blockCards = upgrades.filter((item) => item.modifiers!(1).some((modifier) => modifier.statId === 'rentableAddresses'));
-        expect(blockCards).toHaveLength(11);
+        expect(blockCards).toHaveLength(10);
         const rents: number[] = [];
         for (const card of blockCards) {
             expect(card.requires).toEqual(rents.length === 0 ? ['proxyPool'] : [blockCards[rents.length - 1]!.id]);
@@ -314,11 +314,11 @@ describe('Act I', () => {
         }
         game.state.network.rentedAddresses = 200;
         const blocks = rentedBlocks(game);
-        expect(blocks.map((block) => block.range)).toEqual(['198.18.0.0/29', '198.18.0.16/28', '198.18.0.32/27', '198.18.0.64/26', '198.18.0.128/25', '198.18.1.0/24', '198.18.2.0/23', '198.18.4.0/22',
-            '198.18.8.0/21', '198.18.16.0/20', '198.18.32.0/19']);
-        expect(blocks.map((block) => block.rented)).toEqual([8, 16, 32, 64, 80, 0, 0, 0, 0, 0, 0]);
-        expect(game.stat('rentableAddresses')).toBe(8 * (2 ** 11 - 1));
-        for (const [index, rent] of rents.entries()) expect(rent).toBeCloseTo(0.5 * (2 / 3) ** index);
+        expect(blocks.map((block) => block.range)).toEqual(['198.18.0.0/28', '198.18.0.32/27', '198.18.0.64/26', '198.18.0.128/25', '198.18.1.0/24', '198.18.2.0/23', '198.18.4.0/22', '198.18.8.0/21',
+            '198.18.16.0/20', '198.18.32.0/19']);
+        expect(blocks.map((block) => block.rented)).toEqual([16, 32, 64, 88, 0, 0, 0, 0, 0, 0]);
+        expect(game.stat('rentableAddresses')).toBe(16 * (2 ** 10 - 1));
+        for (const [index, rent] of rents.entries()) expect(rent).toBeCloseTo(0.6 * 0.6 ** index);
     });
 
     it('keeps all generated levels solvable by hand, including credentials', () => {
@@ -473,20 +473,20 @@ describe('Act I', () => {
         game.state.resources.money = 1000;
         game.dispatch({ type: 'checkIn' });
         game.advance(0.25);
-        expect(game.state.network.rentedAddresses).toBe(Math.min(4, Math.floor(incomePerSecond(game, 'money') * 0.3 / game.stat('addressRent'))));
-        expect(game.dispatch({ type: 'setRentedAddresses', count: 9 })).toBe(false);
+        expect(game.state.network.rentedAddresses).toBe(Math.min(16, Math.floor(incomePerSecond(game, 'money') * 0.3 / game.stat('addressRent'))));
+        expect(game.dispatch({ type: 'setRentedAddresses', count: 17 })).toBe(false);
         expect(game.dispatch({ type: 'setRentedAddresses', count: -1 })).toBe(false);
-        expect(game.dispatch({ type: 'setRentedAddresses', count: 8 })).toBe(true);
+        expect(game.dispatch({ type: 'setRentedAddresses', count: 16 })).toBe(true);
         expect(rentPerSecond(game)).toBeGreaterThan(incomePerSecond(game, 'money'));
         const before = game.state.resources.money!;
         game.advance(10);
         expect(game.state.resources.money).toBeCloseTo(before + 10 * (incomePerSecond(game, 'money') - rentPerSecond(game)));
-        expect(addressCount(game)).toBe(9);
+        expect(addressCount(game)).toBe(17);
         game.state.resources.money = 0;
         game.advance(10);
         expect(game.state.resources.money).toBeCloseTo(0);
         expect(game.state.network.rentShare).toBeCloseTo(incomePerSecond(game, 'money') / rentPerSecond(game));
-        expect(addressCount(game)).toBeCloseTo(1 + 8 * game.state.network.rentShare);
+        expect(addressCount(game)).toBeCloseTo(1 + 16 * game.state.network.rentShare);
         expect(game.dispatch({ type: 'setRentedAddresses', count: 1 })).toBe(true);
         game.advance(10);
         expect(game.state.network.rentShare).toBe(1);
@@ -506,7 +506,7 @@ describe('Act I', () => {
         game.advance(120);
         expect(requestedRate(game) * 2).toBeLessThanOrEqual(networkCapacity(game));
         expect(offered()).not.toContain('addressBlock');
-        for (const id of ['threads8', 'keepAlive', 'isdn']) game.state.purchases[id] = 1;
+        for (const id of ['threads8', 'keepAlive', 'isdn', 'gobuster']) game.state.purchases[id] = 1;
         game.invalidateStats();
         game.dispatch({ type: 'setRentedAddresses', count: everyAddress - 1 });
         game.advance(120);

@@ -17,7 +17,7 @@ function reportMeasures(measures: Measures): void {
     console.log(`   under a minute: ${measures.underAMinute.length}${named(measures.underAMinute)}`);
     console.log(`   over six minutes: ${measures.dear.length}${named(measures.dear)}`);
     console.log(`2. Rent of every address, of the income: ${measures.rentShares.map((band) => `levels ${band.fromLevel} to ${band.toLevel} ${percent(band.share)}`).join(', ') || 'nothing rented'}`);
-    console.log(`3. A card waited for it, and left over: ${Object.entries(measures.use).map(([currency, use]) => `${currency} ${percent(use.waited)} of the time and ${percent(use.leftOver)}`).join('; ')}`);
+    console.log(`3. A card waited for it since the player met it, and left over: ${Object.entries(measures.use).map(([currency, use]) => `${currency} ${percent(use.waited)} of the time and ${percent(use.leftOver)}`).join('; ')}`);
     console.log(`4. Last pay card at ${bought(measures.lastPayCard)}, last script card at ${bought(measures.lastScriptCard)}; the play ends at ${clock(measures.end.seconds)} (level ${measures.end.level})`);
 }
 

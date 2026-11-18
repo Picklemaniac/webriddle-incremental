@@ -294,7 +294,7 @@ try {
     await waitFor(`!/, 0 dead/.test(document.querySelector('.proxy-summary').textContent)`);
     await evaluate(`document.querySelector('.proxy-details').open = true`);
     assert.ok(await evaluate(`document.querySelector('.proxy-details').textContent.includes('203.0.113.24')`), 'The IP list shows your own address');
-    if (game.state.purchases.rentedAddresses) assert.ok(await evaluate(`document.querySelector('.proxy-details').textContent.includes('198.18.0.0/29')`), 'The IP list shows rented addresses');
+    if (game.state.purchases.rentedAddresses) assert.ok(await evaluate(`document.querySelector('.proxy-details').textContent.includes('198.18.0.0/28')`), 'The IP list shows rented addresses');
     await evaluate(`document.querySelectorAll('.proxy-row.dead button').forEach((button) => button.click())`);
     await waitFor(`/, 0 dead/.test(document.querySelector('.proxy-summary').textContent)`);
     await evaluate(`document.querySelector('.proxy-details').open = false`);

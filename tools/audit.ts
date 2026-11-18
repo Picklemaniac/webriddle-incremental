@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { assignedScripts, dirbustingScripts, incomePerSecond, incomeWhileEarning, jobs, scriptSlots } from '../src/content/act-one/economy.ts';
+import { assignedScripts, dirbustingScripts, incomePerSecond, incomeWhileEarning, isResourceRevealed, jobs, scriptSlots } from '../src/content/act-one/economy.ts';
 import { actOneContent } from '../src/content/act-one/index.ts';
 import { lastActOneLevel } from '../src/content/act-one/levels.ts';
 import { effectiveRate, rentPerSecond, requestsPerAddress } from '../src/content/act-one/network.ts';
@@ -35,6 +35,8 @@ interface Reading {
     readonly seconds: number;
     readonly level: number;
     readonly held: Readonly<Record<string, number>>;
+    // Whether the player has met the currency: it is on screen, they hold some, or a card on the list costs it.
+    readonly met: Readonly<Record<string, boolean>>;
     readonly income: Readonly<Record<string, number>>;
     // What the player would earn of each currency with the scripts as they are, if it were also their own activity.
     readonly reachableIncome: Readonly<Record<string, number>>;
@@ -93,6 +95,8 @@ function read(game: Game, listed: readonly Upgrade[]): Reading {
         seconds: state.elapsedSeconds,
         level: state.currentLevel,
         held: { ...state.resources },
+        met: Object.fromEntries(currencies.map((currency) =>
+            [currency, isResourceRevealed(game, currency) || (state.resources[currency] ?? 0) > 0 || listed.some((item) => item.price[currency] !== undefined)])),
         income: Object.fromEntries(currencies.map((currency) => [currency, incomePerSecond(game, currency)])),
         reachableIncome: Object.fromEntries(currencies.map((currency) => [currency, incomeWhileEarning(game, currency)])),
         referenceIncome: Object.fromEntries(currencies.map((currency) => [currency, referenceIncome(game, currency)])),
@@ -202,22 +206,33 @@ function waitsFor(reading: Reading, currency: string): boolean {
     return reading.listed.some((item) => (item.price[currency] ?? 0) > (reading.held[currency] ?? 0));
 }
 
+type Stretch = ReturnType<typeof stretches>[number];
+
+function secondsWaitedFor(all: readonly Stretch[], currency: string): number {
+    return all.filter(({ reading }) => waitsFor(reading, currency)).reduce((sum, { seconds }) => sum + seconds, 0);
+}
+
+// Data is not in the game until a wordlist is found to be missing, so its share is taken of the time since then.
+function secondsSinceMet(all: readonly Stretch[], currency: string): number {
+    return all.filter(({ reading }) => reading.met[currency] === true).reduce((sum, { seconds }) => sum + seconds, 0);
+}
+
 export function reportCurrencies(play: Play): void {
     const all = stretches(play);
     const total = all.reduce((sum, { seconds }) => sum + seconds, 0);
     const last = play.readings.at(-1)!;
     const widths = [9, 14, 16, 12, 12, 30];
     console.log('\nWhat each currency was for');
-    console.log(row(['', 'earned', 'spent on cards', 'rent', 'left over', 'a card on the list waited for it'], widths));
+    console.log(row(['', 'earned', 'spent on cards', 'rent', 'left over', 'a card on the list waited for it, of the time since the player met it'], widths));
     for (const currency of currencies) {
         const spent = play.purchases.reduce((sum, purchase) => sum + (purchase.item.price[currency] ?? 0), 0);
         const rent = currency === 'money' ? last.rentPaidSoFar : 0;
         const left = last.held[currency] ?? 0;
-        const waited = all.filter(({ reading }) => waitsFor(reading, currency)).reduce((sum, { seconds }) => sum + seconds, 0);
+        const waited = secondsWaitedFor(all, currency);
         console.log(row([
             currency, formatAmount(currency, left + spent + rent), `${formatAmount(currency, spent)} (${share(spent, left + spent + rent)})`,
             currency === 'money' ? `${formatAmount(currency, rent)} (${share(rent, left + spent + rent)})` : '-', `${formatAmount(currency, left)} (${share(left, left + spent + rent)})`,
-            `${share(waited, total)} of the time`,
+            `${share(waited, secondsSinceMet(all, currency))} (${share(waited, total)} of the whole play)`,
         ], widths));
     }
 }
@@ -351,7 +366,7 @@ export interface Measures {
     readonly dear: readonly Judged[];
     // 2. The rent of every address is a quarter to a half of the income.
     readonly rentShares: readonly { readonly fromLevel: number; readonly toLevel: number; readonly share: number }[];
-    // 3. Each currency has a card waiting for it most of the time, and little of it is left over.
+    // 3. Each currency has a card waiting for it a good part of the time since the player met it, and little of it is left over.
     readonly use: Readonly<Record<string, { readonly waited: number; readonly leftOver: number }>>;
     // 4. The pay cards and the script cards last until the end.
     readonly lastPayCard: Purchase | undefined;
@@ -361,7 +376,6 @@ export interface Measures {
 
 export function measure(play: Play, judged: readonly Judged[]): Measures {
     const all = stretches(play);
-    const total = all.reduce((sum, { seconds }) => sum + seconds, 0);
     const last = play.readings.at(-1)!;
     const worth = judged.filter((card) => card.worthSeconds !== undefined);
     const within = (from: number, to: number): Judged[] => worth.filter((card) => card.worthSeconds! >= from && card.worthSeconds! < to);
@@ -375,8 +389,8 @@ export function measure(play: Play, judged: readonly Judged[]): Measures {
     const use = Object.fromEntries(currencies.map((currency) => {
         const spent = play.purchases.reduce((sum, purchase) => sum + (purchase.item.price[currency] ?? 0), 0) + (currency === 'money' ? last.rentPaidSoFar : 0);
         const left = last.held[currency] ?? 0;
-        const waited = all.filter(({ reading }) => waitsFor(reading, currency)).reduce((sum, { seconds }) => sum + seconds, 0);
-        return [currency, { waited: total === 0 ? 0 : waited / total, leftOver: left + spent === 0 ? 0 : left / (left + spent) }];
+        const sinceMet = secondsSinceMet(all, currency);
+        return [currency, { waited: sinceMet === 0 ? 0 : secondsWaitedFor(all, currency) / sinceMet, leftOver: left + spent === 0 ? 0 : left / (left + spent) }];
     }));
     const lastOf = (changedStat: string): Purchase | undefined => play.purchases.findLast((purchase) => stats(purchase.item).includes(changedStat));
     return {

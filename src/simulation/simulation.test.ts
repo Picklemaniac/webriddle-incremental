@@ -110,7 +110,7 @@ describe('Act I pacing', () => {
             new AutoPlayer(actOneStrategy(4, style)).playUntil(game, () => owns(game.state, 'helpdeskManager') && owns(game.state, 'serverRack'), 4 * 3600);
             return game.state.elapsedSeconds;
         };
-        expect(secondsUntilEveryIncomeCard('earner')).toBeLessThan(secondsUntilEveryIncomeCard('attentive') * 0.75);
+        expect(secondsUntilEveryIncomeCard('attentive') - secondsUntilEveryIncomeCard('earner')).toBeGreaterThan(15 * 60);
     }, 20_000);
 
     it('lets DirBuster keep going during long breaks without paying for a backlog of upgrades', () => {

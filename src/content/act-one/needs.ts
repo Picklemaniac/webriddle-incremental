@@ -69,7 +69,6 @@ const triggers: Readonly<Partial<Record<UpgradeId, Trigger>>> = {
     secondDataCenterRange: whenEveryAddressIsInUse,
     regionalAllocation: whenEveryAddressIsInUse,
     secondRegionalAllocation: whenEveryAddressIsInUse,
-    thirdRegionalAllocation: whenEveryAddressIsInUse,
     proxyUptime: { holds: proxiesKeepDying },
     // Relief comes after the chore: the switch that ends Heat after a second ban, and the checker after twenty proxies replaced by hand.
     throttle: { holds: hasBeenBannedAgain },

@@ -56,7 +56,8 @@ const mostSearchersForRoom = 6;
 // The attentive robot goes for levels: it keeps room under the limit to spare for the next speed card, and works towards cards that are still some levels off.
 const levelChaser: Leaning = { investsFirst: false, steadyTicketShare: 1 / 3, lookaheadLevels: 50, rentShareWhileSaving: 0.4, roomyScripts: 6, pocketMoneySeconds: 30 };
 // The earner goes for income: pay and scripts first, most scripts on tickets, and no more addresses than its searching scripts use.
-const earner: Leaning = { investsFirst: true, steadyTicketShare: 0.6, lookaheadLevels: 0, rentShareWhileSaving: 0.2, roomyScripts: 0, pocketMoneySeconds: 120 };
+// It pays the share of its pay for rent that the game itself rents a new block with.
+const earner: Leaning = { investsFirst: true, steadyTicketShare: 0.6, lookaheadLevels: 0, rentShareWhileSaving: 0.3, roomyScripts: 0, pocketMoneySeconds: 120 };
 
 export function actOneStrategy(decisionIntervalSeconds: number, style: PlayStyle = 'attentive'): Strategy {
     const memories = new WeakMap<Game, DecisionMemory>();
