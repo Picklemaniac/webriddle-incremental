@@ -12,7 +12,8 @@ for (let level = first; level <= last; level++) {
     const page = actOneContent.resolvePage(urlOfLevel(level), state);
     const details = levelPage(level);
     const next = entrance(level + 1);
-    const notes = [`next: ${next.kind}`, next.url.replace(/^https?:\/\/[^/]+/, ''), ...details.comments.map((comment) => `<!-- ${comment} -->`),
+    const way = (next.clue.parts ?? []).map((part) => [part.place, ...(part.reading === undefined ? [] : [part.reading]), ...part.ciphers.map((step) => step.cipher)].join(', ')).join(' and ');
+    const notes = [`next: ${next.kind}`, next.url.replace(/^https?:\/\/[^/]+/, ''), `to undo: ${way}`, ...details.comments.map((comment) => `<!-- ${comment} -->`),
         ...(details.hiddenText === null ? [] : [`hidden: ${details.hiddenText}`]), ...(details.imageName === `${level}.jpg` ? [] : [`image: ${details.imageName}`])];
     cards.push(`<figure><iframe srcdoc="${escapeAttribute(page.html)}" title="Level ${level}"></iframe><figcaption><b>${escapeHtml(page.title ?? '')}</b><br>${notes.map(escapeHtml).join('<br>')}</figcaption></figure>`);
 }

@@ -2,7 +2,7 @@ import type { Action } from '../../core/actions.ts';
 import type { Drawing } from './drawings.ts';
 import { encode, toLeet } from './encodings.ts';
 import { imageWithWord, levelImageCount } from './images.ts';
-import { caseEncodingFor, dateClue, encodedClue, leetEncodingFor, textEncodingFor, wordClue, yearClue, type Clue } from './methods.ts';
+import { caseEncodingFor, credentialsClue, dateClue, encodedClue, leetEncodingFor, textEncodingFor, wordClue, yearClue, type Clue, type Recent } from './methods.ts';
 import { firstYear, pickByUnit, ramp, riddleDomain, riddleOrigin, salts, startUrl, unitHash, yearCount } from './riddle.ts';
 import type { Sound } from './sounds.ts';
 import { alternateFiles, clueLines, fill, handcraftedText, linkedFiles, pageText, riddleName } from './text.ts';
@@ -50,6 +50,9 @@ export interface LevelPage {
     readonly imageName: string;
     readonly imageTitle: string | null;
     readonly imageNote: string | null;
+    readonly altText: string | null;
+    readonly statusText: string | null;
+    readonly areaCoordinates: readonly number[];
     readonly zipped: string | null;
     readonly hotspot: { readonly x: number; readonly y: number } | null;
     readonly colors: readonly string[];
@@ -58,11 +61,21 @@ export interface LevelPage {
     readonly emphasis: readonly (readonly { readonly text: string; readonly bold: boolean }[])[];
     readonly tags: readonly string[];
     readonly spacers: readonly number[];
+    readonly checkboxes: readonly string[];
+    readonly options: readonly string[];
+    readonly marquee: string | null;
     readonly attribute: string | null;
+    readonly anchor: string | null;
+    readonly hiddenField: string | null;
+    readonly unseen: string | null;
+    readonly noscript: string | null;
+    readonly conditional: string | null;
+    readonly scriptVariable: string | null;
     readonly link: string | null;
     readonly lines: readonly string[];
     readonly hiddenText: string | null;
     readonly belowFold: readonly string[];
+    readonly farRight: readonly string[];
     readonly meta: string | null;
     readonly comments: readonly string[];
     readonly farComment: string | null;
@@ -89,7 +102,7 @@ const untitledShare = 0.3;
 
 const wildcardFolders = new Set(['basalt', 'ember']);
 const unlistedNames = answerNames.filter((name) => wordAtRank(rankOfWord(name)) !== name);
-const recentLevels = 20;
+const recentLevels = 240;
 const alwaysHintedLevels = 60;
 const laterLineShare = 0.4;
 const firstExtensionLevel = 150;
@@ -175,6 +188,9 @@ export function levelPage(level: number): LevelPage {
         imageName,
         imageTitle: clue.imageTitle ?? null,
         imageNote: clue.imageNote ?? null,
+        altText: clue.altText ?? null,
+        statusText: clue.statusText ?? null,
+        areaCoordinates: clue.areaCoordinates ?? [],
         zipped: clue.zipped ?? null,
         hotspot: clue.hotspot === undefined ? null : { x: 0.08 + unitHash(level, salts.hotspot) * 0.74, y: 0.1 + unitHash(level + 7919, salts.hotspot) * 0.66 },
         colors: clue.colors ?? [],
@@ -183,11 +199,21 @@ export function levelPage(level: number): LevelPage {
         emphasis: clue.emphasis ?? [],
         tags: clue.tags ?? [],
         spacers: clue.spacers ?? [],
+        checkboxes: clue.checkboxes ?? [],
+        options: clue.options ?? [],
+        marquee: clue.marquee ?? null,
         attribute: clue.attribute ?? null,
+        anchor: clue.anchor ?? null,
+        hiddenField: clue.hiddenField ?? null,
+        unseen: clue.unseen ?? null,
+        noscript: clue.noscript ?? null,
+        conditional: clue.conditional ?? null,
+        scriptVariable: clue.scriptVariable ?? null,
         link: clue.imageLink === true ? next.url : null,
         lines: [...(clue.lines ?? []), ...(level === 404 ? [handcraftedText.easterEgg404] : level === 418 ? [handcraftedText.easterEgg418] : [])],
         hiddenText: clue.hiddenText ?? null,
         belowFold: clue.belowFold ?? [],
+        farRight: clue.farRight ?? [],
         meta: clue.meta ?? null,
         comments: [
             clue.comment,
@@ -269,7 +295,7 @@ function generatedEntrance(level: number, attempt: number): Entrance {
     const kind = chooseKind(level);
     const unit = (salt: number): number => unitHash(level, salt + attempt * 97);
     const folder = folderFor(level);
-    const recent = recentMethods(level);
+    const recent = recentUse(level);
     switch (kind) {
         case 'word': {
             const word = unit(salts.common) < commonWordShare ? sampleCommonWord(unit(salts.rank), commonWordRanks, 10) : sampleWord(level, unit(salts.rank));
@@ -304,7 +330,7 @@ function generatedEntrance(level: number, attempt: number): Entrance {
             const password = sampleCommonWord(unit(salts.password), pairRank(level, 600), 9, username);
             const encoding = textEncodingFor(level, unit(salts.encoding), recent);
             const lines = showsLine(level, firstCredentialsLevel) ? [pickByUnit(clueLines.credentials, unit(salts.ending))] : [];
-            const clue: Clue = { method: encoding, imageLink: true, lines, comment: encode(`${username} ${password}`, encoding) };
+            const clue = credentialsClue(username, password, encoding, level, unit(salts.clue), lines);
             return buildEntrance(level, { kind, answer: door, extension: '', words: [door, username, password], credentials: { username, password }, clue, folder });
         }
         case 'twoWords': {
@@ -388,13 +414,15 @@ function buildEntrance(level: number, { kind, answer, clue, folder, extension = 
     };
 }
 
-function recentMethods(level: number): string[] {
+function recentUse(level: number): Recent {
     const methods: string[] = [];
+    const places: string[] = [];
     for (let previous = level - 1; previous >= Math.max(2, level - recentLevels); previous--) {
-        const method = entrance(previous).clue.method;
+        const { method, parts = [] } = entrance(previous).clue;
         if (method !== undefined) methods.push(method);
+        places.push(...parts.map((part) => part.place));
     }
-    return methods;
+    return { methods, places };
 }
 
 function showsLine(level: number, firstLevel: number): boolean {
